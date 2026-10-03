@@ -1,5 +1,6 @@
 import { Barlow_Condensed, Source_Sans_3, JetBrains_Mono } from "next/font/google";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import { LangProvider } from "@/components/LangProvider";
 import "./globals.css";
 
@@ -21,6 +22,7 @@ export default function RootLayout({ children }) {
         <LangProvider>
           <Header />
           <main className="wrap">{children}</main>
+          <Footer />
         </LangProvider>
       </body>
     </html>

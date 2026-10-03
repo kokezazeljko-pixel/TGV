@@ -233,3 +233,19 @@ a.primary{display:inline-block;text-decoration:none}
 .narrow h2{font-family:var(--f-display);font-size:32px;margin:0 0 6px}
 .stack{display:grid;gap:12px}
 .cm.plain{grid-template-columns:minmax(0,1fr)}
+
+/* footer */
+.foot{border-top:1px solid var(--line);margin-top:24px}
+.foot .wrap{display:flex;flex-wrap:wrap;gap:8px 20px;padding-block:18px 28px;font-size:13px;color:var(--muted)}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--accent)}
+
+/* legal pages */
+.legal{max-width:720px;padding-bottom:16px}
+.legal h2{font-family:var(--f-display);font-size:36px;margin:10px 0 2px;text-wrap:balance}
+.legal h3{font-family:var(--f-display);font-weight:600;font-size:22px;margin:26px 0 6px}
+.legal h4{font-size:15px;margin:12px 0 2px}
+.legal p,.legal li{line-height:1.6}
+.legal ul{padding-left:20px;margin:6px 0}
+.legal li{margin:4px 0}
+.legal a{color:var(--accent)}

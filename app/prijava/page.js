@@ -47,6 +47,7 @@ function EmailForm({ next }) {
           <input id="email" className="input" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
           <button className="primary" type="submit" disabled={state.busy || !email.includes("@")}>{state.busy ? t("sending") : t("sendLink")}</button>
           {state.err && <div className="note err">{t("sendFail", state.err)}</div>}
+          <p className="note"><Link href="/privacy">{t("loginPrivacy")}</Link></p>
         </form>
       )}
     </section>
