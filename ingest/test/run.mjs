@@ -15,12 +15,13 @@ const run = (script, extra) => console.log(execFileSync("node", [join(here, ".."
 
 run("sync-schedule.mjs", { GTFS_FILE: join(dir, "gtfs.zip"), TODAY: DATE, DAYS: "1", OUT_FILE: join(dir, "trains.json") });
 const trains = JSON.parse(readFileSync(join(dir, "trains.json"), "utf8"));
-assert.equal(trains.length, 2, "TER mora biti izbačen, ostaju TGV INOUI i OUIGO");
+assert.equal(trains.length, 2, "TER i šatl moraju biti izbačeni, ostaju TGV INOUI i OUIGO");
 const t1 = trains.find((t) => t.number === "6611");
 assert.equal(t1.type, "TGV INOUI");
 assert.equal(t1.origin, "Paris Gare de Lyon");
 assert.equal(t1.stops[2].name, "Aix-en-Provence, TGV");
 assert.equal(t1.dep, "11:37");
+assert.equal(t1.stops[0].lat, 48.84); assert.equal(t1.stops[0].lon, 2.37);
 assert.equal(t1.arr, "15:16");
 const t2 = trains.find((t) => t.number === "7639");
 assert.equal(t2.type, "OUIGO", "broj voza iz trip_headsign kad nema trip_short_name");

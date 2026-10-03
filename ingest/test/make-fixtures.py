@@ -10,11 +10,12 @@ ymd = date.replace("-", "")
 files = {
 "agency.txt": "agency_id,agency_name,agency_url,agency_timezone\nOCESN,SNCF,https://www.sncf.com,Europe/Paris\n",
 "routes.txt": "route_id,agency_id,route_short_name,route_long_name,route_type\nR1,OCESN,,Paris - Marseille,2\nR2,OCESN,,Marne-la-Vallée - Montpellier,2\nR3,OCESN,,Lyon - Grenoble,2\n",
-"calendar_dates.txt": f"service_id,date,exception_type\nS1,{ymd},1\nS2,{ymd},1\nS3,{ymd},1\n",
+"calendar_dates.txt": f"service_id,date,exception_type\nS1,{ymd},1\nS2,{ymd},1\nS3,{ymd},1\nS4,{ymd},1\n",
 "trips.txt": "route_id,service_id,trip_id,trip_headsign,trip_short_name\n"
              "R1,S1,OCESN006611F01,6611,6611\n"
              "R2,S2,OCESN007639F02,7639,\n"
-             "R3,S3,OCESN017501F03,17501,17501\n",
+             "R3,S3,OCESN017501F03,17501,17501\n"
+             "R1,S4,OCESN879303F04,879303,879303\n",
 "stops.txt": "stop_id,stop_name,stop_lat,stop_lon\n"
              "StopPoint:OCETGV INOUI-87686006,Paris Gare de Lyon,48.84,2.37\n"
              "StopPoint:OCETGV INOUI-87723197,Lyon Part-Dieu,45.76,4.86\n"
@@ -32,7 +33,9 @@ files = {
              "OCESN007639F02,13:04:00,13:04:00,StopPoint:OCEOUIGO-87111849,0\n"
              "OCESN007639F02,16:42:00,16:42:00,StopPoint:OCEOUIGO-87773002,1\n"
              "OCESN017501F03,10:00:00,10:00:00,StopPoint:OCETrain TER-87723197,0\n"
-             "OCESN017501F03,11:20:00,11:20:00,StopPoint:OCETrain TER-87747006,1\n",
+             "OCESN017501F03,11:20:00,11:20:00,StopPoint:OCETrain TER-87747006,1\n"
+             "OCESN879303F04,12:00:00,12:00:00,StopPoint:OCETGV INOUI-87751008,0\n"
+             "OCESN879303F04,12:05:00,12:05:00,StopPoint:OCETGV INOUI-87319012,1\n",
 }
 with zipfile.ZipFile(os.path.join(out, "gtfs.zip"), "w", zipfile.ZIP_DEFLATED) as z:
     for k, v in files.items():

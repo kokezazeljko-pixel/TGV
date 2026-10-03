@@ -19,6 +19,9 @@ const dates = Array.from({ length: DAYS }, (_, i) => addDays(TODAY, i));
 const ymd = (iso) => iso.replaceAll("-", "");
 const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
+// Šatl vozovi (npr. Avignon Centre ↔ Avignon TGV) imaju 6-cifrene brojeve i samo dve stanice
+const isShuttle = (t) => /^\d{6,}$/.test(t.trip_short_name || t.trip_headsign || "") || t.stops.length < 2;
+
 async function main() {
   console.log(`Red vožnje za: ${dates.join(", ")} · vrste: ${TYPES.join(", ")}`);
   const zip = process.env.GTFS_FILE ? await readFile(process.env.GTFS_FILE) : await download(GTFS_URL);
@@ -67,18 +70,26 @@ async function main() {
     const route = routes.get(t.route_id) || {};
     t.type = detectType(productFromStopId(t.stops[0].id), route.route_short_name, route.route_long_name, route.route_desc);
     typeCount[t.type] = (typeCount[t.type] || 0) + 1;
-    if (TYPES.includes(t.type)) keep.push(t);
+    if (TYPES.includes(t.type) && !isShuttle(t)) keep.push(t);
   }
   console.log("Prepoznate vrste vozova:", typeCount);
 
   const needStops = new Set(keep.flatMap((t) => t.stops.map((s) => s.id)));
-  const stopNames = new Map();
-  await read("stops.txt", (r) => { if (needStops.has(r.stop_id)) stopNames.set(r.stop_id, r.stop_name); });
+  const stopNames = new Map(), stopCoords = new Map();
+  await read("stops.txt", (r) => {
+    if (!needStops.has(r.stop_id)) return;
+    stopNames.set(r.stop_id, r.stop_name);
+    const lat = parseFloat(r.stop_lat), lon = parseFloat(r.stop_lon);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) stopCoords.set(r.stop_id, [Math.round(lat * 1e4) / 1e4, Math.round(lon * 1e4) / 1e4]);
+  });
 
   // 5) Redovi za bazu
   const rows = [];
   for (const t of keep) {
-    const stops = t.stops.map((s) => ({ ...s, name: stopNames.get(s.id) || s.id, time: hhmm(s.dep || s.arr), delay: 0 }));
+    const stops = t.stops.map((s) => {
+      const c = stopCoords.get(s.id);
+      return { ...s, name: stopNames.get(s.id) || s.id, time: hhmm(s.dep || s.arr), delay: 0, ...(c ? { lat: c[0], lon: c[1] } : {}) };
+    });
     const first = stops[0], last = stops[stops.length - 1];
     for (const d of t.runs) {
       rows.push({
