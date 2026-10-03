@@ -2,6 +2,7 @@ import { Barlow_Condensed, Source_Sans_3, JetBrains_Mono } from "next/font/googl
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { LangProvider } from "@/components/LangProvider";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 const display = Barlow_Condensed({ subsets: ["latin", "latin-ext"], weight: ["500", "600", "700"], variable: "--font-display" });
@@ -9,8 +10,11 @@ const body = Source_Sans_3({ subsets: ["latin", "latin-ext"], weight: ["400", "6
 const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["500", "700"], variable: "--font-mono" });
 
 export const metadata = {
+  metadataBase: new URL(SITE_URL),
   title: { default: "Train Punctuality – TGV delays", template: "%s · Train Punctuality" },
   description: "How late is your TGV, and what passengers on board are saying. Retards des TGV et avis des voyageurs.",
+  alternates: { canonical: "/" },
+  openGraph: { title: "Train Punctuality – TGV delays", description: "Live TGV delays in France and reports from passengers on board.", url: "/", siteName: "Train Punctuality", type: "website" },
 };
 
 export const viewport = { themeColor: "#16233f" };

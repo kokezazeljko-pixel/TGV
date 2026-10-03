@@ -22,6 +22,7 @@ export async function generateMetadata({ params }) {
   return {
     title: `${t.type} ${t.number} ${t.origin} – ${t.destination}`,
     description: `Delay and passenger reports for ${t.type} ${t.number}, departing ${t.dep}. Retard et avis des voyageurs.`,
+    robots: { index: false, follow: true }, // a train page exists only for its travel day
   };
 }
 
