@@ -23,9 +23,9 @@ export default function Header() {
     <header className="top">
       <div className="wrap">
         <Link href="/" className="brand">
-          <div className="logo" aria-hidden="true">P</div>
+          <div className="logo" aria-hidden="true">TP</div>
           <div>
-            <h1>Peron</h1>
+            <h1>Train Punctuality</h1>
             <p>{t("tagline")}</p>
           </div>
         </Link>

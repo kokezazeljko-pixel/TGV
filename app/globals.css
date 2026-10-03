@@ -1,4 +1,4 @@
-/* Peron – departure-board look. Colors are tokens; dark mode redefines them. */
+/* Train Punctuality – departure-board look. Colors are tokens; dark mode redefines them. */
 /* Layout: station departure board. Header → stats → shared filters → live map with side panel → board rows; a train opens a detail sheet. */
 :root{
   --bg:#eef1f5; --surface:#ffffff; --surface-2:#f5f7fa; --line:#d8dee7;
@@ -32,8 +32,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 header.top{background:var(--board);color:var(--board-fg)}
 header.top .wrap{padding-block:18px 20px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px}
 .brand{display:flex;align-items:center;gap:12px;min-width:0}
-.logo{width:40px;height:40px;border-radius:8px;background:var(--board-amber);color:var(--board);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:24px;flex:none}
+.logo{width:40px;height:40px;border-radius:8px;background:var(--board-amber);color:var(--board);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:19px;letter-spacing:.02em;flex:none}
 .brand h1{margin:0;font-family:var(--f-display);font-weight:700;font-size:34px;letter-spacing:.02em;line-height:1}
+@media (max-width:420px){.brand h1{font-size:28px}}
 .brand p{margin:2px 0 0;color:color-mix(in srgb,var(--board-fg) 72%,transparent);font-size:14px}
 .top-right{display:flex;flex-wrap:wrap;align-items:center;gap:14px 18px}
 .lang{display:flex;border:1px solid color-mix(in srgb,var(--board-fg) 35%,transparent);border-radius:999px;padding:2px}

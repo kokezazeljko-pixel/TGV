@@ -8,7 +8,7 @@ const body = Source_Sans_3({ subsets: ["latin", "latin-ext"], weight: ["400", "6
 const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["500", "700"], variable: "--font-mono" });
 
 export const metadata = {
-  title: { default: "Peron – TGV delays", template: "%s · Peron" },
+  title: { default: "Train Punctuality – TGV delays", template: "%s · Train Punctuality" },
   description: "How late is your TGV, and what passengers on board are saying. Retards des TGV et avis des voyageurs.",
 };
 
