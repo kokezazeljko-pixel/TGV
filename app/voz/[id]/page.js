@@ -18,10 +18,10 @@ async function loadTrain(id) {
 export async function generateMetadata({ params }) {
   const { id } = await params;
   const t = await loadTrain(decodeId(id));
-  if (!t) return { title: "Voz nije pronađen" };
+  if (!t) return { title: "Train not found" };
   return {
     title: `${t.type} ${t.number} ${t.origin} – ${t.destination}`,
-    description: `Kašnjenje i utisci putnika za ${t.type} ${t.number}, polazak ${t.dep}.`,
+    description: `Delay and passenger reports for ${t.type} ${t.number}, departing ${t.dep}. Retard et avis des voyageurs.`,
   };
 }
 

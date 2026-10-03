@@ -3,16 +3,19 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { parisTime } from "@/lib/format";
+import { LANGS } from "@/lib/i18n";
 import { useSession } from "@/components/useSession";
+import { useLang } from "@/components/LangProvider";
 
 export default function Header() {
   const [time, setTime] = useState("--:--");
   const { session, ready } = useSession();
+  const { lang, setLang, t } = useLang();
 
   useEffect(() => {
     const tick = () => setTime(parisTime());
     tick();
-    const id = setInterval(tick, 15000);
+    const id = setInterval(tick, 10000);
     return () => clearInterval(id);
   }, []);
 
@@ -23,19 +26,17 @@ export default function Header() {
           <div className="logo" aria-hidden="true">P</div>
           <div>
             <h1>Peron</h1>
-            <p>Kašnjenja TGV vozova i utisci putnika iz voza</p>
+            <p>{t("tagline")}</p>
           </div>
         </Link>
         <div className="top-right">
-          {ready && (
-            <Link href="/prijava" className="userlink">
-              {session ? "Moj nalog" : "Prijava"}
-            </Link>
-          )}
-          <div className="clock num">
-            <small>Vreme u Parizu</small>
-            {time}
+          {ready && <Link href="/prijava" className="userlink">{session ? t("myAccount") : t("signIn")}</Link>}
+          <div className="lang" role="group" aria-label="Language / Langue">
+            {LANGS.map((l) => (
+              <button key={l} type="button" aria-pressed={lang === l} onClick={() => setLang(l)}>{l.toUpperCase()}</button>
+            ))}
           </div>
+          <div className="clock num"><small>{t("clock")}</small>{time}</div>
         </div>
       </div>
     </header>

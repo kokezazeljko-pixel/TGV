@@ -3,7 +3,7 @@ import { getServerClient, isConfigured } from "@/lib/supabase";
 import { parisDate } from "@/lib/format";
 import { fetchTrainsForDay, fetchCommentCounts } from "@/lib/queries";
 
-export const revalidate = 60; // stranica se osvežava na serveru najviše jednom u minuti
+export const revalidate = 60; // the server refreshes this page at most once a minute
 
 export default async function Home() {
   if (!isConfigured) return <SetupNotice />;
@@ -18,8 +18,8 @@ export default async function Home() {
 function SetupNotice() {
   return (
     <div className="notice" style={{ marginTop: 24 }}>
-      <b>Sajt još nije povezan sa bazom.</b> Napravi fajl <code>.env.local</code> po uzoru na <code>.env.example</code> i
-      upiši adresu i ključ svog Supabase projekta (README.md, korak 2).
+      <b>The site isn&apos;t connected to the database yet.</b> Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
+      (README.md, step 2 and step 6).
     </div>
   );
 }

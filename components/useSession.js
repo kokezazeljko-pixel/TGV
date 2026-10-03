@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase";
 
-// Vraća trenutnu prijavu korisnika i prati promene (prijava/odjava)
+// Returns the current sign-in session and follows sign-in / sign-out
 export function useSession() {
   const [session, setSession] = useState(null);
   const [ready, setReady] = useState(false);
