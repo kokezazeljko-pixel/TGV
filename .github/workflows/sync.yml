@@ -1,0 +1,47 @@
+name: SNCF podaci
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+    - cron: "20 1 * * *"
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Šta da pokrenem"
+        type: choice
+        options: [oba, red-voznje, kasnjenja]
+        default: oba
+
+concurrency:
+  group: sncf-${{ github.event.schedule || github.event.inputs.job }}
+  cancel-in-progress: false
+
+jobs:
+  red-voznje:
+    if: github.event.schedule == '20 1 * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.job != 'kasnjenja')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node ingest/sync-schedule.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+  kasnjenja:
+    needs: [red-voznje]
+    if: always() && (github.event.schedule == '*/5 * * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.job != 'red-voznje'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node ingest/sync-realtime.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
