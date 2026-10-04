@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase";
 import { fetchTrainsForDay, fetchCommentCounts } from "@/lib/queries";
 import { statusOf, toMin, fromMin, trainHref, ago, filterTrains, isShuttle, parisNowMin } from "@/lib/format";
 import { getGeo } from "@/lib/geo";
 
-const COUNTRIES = ["fr", "ch"];
+// Map views: both countries together first, then Switzerland, then France
+const COUNTRIES = ["all", "ch", "fr"];
+const DEFAULT_COUNTRY = "all"; // the server sends this view's trains with the page
 import { useLang } from "@/components/LangProvider";
 import TrainMap from "@/components/TrainMap";
 
@@ -24,14 +26,15 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
   const [q, setQ] = useState("");
   const [station, setStation] = useState(null);
   const [running, setRunning] = useState([]);
-  const [country, setCountry] = useState("fr");
+  const [country, setCountry] = useState(DEFAULT_COUNTRY);
   const [loading, setLoading] = useState(false);
+  const usedInitial = useRef(false); // the trains sent with the page are used only once, for the default view
 
   // Remember the chosen country in this browser
   useEffect(() => {
     let saved = null;
     try { saved = localStorage.getItem("tp-country"); } catch {}
-    if (saved && saved !== "fr" && COUNTRIES.includes(saved)) setCountry(saved);
+    if (saved && saved !== DEFAULT_COUNTRY && COUNTRIES.includes(saved)) setCountry(saved);
   }, []);
   const chooseCountry = (c) => {
     if (c === country) return;
@@ -45,15 +48,15 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
     if (!sb) return;
     let alive = true;
     const refresh = async (first) => {
-      if (first && country !== "fr") setLoading(true);
+      if (first) setLoading(true);
       const [{ data: tr, error }, c] = await Promise.all([fetchTrainsForDay(sb, today, country), fetchCommentCounts(sb, today)]);
       if (!alive) return;
       if (!error) setTrains(tr);
       setCounts(c);
       setLoading(false);
     };
-    if (country !== "fr") { setTrains([]); refresh(true); }
-    else if (trains.length && trains[0].country && trains[0].country !== "fr") refresh(true);
+    if (country === DEFAULT_COUNTRY && !usedInitial.current) usedInitial.current = true;
+    else { usedInitial.current = true; setTrains([]); refresh(true); }
     const id = setInterval(() => refresh(false), 60000);
     return () => { alive = false; clearInterval(id); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -85,7 +88,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
       <div className="countries" role="group" aria-label={t("countryGroup")}>
         {COUNTRIES.map((c) => (
           <button key={c} type="button" className="countrybtn" aria-pressed={country === c} onClick={() => chooseCountry(c)}>
-            <span className={`flag flag-${c}`} aria-hidden="true" />{t("country_" + c)}
+            {(c === "all" ? ["ch", "fr"] : [c]).map((f) => <span key={f} className={`flag flag-${f}`} aria-hidden="true" />)}{t("country_" + c)}
           </button>
         ))}
       </div>
@@ -138,7 +141,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
         ) : !sorted.length ? (
           <div className="empty">{t("nomatch")}</div>
         ) : (
-          sorted.map((tr) => <Row key={tr.id} tr={tr} n={counts[tr.id] || 0} live={runningIds.has(tr.id)} />)
+          sorted.map((tr) => <Row key={tr.id} tr={tr} n={counts[tr.id] || 0} live={runningIds.has(tr.id)} flag={country === "all"} />)
         )}
       </section>
     </>
@@ -154,7 +157,7 @@ function Stat({ k, v, unit, live }) {
   );
 }
 
-function Row({ tr, n, live }) {
+function Row({ tr, n, live, flag }) {
   const { t } = useLang();
   const st = statusOf(tr, t);
   const late = !tr.cancelled && (tr.delay_min || 0) >= 5;
@@ -162,7 +165,7 @@ function Row({ tr, n, live }) {
   return (
     <Link href={trainHref(tr.id)} className="row" aria-label={`${tr.type} ${tr.number}, ${tr.origin} – ${tr.destination}, ${st.label}`}>
       <div className="time num c-time">{late ? <>{fromMin(toMin(tr.dep) + tr.delay_min)}<s>{tr.dep}</s></> : tr.dep}</div>
-      <div className="c-train"><div className="tnum num">{tr.number}</div><span className="ttype">{tr.type}</span></div>
+      <div className="c-train"><div className="tnum num">{flag && <span className={`flag mini flag-${tr.country}`} aria-hidden="true" />}{tr.number}</div><span className="ttype">{tr.type}</span></div>
       <div className="route">
         <b>{tr.origin} → {tr.destination}{live && <span className="livetag">● {t("live")}</span>}</b>
         {via.length > 0 && <span className="via">{t("via")} {via.join(", ")}</span>}
@@ -209,8 +212,8 @@ function LivePanel({ running, hasTrains, country }) {
       <div>
         <h4>{t("legend")}</h4>
         <div className="legend">
-          <LegendRow svg={<line x1="2" y1="7" x2="32" y2="7" stroke="var(--rail-lgv)" strokeWidth="3.2" strokeLinecap="round" />} text={t(country === "ch" ? "lgv_ch" : "lgv")} />
-          <LegendRow svg={<line x1="2" y1="7" x2="32" y2="7" stroke="var(--rail-classic)" strokeWidth="1.8" strokeDasharray="5 4" />} text={t(country === "ch" ? "classic_ch" : "classic")} />
+          <LegendRow svg={<line x1="2" y1="7" x2="32" y2="7" stroke="var(--rail-lgv)" strokeWidth="3.2" strokeLinecap="round" />} text={t(country === "fr" ? "lgv" : "lgv_" + country)} />
+          <LegendRow svg={<line x1="2" y1="7" x2="32" y2="7" stroke="var(--rail-classic)" strokeWidth="1.8" strokeDasharray="5 4" />} text={t(country === "fr" ? "classic" : "classic_" + country)} />
           <LegendRow svg={<circle cx="17" cy="7" r="4.5" fill="var(--station)" stroke="var(--rail-lgv)" strokeWidth="2" />} text={t("station")} />
           {[["ok", "tOk"], ["warn", "tWarn"], ["bad", "tBad"]].map(([c, k]) => (
             <LegendRow key={c} svg={<path d="M24 7L11 1.5L14 7L11 12.5Z" fill={`var(--${c})`} stroke="var(--surface)" strokeWidth="1.2" strokeLinejoin="round" />} text={t(k)} />

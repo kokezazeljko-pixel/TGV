@@ -10,7 +10,7 @@ export default async function Home() {
 
   const today = parisDate();
   const sb = getServerClient();
-  const [{ data: trains, error }, counts] = await Promise.all([fetchTrainsForDay(sb, today), fetchCommentCounts(sb, today)]);
+  const [{ data: trains, error }, counts] = await Promise.all([fetchTrainsForDay(sb, today, "all"), fetchCommentCounts(sb, today)]);
 
   return <Board initialTrains={trains || []} initialCounts={counts} today={today} loadError={error?.message} />;
 }

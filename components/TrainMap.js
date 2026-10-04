@@ -9,7 +9,7 @@ const ARROW = "M1.45 0L-0.95 1.05L-0.45 0L-0.95 -1.05Z"; // points right, rotate
 const TIER_A = new Set(["Lille", "Strasbourg", "Lyon", "Marseille", "Bordeaux", "Nantes", "Rennes", "Toulouse", "Montpellier", "Nice", "Genève", "Lausanne", "Bern", "Zürich", "Basel", "Lugano"]);
 
 /**
- * Stylized map of a country (France or Switzerland) with its lines, stations and trains running now.
+ * Stylized map of France, Switzerland or both together, with its lines, stations and trains running now.
  * Give it a new `key` when the country changes so it starts fresh.
  * Pan/zoom is applied directly to the SVG (no React re-render while dragging);
  * sizes that must stay constant on screen use the CSS variables --u (map units per pixel),
@@ -117,7 +117,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
   return (
     <div className="mapbox" style={{ aspectRatio: `${W} / ${H}` }}>
       <svg
-        ref={svgRef} id="map" role="img" aria-label={t(country === "ch" ? "mapLabel_ch" : "mapLabel")} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet"
+        ref={svgRef} id="map" role="img" aria-label={t(country === "fr" ? "mapLabel" : "mapLabel_" + country)} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet"
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
       >
         <BaseMap geo={geo} />
