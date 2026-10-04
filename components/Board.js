@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase";
-import { fetchTrainsForDay, fetchCommentCounts } from "@/lib/queries";
+import { fetchTrainsForDay, fetchTrainsUpdatedSince, fetchCommentCounts } from "@/lib/queries";
 import { statusOf, toMin, fromMin, trainHref, ago, filterTrains, isShuttle, parisNowMin } from "@/lib/format";
 import { getGeo } from "@/lib/geo";
 
@@ -43,22 +43,36 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
     setStation(null); setType("all"); setRunning([]); setCountry(c);
   };
 
-  // Load the chosen country's trains, then refresh every minute without reloading the page
+  // Load the chosen country's trains, then every minute fetch only the trains whose delays changed
+  // (a full reload every 30 minutes picks up anything else). Keeps the data transfer small.
+  const latest = useRef("");
   useEffect(() => {
     const sb = getBrowserClient();
     if (!sb) return;
-    let alive = true;
-    const refresh = async (first) => {
-      if (first) setLoading(true);
+    let alive = true, ticks = 0;
+    const ms = (iso) => (iso ? Date.parse(iso) : 0);
+    const newest = (rows, from = "") => rows.reduce((a, x) => (ms(x.rt_updated_at) > ms(a) ? new Date(ms(x.rt_updated_at)).toISOString() : a), from);
+    const full = async (showLoading) => {
+      if (showLoading) setLoading(true);
       const [{ data: tr, error }, c] = await Promise.all([fetchTrainsForDay(sb, today, country), fetchCommentCounts(sb, today)]);
       if (!alive) return;
-      if (!error) setTrains(tr);
+      if (!error) { setTrains(tr); latest.current = newest(tr); }
       setCounts(c);
       setLoading(false);
     };
-    if (country === DEFAULT_COUNTRY && !usedInitial.current) usedInitial.current = true;
-    else { usedInitial.current = true; setTrains([]); refresh(true); }
-    const id = setInterval(() => refresh(false), 60000);
+    const changes = async () => {
+      if (!latest.current) return full(false);
+      const [{ data: upd, error }, c] = await Promise.all([fetchTrainsUpdatedSince(sb, today, country, latest.current), fetchCommentCounts(sb, today)]);
+      if (!alive) return;
+      setCounts(c);
+      if (error || !upd.length) return;
+      latest.current = newest(upd, latest.current);
+      const byId = new Map(upd.map((x) => [x.id, x]));
+      setTrains((old) => old.map((x) => byId.get(x.id) || x));
+    };
+    if (country === DEFAULT_COUNTRY && !usedInitial.current) { usedInitial.current = true; latest.current = newest(initialTrains); }
+    else { usedInitial.current = true; setTrains([]); full(true); }
+    const id = setInterval(() => { ticks++; ticks % 30 === 0 ? full(false) : changes(); }, 60000);
     return () => { alive = false; clearInterval(id); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [today, country]);
@@ -89,6 +103,27 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
     for (const x of real) n[x.type] = (n[x.type] || 0) + 1;
     return ["all", ...Object.keys(n).sort((a, b) => n[b] - n[a])];
   }, [real]);
+
+  // Every station served today, for the station menu (grouped by country on the combined map)
+  const stationGroups = useMemo(() => {
+    const seen = new Map(); // name -> { fr: n, ch: n }
+    for (const tr of real) for (const s of tr.stops || []) {
+      if (!s.name) continue;
+      const c = seen.get(s.name) || {};
+      c[tr.country] = (c[tr.country] || 0) + 1;
+      seen.set(s.name, c);
+    }
+    const groups = { ch: [], fr: [] };
+    for (const [name, c] of seen) groups[(c.ch || 0) > (c.fr || 0) ? "ch" : "fr"].push(name);
+    const loc = LOCALES[lang] || "en-GB";
+    for (const g of Object.values(groups)) g.sort((a, b) => a.localeCompare(b, loc));
+    return groups;
+  }, [real, lang]);
+  const stationNames = useMemo(() => new Set([...stationGroups.ch, ...stationGroups.fr]), [stationGroups]);
+  const pickStation = (name) => {
+    setStation(name || null);
+    if (name) requestAnimationFrame(() => document.querySelector(".side")?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
+  };
 
   const runningIds = useMemo(() => new Set(running.map((r) => r.tr.id)), [running]);
   const sorted = useMemo(() => [...list].sort((a, b) => toMin(a.dep) - toMin(b.dep)), [list]);
@@ -124,6 +159,19 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
             <button key={k} type="button" className="chipbtn" aria-pressed={status === k} onClick={() => setStatus(k)}>{t(l)}</button>
           ))}
         </div>
+        <label className="stationpick">
+          <span className="sr">{t("stationPick")}</span>
+          <select value={station && stationNames.has(station) ? station : ""} onChange={(e) => pickStation(e.target.value)} aria-label={t("stationPick")}>
+            <option value="">{t("stationChoose")}</option>
+            {(country === "all" ? ["ch", "fr"] : [country]).map((c) =>
+              stationGroups[c].length ? (
+                country === "all"
+                  ? <optgroup key={c} label={t("country_" + c)}>{stationGroups[c].map((n) => <option key={n} value={n}>{n}</option>)}</optgroup>
+                  : stationGroups[c].map((n) => <option key={n} value={n}>{n}</option>)
+              ) : null,
+            )}
+          </select>
+        </label>
         <input className="search" type="search" id="q" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} aria-label={t("search")} />
       </div>
 

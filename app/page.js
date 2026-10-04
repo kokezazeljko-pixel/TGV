@@ -3,7 +3,7 @@ import { getServerClient, isConfigured } from "@/lib/supabase";
 import { parisDate } from "@/lib/format";
 import { fetchTrainsForDay, fetchCommentCounts } from "@/lib/queries";
 
-export const revalidate = 60; // the server refreshes this page at most once a minute
+export const revalidate = 300; // the server rebuilds this page at most every 5 minutes; the browser fetches newer delays itself
 
 export default async function Home() {
   if (!isConfigured) return <SetupNotice />;

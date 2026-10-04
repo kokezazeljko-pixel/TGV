@@ -1,35 +1,46 @@
 // Minimalan dekoder za GTFS-Realtime (protobuf) – samo polja koja nam trebaju.
 // Specifikacija: https://gtfs.org/realtime/reference/
 
+// Varints are read as plain numbers (fast); only the rare values above 2^53 fall back to BigInt.
+// Negative int64 values (10-byte varints) come out right as well.
 function reader(buf) {
   let pos = 0;
   const varint = () => {
-    let result = 0n, shift = 0n;
+    let result = 0, mul = 1;
+    for (let i = 0; i < 7; i++) { // up to 49 bits fit exactly in a JS number
+      if (pos >= buf.length) throw new Error("Protobuf: neočekivan kraj podataka");
+      const b = buf[pos++];
+      result += (b & 0x7f) * mul;
+      if (!(b & 0x80)) return result;
+      mul *= 128;
+    }
+    let big = BigInt(result), shift = 49n;
     for (;;) {
       if (pos >= buf.length) throw new Error("Protobuf: neočekivan kraj podataka");
       const b = buf[pos++];
-      result |= BigInt(b & 0x7f) << shift;
-      if (!(b & 0x80)) return result;
+      big |= BigInt(b & 0x7f) << shift;
+      if (!(b & 0x80)) return Number(BigInt.asIntN(64, big));
       shift += 7n;
     }
   };
   return {
     eof: () => pos >= buf.length,
-    tag() { const t = Number(varint()); return { field: t >>> 3, wire: t & 7 }; },
+    tag() { const t = varint(); return { field: Math.floor(t / 8), wire: t & 7 }; },
     varint,
-    bytes() { const len = Number(varint()); const b = buf.subarray(pos, pos + len); pos += len; return b; },
+    bytes() { const len = varint(); const b = buf.subarray(pos, pos + len); pos += len; return b; },
     skip(wire) {
       if (wire === 0) varint();
       else if (wire === 1) pos += 8;
-      else if (wire === 2) { const len = Number(varint()); pos += len; }
+      else if (wire === 2) { const len = varint(); pos += len; }
       else if (wire === 5) pos += 4;
       else throw new Error(`Protobuf: nepoznat wire tip ${wire}`);
     },
   };
 }
 
-const int = (v) => Number(BigInt.asIntN(64, v));
-const str = (b) => Buffer.from(b).toString("utf8");
+const int = (v) => v;
+const utf8 = new TextDecoder();
+const str = (b) => utf8.decode(b);
 
 function parse(buf, handlers, init) {
   const r = reader(buf);
@@ -64,17 +75,25 @@ const TripDescriptor = (b) => parse(b, {
   5: [2, (o, v) => (o.routeId = str(v))],
 }, () => ({}));
 
-const TripUpdate = (b) => parse(b, {
-  1: [2, (o, v) => (o.trip = TripDescriptor(v))],
-  2: [2, (o, v) => o.stopTimeUpdates.push(StopTimeUpdate(v))],
-  4: [0, (o, v) => (o.timestamp = int(v))],
-  5: [0, (o, v) => (o.delay = int(v))],
-}, () => ({ stopTimeUpdates: [] }));
+// Stop updates are decoded only for trips we keep (a national feed is mostly buses and trams)
+let keepTrip = null;
+const TripUpdate = (b) => {
+  const raw = [];
+  const o = parse(b, {
+    1: [2, (o, v) => (o.trip = TripDescriptor(v))],
+    2: [2, (o, v) => raw.push(v)],
+    4: [0, (o, v) => (o.timestamp = int(v))],
+    5: [0, (o, v) => (o.delay = int(v))],
+  }, () => ({ stopTimeUpdates: [] }));
+  if (keepTrip && !keepTrip(o.trip)) return null;
+  o.stopTimeUpdates = raw.map(StopTimeUpdate);
+  return o;
+};
 
 const FeedEntity = (b) => parse(b, {
   1: [2, (o, v) => (o.id = str(v))],
-  2: [0, (o, v) => (o.isDeleted = v !== 0n)],
-  3: [2, (o, v) => (o.tripUpdate = TripUpdate(v))],
+  2: [0, (o, v) => (o.isDeleted = v !== 0)],
+  3: [2, (o, v) => { const tu = TripUpdate(v); if (tu) o.tripUpdate = tu; }],
 }, () => ({}));
 
 const FeedHeader = (b) => parse(b, {
@@ -82,9 +101,13 @@ const FeedHeader = (b) => parse(b, {
   3: [0, (o, v) => (o.timestamp = int(v))],
 }, () => ({}));
 
-export function decodeFeed(buf) {
-  return parse(buf, {
-    1: [2, (o, v) => (o.header = FeedHeader(v))],
-    2: [2, (o, v) => o.entities.push(FeedEntity(v))],
-  }, () => ({ header: {}, entities: [] }));
+// keep (optional): function(trip) -> true for the trips we care about; other entities are skipped
+export function decodeFeed(buf, keep = null) {
+  keepTrip = keep;
+  try {
+    return parse(buf, {
+      1: [2, (o, v) => (o.header = FeedHeader(v))],
+      2: [2, (o, v) => { const e = FeedEntity(v); if (e.tripUpdate || !keep) o.entities.push(e); }],
+    }, () => ({ header: {}, entities: [] }));
+  } finally { keepTrip = null; }
 }

@@ -261,3 +261,16 @@ a.primary{display:inline-block;text-decoration:none}
 .countrybtn .flag + .flag{margin-left:-4px}
 .flag.mini{width:15px;height:10px;border-radius:2px;margin-right:6px;vertical-align:1px}
 .flag-ch.mini{width:10px}
+
+/* station menu */
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.stationpick{flex:0 1 260px;min-width:0;position:relative}
+.stationpick select{width:100%;appearance:none;-webkit-appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:7px 34px 7px 14px;font-size:15px;font-weight:600;cursor:pointer;
+  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 18px) 55%,calc(100% - 13px) 55%;background-size:5px 5px;background-repeat:no-repeat}
+@media (max-width:640px){.stationpick{flex:1 1 100%}}
+
+/* language flags */
+.lang button{display:inline-flex;align-items:center;padding:5px 8px}
+.lang button svg{width:24px;height:16px;border-radius:2px;display:block;box-shadow:0 0 0 1px rgba(255,255,255,.35)}
+.lang button[aria-pressed="false"] svg{opacity:.75}
+.lang button[aria-pressed="true"]{background:var(--board-amber)}
