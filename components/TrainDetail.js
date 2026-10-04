@@ -78,7 +78,7 @@ export default function TrainDetail({ initialTrain }) {
 
           <section className="card">
             <h3>{t("routeMap")}</h3>
-            <TrainMap trains={[train]} highlight={train} compact />
+            <TrainMap country={train.country || "fr"} trains={[train]} highlight={train} compact />
           </section>
 
           <section className="card">

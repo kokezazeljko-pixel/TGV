@@ -1,13 +1,22 @@
-// Na svakih nekoliko minuta: čita SNCF GTFS-RT feed i upisuje kašnjenja u tabelu "trains".
+// Na svakih nekoliko minuta: čita GTFS-RT feed i upisuje kašnjenja u tabelu "trains".
+// COUNTRY=fr (SNCF, podrazumevano) ili COUNTRY=ch (Švajcarska, traži SWISS_API_KEY).
 //
 // Pokretanje:  node ingest/sync-realtime.mjs
+//              COUNTRY=ch SWISS_API_KEY=... node ingest/sync-realtime.mjs
 // Za probu bez baze:  DRY_RUN=1 RT_FILE=feed.pb TRAINS_FILE=trains.dry.json node ingest/sync-realtime.mjs
 import { readFile, writeFile } from "node:fs/promises";
 import { decodeFeed } from "./lib/gtfs-rt.mjs";
 import { applyTripUpdate, matchRow } from "./lib/realtime.mjs";
 import { parisDate, env, supabaseRest, download, chunks } from "./lib/util.mjs";
 
-const RT_URL = env("RT_URL", "https://proxy.transport.data.gouv.fr/resource/sncf-gtfs-rt-trip-updates");
+const COUNTRY = env("COUNTRY", "fr");
+const FEEDS = {
+  fr: { url: "https://proxy.transport.data.gouv.fr/resource/sncf-gtfs-rt-trip-updates", headers: () => ({}) },
+  // https://opentransportdata.swiss/en/cookbook/realtime-prediction-cookbook/gtfs-rt/ (najviše 2 zahteva u minuti)
+  ch: { url: "https://api.opentransportdata.swiss/la/gtfs-rt", headers: () => ({ Authorization: `Bearer ${env("SWISS_API_KEY")}`, "Accept-Encoding": "br, gzip, deflate" }) },
+};
+if (!FEEDS[COUNTRY]) throw new Error(`Nepoznata zemlja COUNTRY=${COUNTRY} (dozvoljeno: fr, ch)`);
+const RT_URL = env("RT_URL", FEEDS[COUNTRY].url);
 const DRY = env("DRY_RUN", "") !== "";
 const NOW = Number(env("NOW", "")) || Math.floor(Date.now() / 1000);
 
@@ -16,7 +25,7 @@ async function loadTrains(db) {
   const days = [parisDate(-1), parisDate(0)].join(",");
   const all = [];
   for (let offset = 0; ; offset += 1000) {
-    const page = await db.select("trains", `select=id,trip_id,service_date,stops,delay_min,cancelled&service_date=in.(${days})&order=id&limit=1000&offset=${offset}`);
+    const page = await db.select("trains", `select=id,trip_id,service_date,stops,delay_min,cancelled&country=eq.${COUNTRY}&service_date=in.(${days})&order=id&limit=1000&offset=${offset}`);
     all.push(...page);
     if (page.length < 1000) break;
   }
@@ -26,7 +35,7 @@ async function loadTrains(db) {
 async function main() {
   const db = DRY ? null : supabaseRest();
   const [feedBuf, trains] = await Promise.all([
-    process.env.RT_FILE ? readFile(process.env.RT_FILE) : download(RT_URL),
+    process.env.RT_FILE ? readFile(process.env.RT_FILE) : download(RT_URL, FEEDS[COUNTRY].headers()),
     loadTrains(db),
   ]);
   const feed = decodeFeed(feedBuf);
@@ -53,7 +62,7 @@ async function main() {
     updates.push({ id: res.id, delay_min: res.delay_min, cancelled: res.cancelled, stops: res.stops });
     if (changed) changedCount++;
   }
-  console.log(`Prepoznato TGV vozova u feedu: ${matched} · promenjeno: ${changedCount}`);
+  console.log(`[${COUNTRY}] Prepoznato vozova u feedu: ${matched} · promenjeno: ${changedCount}`);
 
   if (DRY) {
     const out = env("OUT_FILE", "updates.dry.json");

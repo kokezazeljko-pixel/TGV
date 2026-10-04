@@ -83,3 +83,48 @@ feed = ld(1, s(1, "2.0") + vi(3, epoch("14:00"))) \
      + ld(2, s(1, "e3") + ld(3, tu3))
 open(os.path.join(out, "feed.pb"), "wb").write(feed)
 print("now", epoch("14:00"))
+
+# ---- Švajcarska: mali GTFS u švajcarskom stilu (route_desc = kategorija, calendar.txt, SLOID stop_id)
+wd = datetime.datetime.strptime(date, "%Y-%m-%d").weekday()  # 0 = ponedeljak
+days = ["0"] * 7; days[wd] = "1"
+ch = {
+"routes.txt": "route_id,agency_id,route_short_name,route_long_name,route_desc,route_type\n"
+              "91-1-j26-1,11,IC1,,IC,102\n91-8-j26-1,11,S8,,S,109\n91-RE-j26-1,11,RE,,RE,106\n92-B-j26-1,801,31,,B,700\n91-TGV-j26-1,1183,TGV,,TGV,101\n",
+"calendar.txt": "service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date\n"
+                f"TA,{','.join(days)},{date.replace('-','')[:4]}0101,{date.replace('-','')[:4]}1231\n",
+"trips.txt": "route_id,service_id,trip_id,trip_headsign,trip_short_name,direction_id\n"
+             "91-1-j26-1,TA,1.TA.91-1-j26-1.1.H,St. Gallen,717,0\n"
+             "91-8-j26-1,TA,2.TA.91-8-j26-1.1.H,Pfäffikon SZ,18837,0\n"
+             "91-RE-j26-1,TA,3.TA.91-RE-j26-1.1.H,Bern,4021,0\n"
+             "92-B-j26-1,TA,4.TA.92-B-j26-1.1.H,Bahnhof,31,0\n"
+             "91-TGV-j26-1,TA,5.TA.91-TGV-j26-1.1.R,Paris Gare de Lyon,9774,1\n",
+"stops.txt": "stop_id,stop_name,stop_lat,stop_lon,location_type,parent_station\n"
+             "ch:1:sloid:7000:4:7,Genève,46.2102,6.1424,,Parent8501008\n"
+             "ch:1:sloid:5003:2:3,Lausanne,46.5168,6.6291,,Parent8501120\n"
+             "ch:1:sloid:7000:1:1,Bern,46.9488,7.4393,,Parent8507000\n"
+             "ch:1:sloid:3000:31:31,Zürich HB,47.3781,8.5402,,Parent8503000\n"
+             "ch:1:sloid:3000:9:9,Zürich HB,47.3779,8.5400,,Parent8503000\n"
+             "ch:1:sloid:6021:1:1,St. Gallen,47.4232,9.3697,,Parent8506302\n"
+             "8014228_gen:missingSLOID_pf:12,Thalwil,47.2954,8.5646,,\n",
+"stop_times.txt": "trip_id,arrival_time,departure_time,stop_id,stop_sequence\n"
+             "1.TA.91-1-j26-1.1.H,,10:02:00,ch:1:sloid:7000:4:7,1\n"
+             "1.TA.91-1-j26-1.1.H,10:38:00,10:41:00,ch:1:sloid:5003:2:3,2\n"
+             "1.TA.91-1-j26-1.1.H,11:46:00,11:50:00,ch:1:sloid:7000:1:1,3\n"
+             "1.TA.91-1-j26-1.1.H,12:46:00,12:50:00,ch:1:sloid:3000:31:31,4\n"
+             "1.TA.91-1-j26-1.1.H,13:58:00,,ch:1:sloid:6021:1:1,5\n"
+             "2.TA.91-8-j26-1.1.H,,10:05:00,ch:1:sloid:3000:9:9,1\n"
+             "2.TA.91-8-j26-1.1.H,10:20:00,,8014228_gen:missingSLOID_pf:12,2\n"
+             "3.TA.91-RE-j26-1.1.H,,10:00:00,ch:1:sloid:5003:2:3,1\n"
+             "3.TA.91-RE-j26-1.1.H,11:10:00,,ch:1:sloid:7000:1:1,2\n"
+             "4.TA.92-B-j26-1.1.H,,10:00:00,ch:1:sloid:3000:9:9,1\n"
+             "4.TA.92-B-j26-1.1.H,10:10:00,,ch:1:sloid:3000:31:31,2\n"
+             "5.TA.91-TGV-j26-1.1.R,,12:30:00,ch:1:sloid:5003:2:3,1\n"
+             "5.TA.91-TGV-j26-1.1.R,16:15:00,,ch:1:sloid:7000:4:7,2\n",
+}
+with zipfile.ZipFile(os.path.join(out, "gtfs-ch.zip"), "w", zipfile.ZIP_DEFLATED) as z:
+    for k, v in ch.items(): z.writestr(k, v)
+# IC 717 kasni 4 min od Berna (vreme 11:50 + 4), feed sa start_date
+tuch = ld(1, s(1, "1.TA.91-1-j26-1.1.H") + s(3, ymd)) + ld(2, stu(3, departure=vi(1, 240)))
+feedch = ld(1, s(1, "2.0") + vi(3, epoch("12:00"))) + ld(2, s(1, "c1") + ld(3, tuch)) \
+       + ld(2, s(1, "c2") + ld(3, ld(1, s(1, "2.TA.91-8-j26-1.1.H") + s(3, ymd)) + ld(2, stu(1, departure=vi(1, 60)))))
+open(os.path.join(out, "feed-ch.pb"), "wb").write(feedch)

@@ -21,6 +21,9 @@ create table if not exists public.trains (
 );
 create index if not exists trains_date_idx on public.trains (service_date, dep);
 create index if not exists trains_number_idx on public.trains (number);
+-- Zemlja: fr = Francuska (SNCF), ch = Švajcarska (opentransportdata.swiss)
+alter table public.trains add column if not exists country text not null default 'fr' check (country in ('fr','ch'));
+create index if not exists trains_country_date_idx on public.trains (country, service_date, dep);
 
 alter table public.trains enable row level security;
 drop policy if exists "Svi mogu da čitaju vozove" on public.trains;

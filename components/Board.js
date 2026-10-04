@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase";
 import { fetchTrainsForDay, fetchCommentCounts } from "@/lib/queries";
-import { TRAIN_TYPES, statusOf, toMin, fromMin, trainHref, ago, filterTrains, isShuttle, parisNowMin } from "@/lib/format";
-import { stopMatches } from "@/lib/geo";
+import { statusOf, toMin, fromMin, trainHref, ago, filterTrains, isShuttle, parisNowMin } from "@/lib/format";
+import { getGeo } from "@/lib/geo";
+
+const COUNTRIES = ["fr", "ch"];
 import { useLang } from "@/components/LangProvider";
 import TrainMap from "@/components/TrainMap";
 
@@ -22,19 +24,40 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
   const [q, setQ] = useState("");
   const [station, setStation] = useState(null);
   const [running, setRunning] = useState([]);
+  const [country, setCountry] = useState("fr");
+  const [loading, setLoading] = useState(false);
 
-  // Refresh data every minute without reloading the page
+  // Remember the chosen country in this browser
+  useEffect(() => {
+    let saved = null;
+    try { saved = localStorage.getItem("tp-country"); } catch {}
+    if (saved && saved !== "fr" && COUNTRIES.includes(saved)) setCountry(saved);
+  }, []);
+  const chooseCountry = (c) => {
+    if (c === country) return;
+    try { localStorage.setItem("tp-country", c); } catch {}
+    setStation(null); setType("all"); setRunning([]); setCountry(c);
+  };
+
+  // Load the chosen country's trains, then refresh every minute without reloading the page
   useEffect(() => {
     const sb = getBrowserClient();
     if (!sb) return;
-    const refresh = async () => {
-      const [{ data: tr, error }, c] = await Promise.all([fetchTrainsForDay(sb, today), fetchCommentCounts(sb, today)]);
+    let alive = true;
+    const refresh = async (first) => {
+      if (first && country !== "fr") setLoading(true);
+      const [{ data: tr, error }, c] = await Promise.all([fetchTrainsForDay(sb, today, country), fetchCommentCounts(sb, today)]);
+      if (!alive) return;
       if (!error) setTrains(tr);
       setCounts(c);
+      setLoading(false);
     };
-    const id = setInterval(refresh, 60000);
-    return () => clearInterval(id);
-  }, [today]);
+    if (country !== "fr") { setTrains([]); refresh(true); }
+    else if (trains.length && trains[0].country && trains[0].country !== "fr") refresh(true);
+    const id = setInterval(() => refresh(false), 60000);
+    return () => { alive = false; clearInterval(id); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [today, country]);
 
   const real = useMemo(() => trains.filter((x) => !isShuttle(x)), [trains]);
   const list = useMemo(() => filterTrains(trains, { type, status, q }, t), [trains, type, status, q, t]);
@@ -47,11 +70,26 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
     return { total: real.length, onTimePct: real.length ? Math.round((onTime / real.length) * 100) : 0, avg, lastRt };
   }, [real]);
 
+  // Train types offered as filters: the ones present in this country's data, most common first
+  const types = useMemo(() => {
+    const n = {};
+    for (const x of real) n[x.type] = (n[x.type] || 0) + 1;
+    return ["all", ...Object.keys(n).sort((a, b) => n[b] - n[a])];
+  }, [real]);
+
   const runningIds = useMemo(() => new Set(running.map((r) => r.tr.id)), [running]);
   const sorted = useMemo(() => [...list].sort((a, b) => toMin(a.dep) - toMin(b.dep)), [list]);
 
   return (
     <>
+      <div className="countries" role="group" aria-label={t("countryGroup")}>
+        {COUNTRIES.map((c) => (
+          <button key={c} type="button" className="countrybtn" aria-pressed={country === c} onClick={() => chooseCountry(c)}>
+            <span className={`flag flag-${c}`} aria-hidden="true" />{t("country_" + c)}
+          </button>
+        ))}
+      </div>
+
       <section className="stats" aria-label={t("liveNow")}>
         <Stat k={t("stTotal")} v={stats.total || "–"} />
         <Stat k={t("stOntime")} v={stats.total ? stats.onTimePct : "–"} unit={stats.total ? "%" : ""} />
@@ -59,12 +97,12 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
         <Stat k={t("stRunning")} v={stats.total ? running.length : "–"} live />
       </section>
 
-      {stats.lastRt && <p className="muted" style={{ margin: "8px 0 0" }}>{t("updatedSrc", ago(stats.lastRt, t, lang))}</p>}
+      {stats.lastRt && <p className="muted" style={{ margin: "8px 0 0" }}>{t("updatedSrc", ago(stats.lastRt, t, lang), t("source_" + country))}</p>}
       {loadError && <div className="notice"><b>{t("loadError")}</b> {loadError}</div>}
 
       <div className="filters">
         <div className="seg" role="group" aria-label={t("typeGroup")}>
-          {TRAIN_TYPES.map((x) => (
+          {types.map((x) => (
             <button key={x} type="button" className="chipbtn" aria-pressed={type === x} onClick={() => setType(x)}>{x === "all" ? t("all") : x}</button>
           ))}
         </div>
@@ -78,6 +116,8 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
 
       <section className="mapgrid">
         <TrainMap
+          key={country}
+          country={country}
           trains={list}
           selectedStation={station}
           onStationClick={setStation}
@@ -86,15 +126,15 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
         />
         <aside className="side" aria-live="polite">
           {station
-            ? <StationPanel station={station} trains={list} onBack={() => setStation(null)} />
-            : <LivePanel running={running} hasTrains={real.length > 0} />}
+            ? <StationPanel station={station} trains={list} country={country} onBack={() => setStation(null)} />
+            : <LivePanel running={running} hasTrains={real.length > 0} country={country} />}
         </aside>
       </section>
 
       <section className="board" aria-label={t("hDep")}>
         <div className="bhead"><span>{t("hDep")}</span><span>{t("hTrain")}</span><span>{t("hRoute")}</span><span>{t("hStatus")}</span><span style={{ textAlign: "right" }}>{t("hReports")}</span></div>
         {!real.length ? (
-          <div className="empty">{t("noTrainsToday")}</div>
+          <div className="empty">{loading ? t("loading") : t("noTrainsToday")}</div>
         ) : !sorted.length ? (
           <div className="empty">{t("nomatch")}</div>
         ) : (
@@ -147,7 +187,7 @@ function MiniRow({ tr, time, delay, sub, past }) {
   );
 }
 
-function LivePanel({ running, hasTrains }) {
+function LivePanel({ running, hasTrains, country }) {
   const { t } = useLang();
   const late = running.filter((x) => (x.tr.delay_min || 0) >= 5).sort((a, b) => b.tr.delay_min - a.tr.delay_min).slice(0, 5);
   return (
@@ -169,8 +209,8 @@ function LivePanel({ running, hasTrains }) {
       <div>
         <h4>{t("legend")}</h4>
         <div className="legend">
-          <LegendRow svg={<line x1="2" y1="7" x2="32" y2="7" stroke="var(--rail-lgv)" strokeWidth="3.2" strokeLinecap="round" />} text={t("lgv")} />
-          <LegendRow svg={<line x1="2" y1="7" x2="32" y2="7" stroke="var(--rail-classic)" strokeWidth="1.8" strokeDasharray="5 4" />} text={t("classic")} />
+          <LegendRow svg={<line x1="2" y1="7" x2="32" y2="7" stroke="var(--rail-lgv)" strokeWidth="3.2" strokeLinecap="round" />} text={t(country === "ch" ? "lgv_ch" : "lgv")} />
+          <LegendRow svg={<line x1="2" y1="7" x2="32" y2="7" stroke="var(--rail-classic)" strokeWidth="1.8" strokeDasharray="5 4" />} text={t(country === "ch" ? "classic_ch" : "classic")} />
           <LegendRow svg={<circle cx="17" cy="7" r="4.5" fill="var(--station)" stroke="var(--rail-lgv)" strokeWidth="2" />} text={t("station")} />
           {[["ok", "tOk"], ["warn", "tWarn"], ["bad", "tBad"]].map(([c, k]) => (
             <LegendRow key={c} svg={<path d="M24 7L11 1.5L14 7L11 12.5Z" fill={`var(--${c})`} stroke="var(--surface)" strokeWidth="1.2" strokeLinejoin="round" />} text={t(k)} />
@@ -186,7 +226,8 @@ function LegendRow({ svg, text }) {
   return <div><svg width="34" height="14" viewBox="0 0 34 14" aria-hidden="true">{svg}</svg><span>{text}</span></div>;
 }
 
-function StationPanel({ station, trains, onBack }) {
+function StationPanel({ station, trains, country, onBack }) {
+  const { stopMatches } = getGeo(country);
   const { t } = useLang();
   const [now, setNow] = useState(null);
   useEffect(() => { setNow(parisNowMin()); }, [station, trains]);

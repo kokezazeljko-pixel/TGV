@@ -35,4 +35,19 @@ assert.equal(u1.cancelled, false);
 const u2 = ups.find((u) => u.id.endsWith("007639F02"));
 assert.equal(u2.cancelled, true);
 assert.equal(ups.length, 2, "nepoznat voz se preskače");
+// ---- Švajcarska
+run("sync-schedule.mjs", { COUNTRY: "ch", GTFS_FILE: join(dir, "gtfs-ch.zip"), TODAY: DATE, DAYS: "1", OUT_FILE: join(dir, "trains-ch.json") });
+const ch = JSON.parse(readFileSync(join(dir, "trains-ch.json"), "utf8"));
+assert.deepEqual(ch.map((t) => t.type).sort(), ["IC", "TGV Lyria"], "samo IC i TGV, bez S-Bahna, RE i autobusa");
+const ic = ch.find((t) => t.number === "717");
+assert.equal(ic.country, "ch");
+assert.ok(ic.id.includes("_ch_"), "id sa oznakom zemlje");
+assert.equal(ic.origin, "Genève"); assert.equal(ic.destination, "St. Gallen");
+assert.equal(ic.dep, "10:02"); assert.equal(ic.arr, "13:58");
+assert.equal(ic.stops[3].lat, 47.3781);
+run("sync-realtime.mjs", { COUNTRY: "ch", RT_FILE: join(dir, "feed-ch.pb"), TRAINS_FILE: join(dir, "trains-ch.json"), NOW: now, OUT_FILE: join(dir, "updates-ch.json") });
+const upch = JSON.parse(readFileSync(join(dir, "updates-ch.json"), "utf8"));
+assert.equal(upch.length, 1, "S-Bahn iz feeda se preskače");
+assert.deepEqual(upch[0].stops.map((s) => s.delay), [0, 0, 4, 4, 4], "kašnjenje od Berna dalje");
+
 console.log("✔ Svi testovi su prošli");

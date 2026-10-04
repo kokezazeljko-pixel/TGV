@@ -34,12 +34,12 @@ export const PRIVACY = {
         list: [
           "Supabase: database and sign-in. Data is stored in the European Union (Frankfurt, Germany).",
           "Vercel: hosting of the website. Vercel may process technical data, such as IP addresses, outside the EU under the European Commission's standard contractual clauses.",
-          "GitHub: runs the scripts that fetch train data from SNCF. These scripts do not handle any visitor data.",
+          "GitHub: runs the scripts that fetch train data from SNCF and opentransportdata.swiss. These scripts do not handle any visitor data.",
         ],
       },
       {
         h: "Train data",
-        p: ["Timetables and real-time delays come from SNCF open data (transport.data.gouv.fr). They contain no personal data."],
+        p: ["Timetables and real-time delays come from SNCF open data (transport.data.gouv.fr) and, for Switzerland, from opentransportdata.swiss. They contain no personal data."],
       },
       {
         h: "How long we keep data",
@@ -90,10 +90,10 @@ export const PRIVACY = {
         list: [
           "Supabase : base de données et connexion. Les données sont stockées dans l’Union européenne (Francfort, Allemagne).",
           "Vercel : hébergement du site. Vercel peut traiter des données techniques, comme les adresses IP, hors de l’UE, sous couvert des clauses contractuelles types de la Commission européenne.",
-          "GitHub : exécute les scripts qui récupèrent les données SNCF. Ces scripts ne traitent aucune donnée des visiteurs.",
+          "GitHub : exécute les scripts qui récupèrent les données SNCF et opentransportdata.swiss. Ces scripts ne traitent aucune donnée des visiteurs.",
         ],
       },
-      { h: "Données ferroviaires", p: ["Les horaires et les retards en temps réel proviennent de l’open data SNCF (transport.data.gouv.fr). Ils ne contiennent aucune donnée personnelle."] },
+      { h: "Données ferroviaires", p: ["Les horaires et les retards en temps réel proviennent de l’open data SNCF (transport.data.gouv.fr) et, pour la Suisse, d’opentransportdata.swiss. Ils ne contiennent aucune donnée personnelle."] },
       {
         h: "Durée de conservation",
         list: [

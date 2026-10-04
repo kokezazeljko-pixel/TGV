@@ -1,21 +1,24 @@
 "use client";
 
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { NET, W, H, proj, nodes, stations, trainPos, trainRoute } from "@/lib/geo";
+import { getGeo } from "@/lib/geo";
 import { parisNowMin, statusOf } from "@/lib/format";
 import { useLang } from "@/components/LangProvider";
 
 const ARROW = "M1.45 0L-0.95 1.05L-0.45 0L-0.95 -1.05Z"; // points right, rotated to the direction of travel
-const TIER_A = new Set(["Lille", "Strasbourg", "Lyon", "Marseille", "Bordeaux", "Nantes", "Rennes", "Toulouse", "Montpellier", "Nice"]);
+const TIER_A = new Set(["Lille", "Strasbourg", "Lyon", "Marseille", "Bordeaux", "Nantes", "Rennes", "Toulouse", "Montpellier", "Nice", "Genève", "Lausanne", "Bern", "Zürich", "Basel", "Lugano"]);
 
 /**
- * Stylized map of France with TGV lines, stations and trains running now.
+ * Stylized map of a country (France or Switzerland) with its lines, stations and trains running now.
+ * Give it a new `key` when the country changes so it starts fresh.
  * Pan/zoom is applied directly to the SVG (no React re-render while dragging);
  * sizes that must stay constant on screen use the CSS variables --u (map units per pixel),
  * --sr (station radius) and --ts (train arrow size).
  */
-export default function TrainMap({ trains, onTrainClick, onStationClick, selectedStation, highlight, onRunning, compact }) {
+export default function TrainMap({ country = "fr", trains, onTrainClick, onStationClick, selectedStation, highlight, onRunning, compact }) {
   const { t } = useLang();
+  const geo = getGeo(country);
+  const { W, H, trainPos, trainRoute } = geo;
   const svgRef = useRef(null);
   const view = useRef({ x: 0, y: 0, w: W, h: H });
   const zoomRef = useRef(1);
@@ -112,16 +115,17 @@ export default function TrainMap({ trains, onTrainClick, onStationClick, selecte
   const center = () => [view.current.x + view.current.w / 2, view.current.y + view.current.h / 2];
 
   return (
-    <div className="mapbox">
+    <div className="mapbox" style={{ aspectRatio: `${W} / ${H}` }}>
       <svg
-        ref={svgRef} id="map" role="img" aria-label={t("mapLabel")} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet"
+        ref={svgRef} id="map" role="img" aria-label={t(country === "ch" ? "mapLabel_ch" : "mapLabel")} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet"
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
       >
-        <BaseMap />
-        <GeoLabels />
-        <Rails />
+        <BaseMap geo={geo} />
+        <GeoLabels geo={geo} />
+        <Rails geo={geo} />
         <g>{hlPaths.map((pts, i) => <path key={i} className="rail hl" d={"M" + pts.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join("L")} />)}</g>
         <Stations
+          geo={geo}
           selected={selectedStation}
           onClick={(n) => { if (d.moved || !onStationClick) return; onStationClick(n.group && zoomRef.current < 5 ? n.group : n.name); }}
         />
@@ -152,40 +156,47 @@ export default function TrainMap({ trains, onTrainClick, onStationClick, selecte
 }
 
 // ---- static layers (rendered once)
-const ring = (pts) => "M" + pts.map(([lon, lat]) => proj(lat, lon).map((v) => v.toFixed(1)).join(",")).join("L") + "Z";
-const pathOf = (path) => "M" + path.map((k) => `${nodes[k].x.toFixed(1)},${nodes[k].y.toFixed(1)}`).join("L");
+const ring = (geo, pts) => "M" + pts.map(([lon, lat]) => geo.proj(lat, lon).map((v) => v.toFixed(1)).join(",")).join("L") + "Z";
+const pathOf = (geo, path) => "M" + path.map((k) => `${geo.nodes[k].x.toFixed(1)},${geo.nodes[k].y.toFixed(1)}`).join("L");
 
-const BaseMap = memo(function BaseMap() {
-  return <g><path className="land" d={ring(NET.france)} /><path className="land" d={ring(NET.corsica)} /></g>;
-});
-
-const Rails = memo(function Rails() {
-  const lgv = NET.lines.filter(([type]) => type === "lgv"), classic = NET.lines.filter(([type]) => type === "classic");
+const BaseMap = memo(function BaseMap({ geo }) {
   return (
     <g>
-      {lgv.map(([, p], i) => <path key={"c" + i} className="rail casing" d={pathOf(p)} />)}
-      {classic.map(([, p], i) => <path key={"k" + i} className="rail classic" d={pathOf(p)} />)}
-      {lgv.map(([, p], i) => <path key={"l" + i} className="rail lgv" d={pathOf(p)} />)}
+      {geo.NET.land.map((p, i) => <path key={"l" + i} className="land" d={ring(geo, p)} />)}
+      {(geo.NET.water || []).map((p, i) => <path key={"w" + i} className="water" d={ring(geo, p)} />)}
     </g>
   );
 });
 
-function GeoLabels() {
-  const { t } = useLang();
-  const geo = t("geo");
+const Rails = memo(function Rails({ geo }) {
+  const NET = geo.NET;
+  const lgv = NET.lines.filter(([type]) => type === "lgv"), classic = NET.lines.filter(([type]) => type === "classic");
   return (
     <g>
-      {NET.labels.map(([k, lon, lat]) => {
-        const [x, y] = proj(lat, lon);
-        return <text key={k} x={x.toFixed(1)} y={y.toFixed(1)} textAnchor="middle" className={"geo" + (["atl", "man", "med"].includes(k) ? " sea" : "")}>{geo[k]}</text>;
+      {lgv.map(([, p], i) => <path key={"c" + i} className="rail casing" d={pathOf(geo, p)} />)}
+      {classic.map(([, p], i) => <path key={"k" + i} className="rail classic" d={pathOf(geo, p)} />)}
+      {lgv.map(([, p], i) => <path key={"l" + i} className="rail lgv" d={pathOf(geo, p)} />)}
+    </g>
+  );
+});
+
+function GeoLabels({ geo }) {
+  const { t } = useLang();
+  const names = t("geo");
+  return (
+    <g>
+      {geo.NET.labels.map(([k, lon, lat]) => {
+        const [x, y] = geo.proj(lat, lon);
+        return <text key={k} x={x.toFixed(1)} y={y.toFixed(1)} textAnchor="middle" className={"geo" + (["atl", "man", "med"].includes(k) ? " sea" : "")}>{names[k]}</text>;
       })}
     </g>
   );
 }
 
 const ANCHOR = { r: "start", l: "end", t: "middle", b: "middle" };
-function Stations({ selected, onClick }) {
-  const paris = nodes.PGL;
+function Stations({ geo, selected, onClick }) {
+  const { stations } = geo;
+  const paris = geo.nodes.PGL;
   return (
     <>
       <g>
@@ -202,7 +213,7 @@ function Stations({ selected, onClick }) {
         })}
       </g>
       <g>
-        <text x={paris.x.toFixed(1)} y={paris.y.toFixed(1)} textAnchor="end" className="lbl major a grp pos-l">Paris</text>
+        {paris && <text x={paris.x.toFixed(1)} y={paris.y.toFixed(1)} textAnchor="end" className="lbl major a grp pos-l">Paris</text>}
         {stations.filter((n) => n.lvl).map((n) => {
           const cls = n.lvl === 1 ? "lbl major " + (TIER_A.has(n.short) ? "a" : "b") : n.lvl === 5 ? "lbl l5" : "lbl l2";
           return <text key={n.k} x={n.x.toFixed(1)} y={n.y.toFixed(1)} textAnchor={ANCHOR[n.pos] || "start"} className={`${cls} pos-${n.pos || "r"}`}>{n.short}</text>;

@@ -49,6 +49,36 @@ export function detectType(...texts) {
   return "Ostalo";
 }
 
+// Švajcarska: vrsta voza iz kategorije linije (route_desc, npr. "IC", "IR", "EC", "TGV").
+// Vraća null za sve što nije međugradski voz (S-Bahn, RE, tramvaj, autobus, brod…).
+const SWISS_CATS = {
+  IC: "IC", ICN: "IC", IR: "IR", IRE: "IR", EC: "EC", ICE: "ICE", TGV: "TGV Lyria",
+  RJ: "Railjet", RJX: "Railjet", EN: "Night train", NJ: "Night train", PE: "Panorama",
+};
+export function detectSwissType(route = {}) {
+  const desc = (route.route_desc || "").trim().toUpperCase();
+  if (SWISS_CATS[desc]) return SWISS_CATS[desc];
+  const short = ((route.route_short_name || "").match(/^[A-Za-z]+/) || [""])[0].toUpperCase();
+  return SWISS_CATS[short] || null;
+}
+
+// Najnoviji švajcarski GTFS sa opentransportdata.swiss (CKAN API). Godišnji red vožnje
+// važi od sredine decembra, pa posle 10. decembra prvo probamo dataset za sledeću godinu.
+export async function latestSwissGtfsUrl(todayIso) {
+  const [y, m, d] = todayIso.split("-").map(Number);
+  const years = m === 12 && d >= 10 ? [y + 1, y] : [y, y + 1];
+  for (const year of years) {
+    const res = await fetch(`https://data.opentransportdata.swiss/api/3/action/package_show?id=timetable-${year}-gtfs2020`, { headers: { "User-Agent": "train-punctuality-ingest/1.0" } });
+    if (!res.ok) continue;
+    const json = await res.json();
+    const zips = (json.result?.resources || []).filter((r) => /\.zip(\?|$)/i.test(r.url || "") || /zip/i.test(r.format || ""));
+    if (!zips.length) continue;
+    zips.sort((a, b) => String(b.created || b.name).localeCompare(String(a.created || a.name)));
+    return zips[0].url;
+  }
+  throw new Error("Nije pronađen švajcarski GTFS na opentransportdata.swiss");
+}
+
 export function productFromStopId(stopId = "") {
   const m = stopId.match(/OCE(.+?)-\d+$/);
   return m ? m[1] : "";
@@ -84,8 +114,8 @@ export function supabaseRest() {
   };
 }
 
-export async function download(url) {
-  const res = await fetch(url, { headers: { "User-Agent": "peron-ingest/1.0" } });
+export async function download(url, headers = {}) {
+  const res = await fetch(url, { headers: { "User-Agent": "train-punctuality-ingest/1.0", ...headers } });
   if (!res.ok) throw new Error(`Preuzimanje ${url} nije uspelo: ${res.status}`);
   return Buffer.from(await res.arrayBuffer());
 }
