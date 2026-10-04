@@ -1,4 +1,3 @@
-# Peron – kašnjenja TGV vozova i utisci putnika
 
 Sajt koji pokazuje koliko kasne TGV vozovi u Francuskoj (INOUI, OUIGO, Lyria) i gde putnici iz voza ostavljaju komentar: zašto voz kasni i kakav je utisak o liniji.
 
