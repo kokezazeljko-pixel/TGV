@@ -114,6 +114,43 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
   };
   const center = () => [view.current.x + view.current.w / 2, view.current.y + view.current.h / 2];
 
+  // Smoothly move the view to a target rectangle
+  const anim = useRef(0);
+  function animateTo(target, ms = 450) {
+    cancelAnimationFrame(anim.current);
+    const from = { ...view.current }, t0 = performance.now();
+    const step = (tm) => {
+      const k = Math.min(1, (tm - t0) / ms), e = 1 - Math.pow(1 - k, 3);
+      for (const key of ["x", "y", "w"]) view.current[key] = from[key] + (target[key] - from[key]) * e;
+      view.current.h = (view.current.w * H) / W;
+      applyView();
+      if (k < 1) anim.current = requestAnimationFrame(step);
+    };
+    anim.current = requestAnimationFrame(step);
+  }
+
+  // Selecting a station zooms the map onto it; going back shows the whole map again
+  const firstSel = useRef(true);
+  useEffect(() => {
+    if (compact) return;
+    if (firstSel.current && !selectedStation) { firstSel.current = false; return; }
+    firstSel.current = false;
+    if (!selectedStation) { animateTo({ x: 0, y: 0, w: W, h: H }); return; }
+    const pt = geo.stationPoint(selectedStation, trains);
+    if (!pt) return;
+    // Fit the station and the trains now running towards / from it, but never closer than a city-level zoom
+    const nowMin = parisNowMin();
+    const pts = [pt, ...trains.map((tr) => trainPos(tr, nowMin)).filter(Boolean).map((p) => p.xy)];
+    let x0 = Math.min(...pts.map((p) => p[0])), x1 = Math.max(...pts.map((p) => p[0]));
+    let y0 = Math.min(...pts.map((p) => p[1])), y1 = Math.max(...pts.map((p) => p[1]));
+    const minW = W / (country === "ch" ? 2.6 : country === "all" ? 6 : 4.5);
+    let w = Math.max(minW, (x1 - x0) * 1.25, ((y1 - y0) * 1.25 * W) / H);
+    w = Math.min(W, w);
+    const h = (w * H) / W, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    animateTo({ x: cx - w / 2, y: cy - h / 2, w, h });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStation]);
+
   return (
     <div className="mapbox" style={{ aspectRatio: `${W} / ${H}` }}>
       <svg

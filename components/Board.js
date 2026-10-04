@@ -122,11 +122,18 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
   const stationNames = useMemo(() => new Set([...stationGroups.ch, ...stationGroups.fr]), [stationGroups]);
   const pickStation = (name) => {
     setStation(name || null);
-    if (name) requestAnimationFrame(() => document.querySelector(".side")?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
+    if (name) requestAnimationFrame(() => document.querySelector(".mapbox")?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
   };
 
+  // With a station selected, the map and the board show only the trains that stop there
+  const shown = useMemo(() => {
+    if (!station) return list;
+    const { stopMatches } = getGeo(country);
+    return list.filter((tr) => (tr.stops || []).some((s) => stopMatches(s, station)));
+  }, [list, station, country]);
+
   const runningIds = useMemo(() => new Set(running.map((r) => r.tr.id)), [running]);
-  const sorted = useMemo(() => [...list].sort((a, b) => toMin(a.dep) - toMin(b.dep)), [list]);
+  const sorted = useMemo(() => [...shown].sort((a, b) => toMin(a.dep) - toMin(b.dep)), [shown]);
 
   return (
     <>
@@ -179,7 +186,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
         <TrainMap
           key={country}
           country={country}
-          trains={list}
+          trains={shown}
           selectedStation={station}
           onStationClick={setStation}
           onTrainClick={(tr) => router.push(trainHref(tr.id))}
