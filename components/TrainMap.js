@@ -339,7 +339,7 @@ function Stations({ geo, selected, onClick }) {
   );
 }
 
-// Stops of one train on the route view (first/last also with time and delay). Stops already passed are filled.
+// Stops of one train on the route view: name, timetable time and delay. Stops already passed are filled.
 // Each name tries the right side, then left, below and above, and is left out if it would overlap
 // another name or run off the map. First/last stop and big cities get their place first.
 function RouteStops({ geo, tr, now, scale, bounds }) {
@@ -354,8 +354,8 @@ function RouteStops({ geo, tr, now, scale, bounds }) {
   const b = bounds || { x: -1e9, y: -1e9, w: 2e9, h: 2e9 };
   for (const i of order) {
     const n = geo.stopNode(st[i]);
-    const end = i === 0 || i === last; // only the first and last stop show time and delay (the stop list below has the rest)
-    const wu = ((clean(st[i]).length + (end ? (st[i].delay >= 1 ? 10 : 7) : 0)) * 6.6 + 4) / px, hu = 16 / px, g = 10 / px;
+    const end = i === 0 || i === last;
+    const wu = ((clean(st[i]).length + (st[i].delay >= 1 ? 10 : 7)) * (end ? 6.8 : 6.2) + 4) / px, hu = 16 / px, g = 10 / px;
     const cands = [
       ["r", n.x + g, n.y - hu / 2], ["l", n.x - g - wu, n.y - hu / 2],
       ["b", n.x - wu / 2, n.y + g * 0.8], ["t", n.x - wu / 2, n.y - g * 0.8 - hu],
@@ -386,8 +386,8 @@ function RouteStops({ geo, tr, now, scale, bounds }) {
             {side && (
               <text className={"rs-lbl side-" + side} textAnchor={ANCH[side]}>
                 {clean(s)}
-                {end && <tspan className="rs-time">{"  " + s.time}</tspan>}
-                {end && s.delay >= 1 && <tspan className="rs-delay">{` +${s.delay}`}</tspan>}
+                <tspan className="rs-time">{"  " + s.time}</tspan>
+                {s.delay >= 1 && <tspan className="rs-delay">{` +${s.delay}`}</tspan>}
               </text>
             )}
           </g>
