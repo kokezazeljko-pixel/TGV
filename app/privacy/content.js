@@ -34,6 +34,7 @@ export const PRIVACY = {
         list: [
           "Supabase: database and sign-in. Data is stored in the European Union (Frankfurt, Germany).",
           "Vercel: hosting of the website. Vercel may process technical data, such as IP addresses, outside the EU under the European Commission's standard contractual clauses.",
+          "Vercel Web Analytics: counts page visits so we know how many people use the site (pages viewed, country, device type, the site you came from). It uses no cookies, does not store your IP address and does not build a profile of you; we only see totals.",
           "GitHub: runs the scripts that fetch train data from SNCF and opentransportdata.swiss. These scripts do not handle any visitor data.",
         ],
       },
@@ -90,6 +91,7 @@ export const PRIVACY = {
         list: [
           "Supabase: Datenbank und Anmeldung. Die Daten werden in der Europäischen Union gespeichert (Frankfurt, Deutschland).",
           "Vercel: Hosting der Website. Vercel kann technische Daten wie IP-Adressen auf Grundlage der Standardvertragsklauseln der Europäischen Kommission außerhalb der EU verarbeiten.",
+          "Vercel Web Analytics: zählt Seitenaufrufe, damit wir wissen, wie viele Menschen die Website nutzen (besuchte Seiten, Land, Gerätetyp, vorherige Website). Es verwendet keine Cookies, speichert Ihre IP-Adresse nicht und erstellt kein Profil von Ihnen; wir sehen nur Gesamtzahlen.",
           "GitHub: führt die Skripte aus, die Zugdaten von SNCF und opentransportdata.swiss abrufen. Diese Skripte verarbeiten keine Besucherdaten.",
         ],
       },
@@ -143,6 +145,7 @@ export const PRIVACY = {
         list: [
           "Supabase : base de données et connexion. Les données sont stockées dans l’Union européenne (Francfort, Allemagne).",
           "Vercel : hébergement du site. Vercel peut traiter des données techniques, comme les adresses IP, hors de l’UE, sous couvert des clauses contractuelles types de la Commission européenne.",
+          "Vercel Web Analytics : compte les visites pour savoir combien de personnes utilisent le site (pages vues, pays, type d’appareil, site de provenance). Sans cookies, sans enregistrer votre adresse IP et sans créer de profil ; nous ne voyons que des totaux.",
           "GitHub : exécute les scripts qui récupèrent les données SNCF et opentransportdata.swiss. Ces scripts ne traitent aucune donnée des visiteurs.",
         ],
       },

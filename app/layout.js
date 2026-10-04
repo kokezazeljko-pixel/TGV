@@ -3,6 +3,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { LangProvider } from "@/components/LangProvider";
 import { SITE_URL } from "@/lib/site";
+import { Analytics } from "@vercel/analytics/next"; // visitor statistics without cookies (Vercel Web Analytics)
 import "./globals.css";
 
 const display = Barlow_Condensed({ subsets: ["latin", "latin-ext"], weight: ["500", "600", "700"], variable: "--font-display" });
@@ -28,6 +29,7 @@ export default function RootLayout({ children }) {
           <main className="wrap">{children}</main>
           <Footer />
         </LangProvider>
+        <Analytics />
       </body>
     </html>
   );
