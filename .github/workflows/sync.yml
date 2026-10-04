@@ -1,11 +1,11 @@
-# Automatsko preuzimanje podataka o vozovima (Francuska: SNCF, Švajcarska: opentransportdata.swiss)
+# Automatsko preuzimanje podataka o vozovima (Francuska: SNCF, Švajcarska: opentransportdata.swiss, Belgija: SNCB)
 name: SNCF podaci
 
 # Kašnjenja se osvežavaju automatski u Supabase-u (Edge funkcija sync-realtime, na svakih 3 minuta).
 # Ovde ostaje red vožnje (svakog dana) i ručno pokretanje kašnjenja, ako zatreba.
 on:
   schedule:
-    - cron: "20 1 * * *"    # red vožnje (obe zemlje): jednom dnevno, noću
+    - cron: "20 1 * * *"    # red vožnje (sve zemlje): jednom dnevno, noću
     - cron: "20 14 * * *"   # švajcarski red vožnje ponovo, posle njihovog popodnevnog ažuriranja
   workflow_dispatch:
     inputs:
@@ -43,6 +43,14 @@ jobs:
           COUNTRY: ch
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      - name: Belgija – red vožnje
+        if: github.event.schedule != '20 14 * * *'
+        continue-on-error: true
+        run: node ingest/sync-schedule.mjs
+        env:
+          COUNTRY: be
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
   kasnjenja:
     needs: [red-voznje]
@@ -66,5 +74,12 @@ jobs:
         env:
           COUNTRY: ch
           SWISS_API_KEY: ${{ secrets.SWISS_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      - name: Belgija – kašnjenja
+        continue-on-error: true
+        run: node ingest/sync-realtime.mjs
+        env:
+          COUNTRY: be
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
