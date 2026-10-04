@@ -15,8 +15,14 @@ const TIER_A = new Set(["Lille", "Strasbourg", "Lyon", "Marseille", "Bordeaux", 
  * sizes that must stay constant on screen use the CSS variables --u (map units per pixel),
  * --sr (station radius) and --ts (train arrow size).
  */
+export const MAP_STYLES = ["classic", "metro"];
+
 export default function TrainMap({ country = "fr", trains, onTrainClick, onStationClick, selectedStation, highlight, onRunning, compact }) {
   const { t } = useLang();
+  // Map look chosen by the visitor (Classic / Metro), remembered in this browser
+  const [mapStyle, setMapStyle] = useState("classic");
+  useEffect(() => { try { const s = localStorage.getItem("tp-mapstyle"); if (MAP_STYLES.includes(s)) setMapStyle(s); } catch {} }, []);
+  const chooseStyle = (s) => { setMapStyle(s); try { localStorage.setItem("tp-mapstyle", s); } catch {} };
   const geo = getGeo(country);
   const { W, H, trainPos, trainRoute } = geo;
   const svgRef = useRef(null);
@@ -152,7 +158,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
   }, [selectedStation]);
 
   return (
-    <div className="mapbox" style={{ aspectRatio: `${W} / ${H}` }}>
+    <div className={"mapbox style-" + mapStyle} style={{ aspectRatio: `${W} / ${H}` }}>
       <svg
         ref={svgRef} id="map" role="img" aria-label={t(country === "fr" ? "mapLabel" : "mapLabel_" + country)} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet"
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
@@ -164,7 +170,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
         <Stations
           geo={geo}
           selected={selectedStation}
-          onClick={(n) => { if (d.moved || !onStationClick) return; onStationClick(n.group && zoomRef.current < 5 ? n.group : n.name); }}
+          onClick={(n) => { if (d.moved || !onStationClick) return; onStationClick(n.name); }}
         />
         <g>
           {running.map(({ tr, p }) => {
@@ -188,6 +194,13 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
         <button type="button" className="small" title={t("zreset")} aria-label={t("zreset")} onClick={() => { view.current = { x: 0, y: 0, w: W, h: H }; applyView(); }}>⤢</button>
       </div>
       {!compact && <div className="maphint">{t("hint")}</div>}
+      {!compact && (
+        <div className="mapstyle" role="group" aria-label={t("mapStyle")}>
+          {MAP_STYLES.map((s) => (
+            <button key={s} type="button" aria-pressed={mapStyle === s} onClick={() => chooseStyle(s)}>{t("style_" + s)}</button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -231,9 +244,39 @@ function GeoLabels({ geo }) {
 }
 
 const ANCHOR = { r: "start", l: "end", t: "middle", b: "middle" };
+
+// Map pins for big stations and airport stations. Drawn in screen pixels (scaled by --u):
+// the tip touches the station, the round head holds a train or plane symbol.
+const isAirport = (name = "") => /a[eé]roport|airport|flughafen|saint-exup/i.test(name);
+const PIN = "M0 0C-1.6-5-9-9.5-9-17.5A9 9 0 1 1 9-17.5C9-9.5 1.6-5 0 0Z";
+// Material Design icons "train" and "flight" (Apache License 2.0), 24×24, placed in the pin head
+const ICON_TRAIN = "M12 2c-4 0-8 .5-8 4v9.5C4 17.43 5.57 19 7.5 19L6 20.5v.5h2.23l2-2H14l2 2h2v-.5L16.5 19c1.93 0 3.5-1.57 3.5-3.5V6c0-3.5-3.58-4-8-4zM7.5 17c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm3.5-7H6V6h5v4zm2 0V6h5v4h-5zm3.5 7c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z";
+const ICON_PLANE = "M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z";
+export function PinShape({ airport }) {
+  return (
+    <>
+      <path className="pin-body" d={PIN} />
+      <circle className="pin-face" cy="-17.5" r="6.6" />
+      <path className="pin-icon" d={airport ? ICON_PLANE : ICON_TRAIN} transform="translate(0 -17.5) scale(0.42) translate(-12 -12)" />
+    </>
+  );
+}
+
 function Stations({ geo, selected, onClick }) {
   const { stations } = geo;
   const paris = geo.nodes.PGL;
+  const pins = useMemo(() => stations.filter((n) => n.lvl === 1 || n.group || isAirport(n.name)), [stations]);
+  // Stations of one city (Paris) are only a few hundred metres apart and would cover each other,
+  // so their pins are fanned out side by side (west to east) with a thin line to the real spot.
+  const spread = useMemo(() => {
+    const out = {}, byGroup = {};
+    for (const n of stations) if (n.group) (byGroup[n.group] ||= []).push(n);
+    for (const list of Object.values(byGroup)) {
+      list.sort((a, b) => a.lon - b.lon);
+      list.forEach((n, i) => { out[n.k] = { dx: (i - (list.length - 1) / 2) * 21, dy: -9, ly: i % 2 ? -42 : -30 }; });
+    }
+    return out;
+  }, [stations]);
   return (
     <>
       <g>
@@ -249,11 +292,29 @@ function Stations({ geo, selected, onClick }) {
           );
         })}
       </g>
+      <g className="pins">
+        {pins.map((n) => {
+          const sel = selected && (n.name === selected || n.group === selected);
+          const air = isAirport(n.name);
+          const sp = spread[n.k];
+          return (
+            <g key={n.k} className={"pin" + (air ? " air" : "") + (sel ? " sel" : "") + (sp ? " spread" : "")} transform={`translate(${n.x.toFixed(1)} ${n.y.toFixed(1)})`} style={sp ? { "--dx": sp.dx, "--dy": sp.dy } : undefined}>
+              {sp && <g className="lead"><line x2={sp.dx} y2={sp.dy} /></g>}
+              <g className="pz" onClick={(e) => { e.stopPropagation(); onClick(n); }}>
+                <title>{n.name}</title><PinShape airport={air} />
+                {sp && <text className="pinlbl" y={sp.ly}>{n.short}</text>}
+              </g>
+            </g>
+          );
+        })}
+      </g>
       <g>
         {paris && <text x={paris.x.toFixed(1)} y={paris.y.toFixed(1)} textAnchor="end" className="lbl major a grp pos-l">Paris</text>}
         {stations.filter((n) => n.lvl).map((n) => {
           const cls = n.lvl === 1 ? "lbl major " + (TIER_A.has(n.short) ? "a" : "b") : n.lvl === 5 ? "lbl l5" : "lbl l2";
-          return <text key={n.k} x={n.x.toFixed(1)} y={n.y.toFixed(1)} textAnchor={ANCHOR[n.pos] || "start"} className={`${cls} pos-${n.pos || "r"}`}>{n.short}</text>;
+          if (n.group) return null; // their names sit on the fanned-out pins
+          const pinned = n.lvl === 1 || isAirport(n.name) ? " pinned" : "";
+          return <text key={n.k} x={n.x.toFixed(1)} y={n.y.toFixed(1)} textAnchor={ANCHOR[n.pos] || "start"} className={`${cls}${pinned} pos-${n.pos || "r"}`}>{n.short}</text>;
         })}
       </g>
     </>

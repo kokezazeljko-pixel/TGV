@@ -13,7 +13,11 @@ const COUNTRIES = ["all", "ch", "fr"];
 const DEFAULT_COUNTRY = "all"; // the server sends this view's trains with the page
 import { useLang } from "@/components/LangProvider";
 import { LOCALES } from "@/lib/i18n";
-import TrainMap from "@/components/TrainMap";
+import TrainMap, { PinShape } from "@/components/TrainMap";
+
+// "Paris-Est" = "Paris Est", "Paris Gare de Lyon Hall 1 - 2" = "Paris Gare de Lyon", but "Lyon Perrache" ≠ "Lyon Part-Dieu"
+const normName = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\bhall\b|\d+/g, " ").replace(/[^a-z]+/g, " ").trim();
+const sameStation = (a, b) => { const x = normName(a), y = normName(b); return x === y || x.startsWith(y + " ") || y.startsWith(x + " "); };
 
 const STATUSES = [["all", "allStatus"], ["late", "delayed"], ["ontime", "ontime"]];
 
@@ -104,21 +108,25 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
     return ["all", ...Object.keys(n).sort((a, b) => n[b] - n[a])];
   }, [real]);
 
-  // Every station served today, for the station menu (grouped by country on the combined map)
+  // Every station served today, for the station menu (grouped by country on the combined map).
+  // Stops that belong to a map station use its name, so spellings like "Paris-Est" / "Paris Est" become one entry.
   const stationGroups = useMemo(() => {
+    const { stopNode } = getGeo(country);
     const seen = new Map(); // name -> { fr: n, ch: n }
     for (const tr of real) for (const s of tr.stops || []) {
       if (!s.name) continue;
-      const c = seen.get(s.name) || {};
+      const n = stopNode(s);
+      const name = n?.name && sameStation(n.name, s.name) ? n.name : s.name;
+      const c = seen.get(name) || {};
       c[tr.country] = (c[tr.country] || 0) + 1;
-      seen.set(s.name, c);
+      seen.set(name, c);
     }
     const groups = { ch: [], fr: [] };
     for (const [name, c] of seen) groups[(c.ch || 0) > (c.fr || 0) ? "ch" : "fr"].push(name);
     const loc = LOCALES[lang] || "en-GB";
     for (const g of Object.values(groups)) g.sort((a, b) => a.localeCompare(b, loc));
     return groups;
-  }, [real, lang]);
+  }, [real, lang, country]);
   const stationNames = useMemo(() => new Set([...stationGroups.ch, ...stationGroups.fr]), [stationGroups]);
   const pickStation = (name) => {
     setStation(name || null);
@@ -280,6 +288,8 @@ function LivePanel({ running, hasTrains, country }) {
           <LegendRow svg={<line x1="2" y1="7" x2="32" y2="7" stroke="var(--rail-lgv)" strokeWidth="3.2" strokeLinecap="round" />} text={t(country === "fr" ? "lgv" : "lgv_" + country)} />
           <LegendRow svg={<line x1="2" y1="7" x2="32" y2="7" stroke="var(--rail-classic)" strokeWidth="1.8" strokeDasharray="5 4" />} text={t(country === "fr" ? "classic" : "classic_" + country)} />
           <LegendRow svg={<circle cx="17" cy="7" r="4.5" fill="var(--station)" stroke="var(--rail-lgv)" strokeWidth="2" />} text={t("station")} />
+          <LegendRow tall svg={<g className="legend-pin" transform="translate(17 26)"><PinShape /></g>} text={t("bigStation")} />
+          <LegendRow tall svg={<g className="legend-pin" transform="translate(17 26)"><PinShape airport /></g>} text={t("airportStation")} />
           {[["ok", "tOk"], ["warn", "tWarn"], ["bad", "tBad"]].map(([c, k]) => (
             <LegendRow key={c} svg={<path d="M24 7L11 1.5L14 7L11 12.5Z" fill={`var(--${c})`} stroke="var(--surface)" strokeWidth="1.2" strokeLinejoin="round" />} text={t(k)} />
           ))}
@@ -290,8 +300,8 @@ function LivePanel({ running, hasTrains, country }) {
   );
 }
 
-function LegendRow({ svg, text }) {
-  return <div><svg width="34" height="14" viewBox="0 0 34 14" aria-hidden="true">{svg}</svg><span>{text}</span></div>;
+function LegendRow({ svg, text, tall }) {
+  return <div><svg width="34" height={tall ? 28 : 14} viewBox={tall ? "0 0 34 28" : "0 0 34 14"} aria-hidden="true">{svg}</svg><span>{text}</span></div>;
 }
 
 function StationPanel({ station, trains, country, onBack }) {
