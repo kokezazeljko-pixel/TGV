@@ -32,7 +32,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 header.top{background:var(--board);color:var(--board-fg)}
 header.top .wrap{padding-block:18px 20px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px}
 .brand{display:flex;align-items:center;gap:12px;min-width:0}
-.logo{width:40px;height:40px;border-radius:8px;background:var(--board-amber);color:var(--board);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:19px;letter-spacing:.02em;flex:none}
+.logo-svg{display:block;flex:none}
 .brand h1{margin:0;font-family:var(--f-display);font-weight:700;font-size:34px;letter-spacing:.02em;line-height:1}
 @media (max-width:420px){.brand h1{font-size:28px}}
 .brand p{margin:2px 0 0;color:color-mix(in srgb,var(--board-fg) 72%,transparent);font-size:14px}

@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { parisTime } from "@/lib/format";
 import { LANGS } from "@/lib/i18n";
+import { useSession } from "@/components/useSession";
+import { useLang } from "@/components/LangProvider";
+import Logo from "@/components/Logo";
 
 // Language buttons show the flag of the language's country (English → United Kingdom)
 const LANG_NAMES = { en: "English", de: "Deutsch", fr: "Français" };
@@ -28,8 +31,6 @@ const FLAGS = {
     <svg viewBox="0 0 3 2" aria-hidden="true"><path d="M0 0h3v2H0z" fill="#EF4135" /><path d="M0 0h2v2H0z" fill="#fff" /><path d="M0 0h1v2H0z" fill="#0055A4" /></svg>
   ),
 };
-import { useSession } from "@/components/useSession";
-import { useLang } from "@/components/LangProvider";
 
 export default function Header() {
   const [time, setTime] = useState("--:--");
@@ -47,7 +48,7 @@ export default function Header() {
     <header className="top">
       <div className="wrap">
         <Link href="/" className="brand">
-          <div className="logo" aria-hidden="true">TP</div>
+          <Logo size={44} />
           <div>
             <h1>Train Punctuality</h1>
             <p>{t("tagline")}</p>
