@@ -62,21 +62,41 @@ export function detectSwissType(route = {}) {
   return SWISS_CATS[short] || null;
 }
 
-// Najnoviji švajcarski GTFS sa opentransportdata.swiss (CKAN API). Godišnji red vožnje
-// važi od sredine decembra, pa posle 10. decembra prvo probamo dataset za sledeću godinu.
+// Najnoviji švajcarski GTFS sa opentransportdata.swiss. Svaki godišnji red vožnje ima stalni link
+// ".../dataset/timetable-GODINA-gtfs2020/permalink" koji vodi na najnoviji zip. Godišnji red vožnje
+// važi od sredine decembra, pa posle 10. decembra prvo probamo sledeću godinu.
 export async function latestSwissGtfsUrl(todayIso) {
   const [y, m, d] = todayIso.split("-").map(Number);
   const years = m === 12 && d >= 10 ? [y + 1, y] : [y, y + 1];
+  const headers = { "User-Agent": "train-punctuality-ingest/1.0" };
+  const tried = [];
   for (const year of years) {
-    const res = await fetch(`https://data.opentransportdata.swiss/api/3/action/package_show?id=timetable-${year}-gtfs2020`, { headers: { "User-Agent": "train-punctuality-ingest/1.0" } });
-    if (!res.ok) continue;
-    const json = await res.json();
-    const zips = (json.result?.resources || []).filter((r) => /\.zip(\?|$)/i.test(r.url || "") || /zip/i.test(r.format || ""));
-    if (!zips.length) continue;
-    zips.sort((a, b) => String(b.created || b.name).localeCompare(String(a.created || a.name)));
-    return zips[0].url;
+    const permalink = `https://data.opentransportdata.swiss/dataset/timetable-${year}-gtfs2020/permalink`;
+    try {
+      const res = await fetch(permalink, { headers: { ...headers, Range: "bytes=0-3" } });
+      // čitamo samo prvih par bajtova (ako server ignoriše Range, ne skidamo ceo fajl dvaput)
+      const reader = res.body.getReader();
+      const { value } = await reader.read();
+      await reader.cancel().catch(() => {});
+      const head = Buffer.from(value || []);
+      tried.push(`${permalink} → ${res.status}`);
+      if (res.ok && head[0] === 0x50 && head[1] === 0x4b) return res.url; // "PK" = zip fajl
+    } catch (e) { tried.push(`${permalink} → ${e.message}`); }
   }
-  throw new Error("Nije pronađen švajcarski GTFS na opentransportdata.swiss");
+  for (const year of years) {
+    const api = `https://data.opentransportdata.swiss/api/3/action/package_show?id=timetable-${year}-gtfs2020`;
+    try {
+      const res = await fetch(api, { headers });
+      tried.push(`${api} → ${res.status}`);
+      if (!res.ok) continue;
+      const json = await res.json();
+      const zips = (json.result?.resources || []).filter((r) => /\.zip(\?|$)/i.test(r.url || "") || /zip/i.test(r.format || ""));
+      if (!zips.length) continue;
+      zips.sort((a, b) => String(b.created || b.name).localeCompare(String(a.created || a.name)));
+      return zips[0].url;
+    } catch (e) { tried.push(`${api} → ${e.message}`); }
+  }
+  throw new Error("Nije pronađen švajcarski GTFS na opentransportdata.swiss. Pokušano:\n  " + tried.join("\n  "));
 }
 
 export function productFromStopId(stopId = "") {
