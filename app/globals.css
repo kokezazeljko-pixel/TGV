@@ -295,20 +295,18 @@ a.primary{display:inline-block;text-decoration:none}
 /* ===== map styles ===== */
 .mapbox{--pin:var(--rail-lgv);--pin-edge:#fff}
 .legend{--pin:var(--rail-lgv);--pin-edge:#fff}
-/* Metro: white map, bold red high-speed lines, solid grey other lines, black pins */
-.mapbox.style-metro{--sea:#edf2f7;--land:#ffffff;--coast:#c9d4de;--rail-lgv:#d7263d;--rail-classic:#8a94a3;--station:#fff;--halo:#fff;--sea-label:#94a3b8;--pin:#111827;--pin-edge:#fff}
-.mapbox.style-metro #map .rail.lgv{stroke-width:4.2}
-.mapbox.style-metro #map .rail.casing{stroke-width:8}
-.mapbox.style-metro #map .rail.classic{stroke-dasharray:none;stroke-width:1.6}
-.mapbox.style-metro #map .stn{stroke:#111827}
-.mapbox.style-metro #map .lbl{fill:#111827}
-@media (prefers-color-scheme: dark){
-  .mapbox.style-metro{--sea:#0b1220;--land:#1b2333;--coast:#2f3b52;--rail-lgv:#ff5a6e;--rail-classic:#6d7890;--station:#0d1320;--halo:#1b2333;--sea-label:#53627d;--pin:#e5e7eb;--pin-edge:#0d1320}
-  .mapbox.style-metro #map .stn{stroke:#e5e7eb}
-  .mapbox.style-metro #map .lbl{fill:#e8ecf4}
-  .mapbox.style-metro #map .pin-face{fill:#0d1320}
-  .mapbox.style-metro #map .pin-icon{fill:#e5e7eb}
-}
+/* Dark: night map, glowing light-blue lines, amber pins (same in light and dark mode) */
+.mapbox.style-dark{--sea:#0a1020;--land:#141d33;--coast:#2a3757;--rail-lgv:#4cc9f0;--rail-classic:#3e5078;--station:#0a1020;--halo:#141d33;--sea-label:#4f6590;--pin:#ffc24b;--pin-edge:#0a1020;
+  --fg:#e6edf8;--surface:#141d33;--line:#2a3757;--muted:#93a1bd;border-color:#1f2a44}
+.mapbox.style-dark #map .rail.casing{stroke:rgba(76,201,240,.16);stroke-width:9}
+.mapbox.style-dark #map .rail.classic{stroke-dasharray:3 3}
+.mapbox.style-dark #map .stn{stroke:#4cc9f0}
+.mapbox.style-dark #map .pin-face{fill:#0a1020}
+.mapbox.style-dark #map .pin-icon{fill:#ffc24b}
+.mapbox.style-dark #map .pin.sel .pin-body{fill:#ffffff}
+.mapbox.style-dark #map .pin.sel .pin-icon{fill:#0a1020}
+.mapbox.style-dark #map .trn .arrow{stroke:#0a1020}
+.mapbox.style-dark .mapctl button{color:var(--fg)}
 .mapstyle{position:absolute;left:10px;top:10px;display:flex;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:2px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .mapstyle button{border:0;background:none;color:var(--fg);font-weight:700;font-size:12.5px;padding:5px 11px;border-radius:999px;cursor:pointer}
 .mapstyle button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}

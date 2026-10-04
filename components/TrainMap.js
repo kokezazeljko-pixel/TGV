@@ -15,11 +15,11 @@ const TIER_A = new Set(["Lille", "Strasbourg", "Lyon", "Marseille", "Bordeaux", 
  * sizes that must stay constant on screen use the CSS variables --u (map units per pixel),
  * --sr (station radius) and --ts (train arrow size).
  */
-export const MAP_STYLES = ["classic", "metro"];
+export const MAP_STYLES = ["classic", "dark"];
 
 export default function TrainMap({ country = "fr", trains, onTrainClick, onStationClick, selectedStation, highlight, onRunning, compact }) {
   const { t } = useLang();
-  // Map look chosen by the visitor (Classic / Metro), remembered in this browser
+  // Map look chosen by the visitor (Classic / Dark), remembered in this browser
   const [mapStyle, setMapStyle] = useState("classic");
   useEffect(() => { try { const s = localStorage.getItem("tp-mapstyle"); if (MAP_STYLES.includes(s)) setMapStyle(s); } catch {} }, []);
   const chooseStyle = (s) => { setMapStyle(s); try { localStorage.setItem("tp-mapstyle", s); } catch {} };
