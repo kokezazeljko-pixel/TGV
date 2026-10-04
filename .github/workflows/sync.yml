@@ -1,9 +1,11 @@
+# Automatsko preuzimanje podataka o vozovima (Francuska: SNCF, Švajcarska: opentransportdata.swiss)
 name: SNCF podaci
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
-    - cron: "20 1 * * *"
+    - cron: "*/5 * * * *"   # kašnjenja: na svakih 5 minuta
+    - cron: "20 1 * * *"    # red vožnje (obe zemlje): jednom dnevno, noću
+    - cron: "20 14 * * *"   # švajcarski red vožnje ponovo, posle njihovog popodnevnog ažuriranja
   workflow_dispatch:
     inputs:
       job:
@@ -13,21 +15,31 @@ on:
         default: oba
 
 concurrency:
-  group: sncf-${{ github.event.schedule || github.event.inputs.job }}
+  group: sync-${{ github.event.schedule || github.event.inputs.job }}
   cancel-in-progress: false
 
 jobs:
   red-voznje:
-    if: github.event.schedule == '20 1 * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.job != 'kasnjenja')
+    if: github.event.schedule == '20 1 * * *' || github.event.schedule == '20 14 * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.job != 'kasnjenja')
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node ingest/sync-schedule.mjs
+      - name: Francuska – red vožnje
+        if: github.event.schedule != '20 14 * * *'
+        continue-on-error: true
+        run: node ingest/sync-schedule.mjs
         env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      - name: Švajcarska – red vožnje
+        continue-on-error: true
+        run: node ingest/sync-schedule.mjs
+        env:
+          COUNTRY: ch
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
@@ -35,13 +47,23 @@ jobs:
     needs: [red-voznje]
     if: always() && (github.event.schedule == '*/5 * * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.job != 'red-voznje'))
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node ingest/sync-realtime.mjs
+      - name: Francuska – kašnjenja
+        continue-on-error: true
+        run: node ingest/sync-realtime.mjs
         env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      - name: Švajcarska – kašnjenja
+        continue-on-error: true
+        run: node ingest/sync-realtime.mjs
+        env:
+          COUNTRY: ch
+          SWISS_API_KEY: ${{ secrets.SWISS_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
