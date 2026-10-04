@@ -75,7 +75,7 @@ function OfficialNotices({ alerts }) {
                 <p className="small"><a href={gtranslate(origText, want)} target="_blank" rel="noopener noreferrer">{t("noticeGoogle", LANG_NAMES[want])} ↗</a></p>
               </>
             )}
-            <p className="muted small">{t("officialSource", SOURCE[a.country] || "SNCF")} · {t("noticeOriginal")}: {LANG_NAMES[orig] || orig.toUpperCase()}{a.active_from ? ` · ${t("officialSince", time(a.active_from))}` : ""}</p>
+            <p className="muted small">{t("officialSource", SOURCE[a.country] || "SNCF")} · {t("noticeOriginal")}: {LANG_NAMES[orig] || orig.toUpperCase()}{a.active_from && !(a.country === "be" && a.cause === 10) ? ` · ${t("officialSince", time(a.active_from))}` : ""}</p>
           </div>
         );
       })}

@@ -93,9 +93,40 @@ const lang2 = (l) => (l || "").toLowerCase().slice(0, 2);
 const allLangs = (t) => { const o = {}; for (const x of t || []) if (x.text && lang2(x.lang) && !o[lang2(x.lang)]) o[lang2(x.lang)] = x.text; return o; };
 const pick = (t, langs) => { for (const l of langs) { const x = (t || []).find((y) => lang2(y.lang) === l); if (x?.text) return x.text; } return t?.[0]?.text || null; };
 
+// Planned works (cause 10) come without dates in the feed; the dates are only in the text, e.g.
+// "During the weekend of 10-11/10", "From 3 to 18/10", "weekends of 3-4, 17-18 and 24-25/10", "from 31/10 to 6/11".
+// Returns the days (YYYY-MM-DD) the text mentions, or null when it names no date.
+const iso = (y, m, d) => `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+export function worksDays(text = "", todayIso) {
+  const [ty, tm] = todayIso.split("-").map(Number);
+  const year = (m) => (m < tm - 6 ? ty + 1 : m > tm + 6 ? ty - 1 : ty);
+  const days = new Set();
+  const addRange = (d1, m1, d2, m2) => {
+    let t = Date.UTC(year(m1), m1 - 1, d1), end = Date.UTC(year(m2), m2 - 1, d2);
+    if (end < t) end = Date.UTC(year(m2) + 1, m2 - 1, d2);
+    for (let i = 0; t <= end && i < 120; t += 86400000, i++) { const x = new Date(t); days.add(iso(x.getUTCFullYear(), x.getUTCMonth() + 1, x.getUTCDate())); }
+  };
+  let rest = text.replace(/(\d{1,2})\/(\d{1,2})\s*(?:-|to|au|tot|bis)\s*(\d{1,2})\/(\d{1,2})/gi, (_, a, b, c, d) => { addRange(+a, +b, +c, +d); return " "; });
+  // day lists ending with one month: "3-4, 17-18 and 24-25/10", "3 to 18/10", "10/10"
+  rest.replace(/((?:\d{1,2}(?:\s*(?:-|to)\s*\d{1,2})?(?:\s*,\s*|\s+and\s+))*\d{1,2}(?:\s*(?:-|to)\s*\d{1,2})?)\/(\d{1,2})\b/gi, (_, list, mo) => {
+    const m = +mo;
+    if (m < 1 || m > 12) return "";
+    for (const part of list.split(/\s*,\s*|\s+and\s+/)) {
+      const r = part.split(/\s*(?:-|to)\s*/).map(Number);
+      if (r.every((d) => d >= 1 && d <= 31)) addRange(r[0], m, r[r.length - 1], m);
+    }
+    return "";
+  });
+  let out = [...days].sort();
+  if (/\bweekdays\b|\bwerkdagen\b|en semaine/i.test(text)) out = out.filter((d) => ![0, 6].includes(new Date(d + "T12:00:00Z").getUTCDay())); // "On weekdays from 12 to 22/10"
+  return out.length ? out : null;
+}
+
 // rows for apply_alerts_stations (Belgium); French is listed first by SNCB, Dutch is equally official
-export function belgianAlertRows(feed, nowSec) {
+export function belgianAlertRows(feed, nowSec, todayIso) {
   const rows = [];
+  const today = todayIso || new Date(nowSec * 1000).toLocaleDateString("en-CA", { timeZone: "Europe/Brussels" });
+  const tomorrow = new Date(Date.parse(today + "T12:00:00Z") + 86400000).toISOString().slice(0, 10);
   for (const e of feed.entities) {
     const a = e.alert;
     if (!a || e.isDeleted) continue;
@@ -104,7 +135,13 @@ export function belgianAlertRows(feed, nowSec) {
     if (!live) continue;
     const { stations, need } = alertStations(a.header);
     if (!stations.length) continue;
-    const p = periods.find((x) => x.start || x.end) || {};
+    let p = periods.find((x) => x.start || x.end) || {};
+    if (a.cause === 10 && !p.start && !p.end) {
+      // planned works: only on the days named in the text (today / tomorrow), never "always"
+      const days = worksDays(pick(a.description, ["en", "fr"]) || "", today)?.filter((d) => d === today || d === tomorrow);
+      if (!days?.length) continue;
+      p = { start: Date.parse(days[0] + "T00:00:00+02:00") / 1000 + 3600, end: Date.parse(days[days.length - 1] + "T23:00:00+02:00") / 1000 };
+    }
     rows.push({
       id: e.id, orig_lang: "fr", header_tr: allLangs(a.header), description_tr: allLangs(a.description),
       header: pick(a.header, ["fr", "nl"]), description: pick(a.description, ["fr", "nl"]),
