@@ -8,6 +8,10 @@ import { TRAIN_FIELDS, statusOf, toMin, parisTime, parisNowMin, ago } from "@/li
 import { REASON_KEYS } from "@/lib/i18n";
 import { useLang } from "@/components/LangProvider";
 import TrainMap from "@/components/TrainMap";
+import { getGeo } from "@/lib/geo";
+
+// The train's own country map, or France + Switzerland together when the trip leaves that country
+const routeMapFor = (train) => (getGeo(train.country || "fr").fitsTrain(train) ? train.country || "fr" : "all");
 
 const COMMENT_FIELDS = "id,kind,reason,rating,body,onboard,created_at,author_name,is_mine";
 
@@ -78,7 +82,7 @@ export default function TrainDetail({ initialTrain }) {
 
           <section className="card">
             <h3>{t("routeMap")}</h3>
-            <TrainMap country={train.country || "fr"} trains={[train]} highlight={train} compact />
+            <TrainMap country={routeMapFor(train)} trains={[train]} highlight={train} compact />
           </section>
 
           <section className="card">

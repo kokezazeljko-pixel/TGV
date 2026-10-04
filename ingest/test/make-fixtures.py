@@ -97,7 +97,8 @@ ch = {
              "91-8-j26-1,TA,2.TA.91-8-j26-1.1.H,Pfäffikon SZ,18837,0\n"
              "91-RE-j26-1,TA,3.TA.91-RE-j26-1.1.H,Bern,4021,0\n"
              "92-B-j26-1,TA,4.TA.92-B-j26-1.1.H,Bahnhof,31,0\n"
-             "91-TGV-j26-1,TA,5.TA.91-TGV-j26-1.1.R,Paris Gare de Lyon,9774,1\n",
+             "91-TGV-j26-1,TA,5.TA.91-TGV-j26-1.1.R,Paris Gare de Lyon,9774,1\n"
+             "91-TGV-j26-1,TA,6.TA.91-TGV-j26-1.1.H,Nice-Ville,6805,0\n",
 "stops.txt": "stop_id,stop_name,stop_lat,stop_lon,location_type,parent_station\n"
              "ch:1:sloid:7000:4:7,Genève,46.2102,6.1424,,Parent8501008\n"
              "ch:1:sloid:5003:2:3,Lausanne,46.5168,6.6291,,Parent8501120\n"
@@ -105,7 +106,9 @@ ch = {
              "ch:1:sloid:3000:31:31,Zürich HB,47.3781,8.5402,,Parent8503000\n"
              "ch:1:sloid:3000:9:9,Zürich HB,47.3779,8.5400,,Parent8503000\n"
              "ch:1:sloid:6021:1:1,St. Gallen,47.4232,9.3697,,Parent8506302\n"
-             "8014228_gen:missingSLOID_pf:12,Thalwil,47.2954,8.5646,,\n",
+             "8014228_gen:missingSLOID_pf:12,Thalwil,47.2954,8.5646,,\n"
+             "8772319,Lyon Part Dieu,45.7606,4.8593,,\n"
+             "8775605,Nice-Ville,43.7046,7.2619,,\n",
 "stop_times.txt": "trip_id,arrival_time,departure_time,stop_id,stop_sequence\n"
              "1.TA.91-1-j26-1.1.H,,10:02:00,ch:1:sloid:7000:4:7,1\n"
              "1.TA.91-1-j26-1.1.H,10:38:00,10:41:00,ch:1:sloid:5003:2:3,2\n"
@@ -119,7 +122,9 @@ ch = {
              "4.TA.92-B-j26-1.1.H,,10:00:00,ch:1:sloid:3000:9:9,1\n"
              "4.TA.92-B-j26-1.1.H,10:10:00,,ch:1:sloid:3000:31:31,2\n"
              "5.TA.91-TGV-j26-1.1.R,,12:30:00,ch:1:sloid:5003:2:3,1\n"
-             "5.TA.91-TGV-j26-1.1.R,16:15:00,,ch:1:sloid:7000:4:7,2\n",
+             "5.TA.91-TGV-j26-1.1.R,16:15:00,,ch:1:sloid:7000:4:7,2\n"
+             "6.TA.91-TGV-j26-1.1.H,,08:06:00,8772319,1\n"
+             "6.TA.91-TGV-j26-1.1.H,13:04:00,,8775605,2\n",
 }
 with zipfile.ZipFile(os.path.join(out, "gtfs-ch.zip"), "w", zipfile.ZIP_DEFLATED) as z:
     for k, v in ch.items(): z.writestr(k, v)

@@ -27,6 +27,10 @@ const dates = Array.from({ length: DAYS }, (_, i) => addDays(TODAY, i));
 const ymd = (iso) => iso.replaceAll("-", "");
 const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
+// Švajcarski GTFS sadrži i mnoge strane vozove (npr. francuske TGV Lyon–Nica bez ijedne stanice u Švajcarskoj).
+// Zadržavamo samo one koji staju bar na jednoj švajcarskoj stanici (SLOID "ch:..." ili UIC broj 85xxxxx).
+const servesCountry = (t) => COUNTRY !== "ch" || t.stops.some((s) => /^(ch:|85\d{5})/.test(s.id));
+
 // Šatl vozovi (npr. Avignon Centre ↔ Avignon TGV) imaju 6-cifrene brojeve i samo dve stanice
 const isShuttle = (t) => (COUNTRY === "fr" && /^\d{6,}$/.test(t.trip_short_name || t.trip_headsign || "")) || t.stops.length < 2;
 
@@ -91,7 +95,7 @@ async function main() {
     const route = routes.get(t.route_id) || {};
     t.type = COUNTRY === "ch" ? route.type : detectType(productFromStopId(t.stops[0].id), route.route_short_name, route.route_long_name, route.route_desc);
     typeCount[t.type] = (typeCount[t.type] || 0) + 1;
-    if (TYPES.includes(t.type) && !isShuttle(t)) keep.push(t);
+    if (TYPES.includes(t.type) && !isShuttle(t) && servesCountry(t)) keep.push(t);
   }
   console.log("Prepoznate vrste vozova:", typeCount);
 

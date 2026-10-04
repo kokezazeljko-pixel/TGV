@@ -39,6 +39,7 @@ assert.equal(ups.length, 2, "nepoznat voz se preskače");
 run("sync-schedule.mjs", { COUNTRY: "ch", GTFS_FILE: join(dir, "gtfs-ch.zip"), TODAY: DATE, DAYS: "1", OUT_FILE: join(dir, "trains-ch.json") });
 const ch = JSON.parse(readFileSync(join(dir, "trains-ch.json"), "utf8"));
 assert.deepEqual(ch.map((t) => t.type).sort(), ["IC", "TGV Lyria"], "samo IC i TGV, bez S-Bahna, RE i autobusa");
+assert.ok(!ch.some((t) => t.number === "6805"), "francuski TGV bez švajcarske stanice (Lyon–Nica) se izbacuje");
 const ic = ch.find((t) => t.number === "717");
 assert.equal(ic.country, "ch");
 assert.ok(ic.id.includes("_ch_"), "id sa oznakom zemlje");
