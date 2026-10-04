@@ -5,7 +5,7 @@ import { DICT, translate } from "@/lib/i18n";
 
 const LangContext = createContext({ lang: "en", setLang: () => {}, t: (k, ...a) => translate("en", k, ...a) });
 
-// Remembers the chosen language in the browser; French browsers start in French
+// Remembers the chosen language in the browser; German and French browsers start in their language
 export function LangProvider({ children }) {
   const [lang, setLangState] = useState("en");
 
@@ -13,7 +13,10 @@ export function LangProvider({ children }) {
     let saved = null;
     try { saved = localStorage.getItem("peron-lang"); } catch {}
     if (saved && DICT[saved]) setLangState(saved);
-    else if ((navigator.language || "").toLowerCase().startsWith("fr")) setLangState("fr");
+    else {
+      const nav = (navigator.language || "").toLowerCase().slice(0, 2);
+      if (DICT[nav]) setLangState(nav);
+    }
   }, []);
 
   useEffect(() => { document.documentElement.lang = lang; }, [lang]);

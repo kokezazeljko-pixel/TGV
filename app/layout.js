@@ -12,7 +12,7 @@ const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["500", "700"], variab
 export const metadata = {
   metadataBase: new URL(SITE_URL),
   title: { default: "Train Punctuality – train delays in France and Switzerland", template: "%s · Train Punctuality" },
-  description: "How late is your train in France (TGV) and Switzerland (IC, IR, EC), and what passengers on board are saying. Retards des trains et avis des voyageurs.",
+  description: "How late is your train in France (TGV) and Switzerland (IC, IR, EC), and what passengers on board are saying. Zugverspätungen und Berichte von Reisenden. Retards des trains et avis des voyageurs.",
   alternates: { canonical: "/" },
   openGraph: { title: "Train Punctuality – train delays in France and Switzerland", description: "Live train delays in France and Switzerland and reports from passengers on board.", url: "/", siteName: "Train Punctuality", type: "website" },
 };

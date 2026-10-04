@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useLang } from "@/components/LangProvider";
 import { CONTACT_EMAIL, SITE_NAME, PRIVACY_UPDATED } from "@/lib/site";
 import { PRIVACY } from "./content";
+import { LOCALES } from "@/lib/i18n";
 
 const fill = (s) => s.replaceAll("{site}", SITE_NAME).replaceAll("{email}", CONTACT_EMAIL);
 
@@ -18,7 +19,7 @@ function Text({ children }) {
 export default function PrivacyPage() {
   const { lang, t } = useLang();
   const c = PRIVACY[lang] || PRIVACY.en;
-  const date = new Date(PRIVACY_UPDATED + "T12:00:00Z").toLocaleDateString(lang === "fr" ? "fr-FR" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const date = new Date(PRIVACY_UPDATED + "T12:00:00Z").toLocaleDateString(LOCALES[lang] || "en-GB", { day: "numeric", month: "long", year: "numeric" });
   return (
     <article className="legal">
       <Link href="/" className="back">{t("allTrains")}</Link>

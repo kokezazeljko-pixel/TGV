@@ -1,4 +1,4 @@
-// Privacy policy text in English and French.
+// Privacy policy text in English, German and French.
 // Each section: h (heading), p (paragraphs before the list), list, after (paragraphs after the list).
 // Placeholders: {site} = site name, {email} = contact email.
 
@@ -6,7 +6,7 @@ export const PRIVACY = {
   en: {
     title: "Privacy policy",
     updated: "Last updated",
-    intro: "{site} shows how late TGV trains are and lets passengers share what is happening on board. This page explains what personal data the site handles, why, and what your rights are under the EU General Data Protection Regulation (GDPR).",
+    intro: "{site} shows how late trains in France and Switzerland are and lets passengers share what is happening on board. This page explains what personal data the site handles, why, and what your rights are under the EU General Data Protection Regulation (GDPR) and the Swiss Federal Act on Data Protection (FADP).",
     sections: [
       { h: "Who is responsible", p: ["The site is run by the operator of {site}, who is the data controller. You can reach the operator at {email} for any question about your data."] },
       {
@@ -16,7 +16,7 @@ export const PRIVACY = {
           "The display name you choose. It is shown next to your comments unless you post anonymously.",
           "Your comments: the text, the reason or rating you pick, whether you marked yourself as on board, the train and the time of posting.",
           "Technical data needed to run the site, such as your IP address and browser type, which our hosting providers keep in their server logs for a short time.",
-          "Your language choice (EN/FR) and, if you sign in, your session. Both are stored in your own browser.",
+          "Your language and country choice and, if you sign in, your session. These are stored in your own browser.",
         ],
         after: ["You can read train delays without signing in. In that case we do not collect any personal data beyond the technical server logs."],
       },
@@ -53,16 +53,69 @@ export const PRIVACY = {
         h: "Your rights",
         p: ["Under the GDPR you can ask to access your data, correct it, delete it, receive a copy of it, or object to how we use it. Write to {email} and we will answer within one month. You can also delete any of your comments yourself at any time."],
         list2h: "If you are not satisfied",
-        list2: "You can file a complaint with a data protection authority, for example the CNIL in France (www.cnil.fr) or the authority in your own country.",
+        list2: "You can file a complaint with a data protection authority, for example the Federal Data Protection and Information Commissioner in Switzerland (www.edoeb.admin.ch), the CNIL in France (www.cnil.fr) or the authority in your own country.",
       },
       { h: "Children", p: ["The site is not intended for children under 15. Do not create an account if you are under 15."] },
       { h: "Changes to this policy", p: ["If we change how we handle data, we will update this page and the date at the top."] },
     ],
   },
+  de: {
+    title: "Datenschutzerklärung",
+    updated: "Zuletzt aktualisiert",
+    intro: "{site} zeigt, wie verspätet Züge in Frankreich und der Schweiz sind, und lässt Reisende teilen, was an Bord passiert. Diese Seite erklärt, welche personenbezogenen Daten die Website verarbeitet, warum, und welche Rechte Sie nach der EU-Datenschutz-Grundverordnung (DSGVO) und dem Schweizer Datenschutzgesetz (DSG) haben.",
+    sections: [
+      { h: "Verantwortlicher", p: ["Die Website wird vom Betreiber von {site} betrieben, der für die Datenverarbeitung verantwortlich ist. Bei Fragen zu Ihren Daten erreichen Sie den Betreiber unter {email}."] },
+      {
+        h: "Welche Daten wir erheben",
+        list: [
+          "Ihre E-Mail-Adresse, nur wenn Sie sich anmelden. Sie dient dazu, Ihnen einen Anmeldelink zu senden und Sie angemeldet zu halten. Sie wird anderen Besuchern nie angezeigt.",
+          "Den Anzeigenamen, den Sie wählen. Er erscheint neben Ihren Kommentaren, außer Sie posten anonym.",
+          "Ihre Kommentare: den Text, den gewählten Grund oder die Bewertung, ob Sie sich als „an Bord“ markiert haben, den Zug und den Zeitpunkt.",
+          "Technische Daten, die für den Betrieb nötig sind, etwa IP-Adresse und Browsertyp, die unsere Hosting-Anbieter kurzzeitig in ihren Server-Logs speichern.",
+          "Ihre Sprachwahl, Ihre Länderwahl und, wenn Sie angemeldet sind, Ihre Sitzung. Diese werden in Ihrem eigenen Browser gespeichert.",
+        ],
+        after: ["Sie können Verspätungen ohne Anmeldung ansehen. In diesem Fall erheben wir außer den technischen Server-Logs keine personenbezogenen Daten."],
+      },
+      { h: "Was wir nicht tun", list: ["Wir verkaufen oder vermieten Ihre Daten nicht.", "Wir zeigen keine Werbung.", "Wir verwenden keine Tracking- oder Werbe-Cookies und keine Analyse-Tools, die Sie über Websites hinweg verfolgen."] },
+      {
+        h: "Wozu wir Ihre Daten verwenden (Rechtsgrundlage)",
+        list: [
+          "Um Ihnen ein Konto zu geben und Ihre Kommentare zu veröffentlichen: zur Erbringung des von Ihnen gewünschten Dienstes erforderlich (Art. 6 Abs. 1 lit. b DSGVO).",
+          "Um die Website zu schützen und Spam und Missbrauch zu verhindern, mithilfe von Server-Logs und Posting-Limits: unser berechtigtes Interesse (Art. 6 Abs. 1 lit. f DSGVO).",
+        ],
+      },
+      {
+        h: "Wer Daten für uns verarbeitet",
+        p: ["Wir nutzen vertrauenswürdige Anbieter, die Daten in unserem Auftrag verarbeiten:"],
+        list: [
+          "Supabase: Datenbank und Anmeldung. Die Daten werden in der Europäischen Union gespeichert (Frankfurt, Deutschland).",
+          "Vercel: Hosting der Website. Vercel kann technische Daten wie IP-Adressen auf Grundlage der Standardvertragsklauseln der Europäischen Kommission außerhalb der EU verarbeiten.",
+          "GitHub: führt die Skripte aus, die Zugdaten von SNCF und opentransportdata.swiss abrufen. Diese Skripte verarbeiten keine Besucherdaten.",
+        ],
+      },
+      { h: "Zugdaten", p: ["Fahrpläne und Echtzeit-Verspätungen stammen aus den Open Data der SNCF (transport.data.gouv.fr) und für die Schweiz von opentransportdata.swiss. Sie enthalten keine personenbezogenen Daten."] },
+      {
+        h: "Wie lange wir Daten speichern",
+        list: [
+          "Ihr Konto und Ihr Anzeigename: bis Sie die Löschung verlangen.",
+          "Ihre Kommentare: bis Sie sie selbst löschen (mit „Löschen“ neben dem Kommentar) oder Ihr Konto gelöscht wird.",
+          "Server-Logs: von unseren Hosting-Anbietern für begrenzte Zeit gespeichert, meist einige Tage bis wenige Wochen.",
+        ],
+      },
+      {
+        h: "Ihre Rechte",
+        p: ["Sie können Auskunft über Ihre Daten verlangen, sie berichtigen oder löschen lassen, eine Kopie erhalten oder der Verarbeitung widersprechen. Schreiben Sie an {email}, wir antworten innerhalb eines Monats. Ihre Kommentare können Sie jederzeit selbst löschen."],
+        list2h: "Wenn Sie nicht zufrieden sind",
+        list2: "Sie können sich bei einer Datenschutzbehörde beschweren, zum Beispiel beim Eidgenössischen Datenschutz- und Öffentlichkeitsbeauftragten in der Schweiz (www.edoeb.admin.ch), bei der CNIL in Frankreich (www.cnil.fr) oder bei der Behörde in Ihrem Land.",
+      },
+      { h: "Kinder", p: ["Die Website richtet sich nicht an Kinder unter 15 Jahren. Erstellen Sie kein Konto, wenn Sie jünger als 15 sind."] },
+      { h: "Änderungen", p: ["Wenn wir den Umgang mit Daten ändern, aktualisieren wir diese Seite und das Datum oben."] },
+    ],
+  },
   fr: {
     title: "Politique de confidentialité",
     updated: "Dernière mise à jour",
-    intro: "{site} indique les retards des TGV et permet aux voyageurs de partager ce qui se passe à bord. Cette page explique quelles données personnelles le site traite, pourquoi, et quels sont vos droits selon le Règlement général sur la protection des données (RGPD).",
+    intro: "{site} indique les retards des trains en France et en Suisse et permet aux voyageurs de partager ce qui se passe à bord. Cette page explique quelles données personnelles le site traite, pourquoi, et quels sont vos droits selon le Règlement général sur la protection des données (RGPD) et la loi suisse sur la protection des données (LPD).",
     sections: [
       { h: "Responsable du traitement", p: ["Le site est géré par l’exploitant de {site}, responsable du traitement. Vous pouvez le contacter à {email} pour toute question sur vos données."] },
       {
@@ -72,7 +125,7 @@ export const PRIVACY = {
           "Le nom d’affichage que vous choisissez. Il apparaît à côté de vos commentaires, sauf si vous publiez anonymement.",
           "Vos commentaires : le texte, le motif ou la note choisis, l’indication « à bord », le train et l’heure de publication.",
           "Les données techniques nécessaires au fonctionnement du site, comme l’adresse IP et le type de navigateur, conservées brièvement par nos hébergeurs dans leurs journaux.",
-          "Votre choix de langue (EN/FR) et, si vous êtes connecté, votre session. Les deux sont enregistrés dans votre propre navigateur.",
+          "Votre choix de langue et de pays et, si vous êtes connecté, votre session. Ils sont enregistrés dans votre propre navigateur.",
         ],
         after: ["Vous pouvez consulter les retards sans vous connecter. Dans ce cas, aucune donnée personnelle n’est collectée en dehors des journaux techniques."],
       },
@@ -106,7 +159,7 @@ export const PRIVACY = {
         h: "Vos droits",
         p: ["Selon le RGPD, vous pouvez demander l’accès à vos données, leur rectification, leur effacement, leur portabilité, ou vous opposer à leur traitement. Écrivez à {email}, nous répondrons dans un délai d’un mois. Vous pouvez aussi supprimer vous-même vos commentaires à tout moment."],
         list2h: "En cas de désaccord",
-        list2: "Vous pouvez introduire une réclamation auprès d’une autorité de protection des données, par exemple la CNIL en France (www.cnil.fr) ou l’autorité de votre pays.",
+        list2: "Vous pouvez introduire une réclamation auprès d’une autorité de protection des données, par exemple le Préposé fédéral à la protection des données et à la transparence en Suisse (www.edoeb.admin.ch), la CNIL en France (www.cnil.fr) ou l’autorité de votre pays.",
       },
       { h: "Mineurs", p: ["Le site ne s’adresse pas aux enfants de moins de 15 ans. Ne créez pas de compte si vous avez moins de 15 ans."] },
       { h: "Modifications", p: ["Si nous modifions la façon dont nous traitons les données, nous mettrons à jour cette page et la date indiquée en haut."] },
