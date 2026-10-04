@@ -1,9 +1,10 @@
 # Automatsko preuzimanje podataka o vozovima (Francuska: SNCF, Švajcarska: opentransportdata.swiss)
 name: SNCF podaci
 
+# Kašnjenja se osvežavaju automatski u Supabase-u (Edge funkcija sync-realtime, na svakih 3 minuta).
+# Ovde ostaje red vožnje (svakog dana) i ručno pokretanje kašnjenja, ako zatreba.
 on:
   schedule:
-    - cron: "*/5 * * * *"   # kašnjenja: na svakih 5 minuta
     - cron: "20 1 * * *"    # red vožnje (obe zemlje): jednom dnevno, noću
     - cron: "20 14 * * *"   # švajcarski red vožnje ponovo, posle njihovog popodnevnog ažuriranja
   workflow_dispatch:
@@ -45,7 +46,7 @@ jobs:
 
   kasnjenja:
     needs: [red-voznje]
-    if: always() && (github.event.schedule == '*/5 * * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.job != 'red-voznje'))
+    if: always() && github.event_name == 'workflow_dispatch' && github.event.inputs.job != 'red-voznje'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
