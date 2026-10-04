@@ -18,19 +18,58 @@ const routeMapFor = (train) => (getGeo(train.country || "fr").fitsTrain(train) ?
 const paragraphs = (html) => (html || "").replace(/<br\s*\/?>/gi, "\n").split(/<\/p>|\n/i)
   .map((p) => p.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#39;|&rsquo;/g, "’").replace(/&quot;/g, "\"").trim()).filter(Boolean);
 
+const SITE_LANGS = ["en", "de", "fr"];
+const LANG_NAMES = { en: "English", de: "Deutsch", fr: "Français", it: "Italiano" };
+const gtranslate = (text, to) => `https://translate.google.com/?sl=auto&tl=${to}&text=${encodeURIComponent(text.slice(0, 4500))}&op=translate`;
+
+// Shown in the railway's original language first; the reader can switch to the other site languages.
+// Uses the railway's own translation when the feed has one, otherwise offers a Google Translate link.
 function OfficialNotices({ alerts }) {
   const { t, lang } = useLang();
+  const [view, setView] = useState("orig");
   const time = (iso) => new Date(iso).toLocaleTimeString(lang === "en" ? "en-GB" : lang, { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
+  const origs = [...new Set(alerts.map((a) => a.orig_lang || (a.country === "ch" ? "de" : "fr")))];
+  const choices = SITE_LANGS.filter((l) => !(origs.length === 1 && origs[0] === l));
   return (
     <section className="card notice-official">
       <h3><span className="warn-ico" aria-hidden="true">⚠</span> {t("officialTitle")}</h3>
-      {alerts.map((a) => (
-        <div key={a.id} className="alert-item">
-          {a.header && <b>{a.header}</b>}
-          {paragraphs(a.description).map((p, i) => <p key={i}>{p}</p>)}
-          <p className="muted small">{t("officialSource", a.country === "ch" ? "opentransportdata.swiss" : "SNCF")}{a.active_from ? ` · ${t("officialSince", time(a.active_from))}` : ""}</p>
-        </div>
-      ))}
+      <div className="notice-langs" role="group" aria-label={t("noticeLang")}>
+        <button type="button" className={view === "orig" ? "on" : ""} aria-pressed={view === "orig"} onClick={() => setView("orig")}>
+          {t("noticeOriginal")} ({origs.map((o) => o.toUpperCase()).join("/")})
+        </button>
+        {choices.map((l) => (
+          <button key={l} type="button" className={view === l ? "on" : ""} aria-pressed={view === l} onClick={() => setView(l)} title={LANG_NAMES[l]}>
+            {l.toUpperCase()}
+          </button>
+        ))}
+      </div>
+      {alerts.map((a) => {
+        const orig = a.orig_lang || (a.country === "ch" ? "de" : "fr");
+        const want = view === "orig" ? orig : view;
+        const hTr = a.header_tr || {}, dTr = a.description_tr || {};
+        const has = want === orig || hTr[want] || dTr[want];
+        const header = want === orig ? (hTr[orig] || a.header) : (hTr[want] || "");
+        const desc = want === orig ? (dTr[orig] || a.description) : (dTr[want] || "");
+        const origText = [hTr[orig] || a.header, paragraphs(dTr[orig] || a.description).join("\n")].filter(Boolean).join("\n\n");
+        return (
+          <div key={a.id} className="alert-item">
+            {has ? (
+              <>
+                {header && <b>{header}</b>}
+                {paragraphs(desc).map((p, i) => <p key={i}>{p}</p>)}
+                {want !== orig && <p className="muted small">{t("noticeTranslatedBy")}</p>}
+              </>
+            ) : (
+              <>
+                {(hTr[orig] || a.header) && <b>{hTr[orig] || a.header}</b>}
+                {paragraphs(dTr[orig] || a.description).map((p, i) => <p key={i}>{p}</p>)}
+                <p className="small"><a href={gtranslate(origText, want)} target="_blank" rel="noopener noreferrer">{t("noticeGoogle", LANG_NAMES[want])} ↗</a></p>
+              </>
+            )}
+            <p className="muted small">{t("officialSource", a.country === "ch" ? "opentransportdata.swiss" : "SNCF")} · {t("noticeOriginal")}: {LANG_NAMES[orig] || orig.toUpperCase()}{a.active_from ? ` · ${t("officialSince", time(a.active_from))}` : ""}</p>
+          </div>
+        );
+      })}
     </section>
   );
 }

@@ -365,4 +365,7 @@ a.primary{display:inline-block;text-decoration:none}
 .notice-official .alert-item:first-of-type{border-top:0;padding-top:2px}
 .notice-official .alert-item p{margin:6px 0 0}
 .notice-official .small{font-size:12.5px}
+.notice-langs{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+.notice-langs button{font:inherit;font-size:12.5px;padding:3px 10px;border-radius:999px;border:1px solid color-mix(in srgb,var(--warn) 45%,transparent);background:transparent;color:var(--fg);cursor:pointer}
+.notice-langs button.on{background:var(--warn);border-color:var(--warn);color:#fff;font-weight:600}
 .noticetag{margin-left:8px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--warn);white-space:nowrap}

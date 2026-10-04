@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
   const swissKey = Deno.env.get("SWISS_API_KEY") || "";
   if (country === "ch" && !swissKey) return json({ error: "SWISS_API_KEY is not set (Edge Functions → Secrets)" }, 500);
 
-  if (new URL(req.url).searchParams.get("kind") === "alerts") return syncAlerts(country, swissKey);
+  if (new URL(req.url).searchParams.get("kind") === "alerts") return syncAlerts(country, Deno.env.get("SWISS_SA_API_KEY") || swissKey);
 
   try {
     const t0 = Date.now();

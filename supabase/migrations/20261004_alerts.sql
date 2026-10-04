@@ -60,3 +60,9 @@ $$;
 revoke all on function public.call_sync_alerts(text) from public, anon, authenticated;
 select cron.schedule('alerts-fr', '2-59/5 * * * *', $$select public.call_sync_alerts('fr')$$);
 select cron.schedule('alerts-ch', '4-59/5 * * * *', $$select public.call_sync_alerts('ch')$$);
+
+-- Translations: keep every language the railway publishes + the original language
+alter table public.alerts add column if not exists orig_lang text;
+alter table public.alerts add column if not exists header_tr jsonb not null default '{}'::jsonb;
+alter table public.alerts add column if not exists description_tr jsonb not null default '{}'::jsonb;
+-- (apply_alerts was updated to store orig_lang, header_tr, description_tr — see the live function in Supabase)

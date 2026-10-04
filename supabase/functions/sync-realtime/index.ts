@@ -246,6 +246,20 @@ var ALERT_FEEDS = {
   fr: { url: "https://proxy.transport.data.gouv.fr/resource/sncf-gtfs-rt-service-alerts", headers: () => ({}), langs: ["fr", "en"] },
   ch: { url: "https://api.opentransportdata.swiss/la/gtfs-sa", headers: (key) => ({ Authorization: `Bearer ${key}`, "Accept-Encoding": "br, gzip, deflate" }), langs: ["de", "fr", "it", "en"] }
 };
+var lang2 = (l) => (l || "").toLowerCase().slice(0, 2);
+var allLangs = (tr) => {
+  const o = {};
+  for (const t of tr || [])
+    if (t.text && lang2(t.lang) && !o[lang2(t.lang)])
+      o[lang2(t.lang)] = t.text;
+  return o;
+};
+var origLang = (tr, country) => {
+  const langs = (tr || []).map((t) => lang2(t.lang)).filter(Boolean);
+  if (country === "fr")
+    return langs.includes("fr") ? "fr" : langs[0] || "fr";
+  return langs.find((l) => ["de", "fr", "it"].includes(l)) || langs[0] || "de";
+};
 var pick = (tr, langs) => {
   if (!tr?.length)
     return null;
@@ -271,10 +285,14 @@ function alertRows(feed, country, nowSec) {
     if (!trip_ids.length)
       continue;
     const p = periods.find((x) => x.start || x.end) || {};
+    const orig = origLang(a.description?.length ? a.description : a.header, country);
     rows.push({
       id: e.id,
-      header: pick(a.header, langs),
-      description: pick(a.description, langs),
+      orig_lang: orig,
+      header_tr: allLangs(a.header),
+      description_tr: allLangs(a.description),
+      header: pick(a.header, [orig, ...langs]),
+      description: pick(a.description, [orig, ...langs]),
       cause: a.cause ?? null,
       effect: a.effect ?? null,
       url: pick(a.url, langs),
@@ -326,7 +344,7 @@ Deno.serve(async (req) => {
   if (country === "ch" && !swissKey)
     return json({ error: "SWISS_API_KEY is not set (Edge Functions → Secrets)" }, 500);
   if (new URL(req.url).searchParams.get("kind") === "alerts")
-    return syncAlerts(country, swissKey);
+    return syncAlerts(country, Deno.env.get("SWISS_SA_API_KEY") || swissKey);
   try {
     const t0 = Date.now();
     const [rows, feedBuf] = await Promise.all([rpc("rt_candidates", { p_country: country }), fetchFeed(country, swissKey)]);

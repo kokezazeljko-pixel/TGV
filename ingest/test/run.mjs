@@ -62,5 +62,7 @@ assert.deepEqual(upch[0].stops.map((s) => s.delay), [0, 0, 4, 4, 4], "kašnjenje
   assert.equal(rowsA[0].header, "Train retardé");
   assert.equal(rowsA[0].description, "Panne de signalisation à Mâcon");
   assert.deepEqual(rowsA[0].trip_ids, ["OCESN006611F01"]);
+  assert.equal(rowsA[0].orig_lang, "fr", "SNCF obaveštenje je na francuskom");
+  assert.deepEqual(rowsA[0].header_tr, { fr: "Train retardé", en: "Train retardé (en)" }, "čuvaju se svi jezici iz feeda");
 }
 console.log("✔ Svi testovi su prošli");
