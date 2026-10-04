@@ -133,3 +133,18 @@ tuch = ld(1, s(1, "1.TA.91-1-j26-1.1.H") + s(3, ymd)) + ld(2, stu(3, departure=v
 feedch = ld(1, s(1, "2.0") + vi(3, epoch("12:00"))) + ld(2, s(1, "c1") + ld(3, tuch)) \
        + ld(2, s(1, "c2") + ld(3, ld(1, s(1, "2.TA.91-8-j26-1.1.H") + s(3, ymd)) + ld(2, stu(1, departure=vi(1, 60)))))
 open(os.path.join(out, "feed-ch.pb"), "wb").write(feedch)
+
+# ---- Service Alerts (zvanična obaveštenja): jedno za voz 6611, jedno samo za liniju, jedno isteklo
+def tr(text, lang): return ld(1, s(1, text) + s(2, lang))
+def alert(eid, trip=None, route=None, start=None, end=None, header="", desc=""):
+    a = b""
+    if start or end: a += ld(1, (vi(1, start) if start else b"") + (vi(2, end) if end else b""))
+    if trip: a += ld(5, ld(4, s(1, trip)))
+    if route: a += ld(5, s(2, route))
+    a += vi(6, 9) + vi(7, 3) + ld(10, tr(header, "fr") + tr(header + " (en)", "en")) + ld(11, tr(desc, "fr"))
+    return ld(2, s(1, eid) + ld(5, a))
+fa = ld(1, s(1, "2.0") + vi(3, epoch("14:00"))) \
+   + alert("A1", trip="OCESN006611F01", start=epoch("10:00"), end=epoch("23:00"), header="Train retardé", desc="Panne de signalisation à Mâcon") \
+   + alert("A2", route="R1", header="Travaux", desc="Ligne modifiée") \
+   + alert("A3", trip="OCESN006611F01", start=epoch("06:00"), end=epoch("07:00"), header="Ancien", desc="Fini")
+open(os.path.join(out, "alerts.pb"), "wb").write(fa)

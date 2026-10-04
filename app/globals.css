@@ -356,3 +356,13 @@ a.primary{display:inline-block;text-decoration:none}
 .mapbox.routeview.style-dark #map .rs-lbl{fill:#e6edf8;stroke:#141d33}
 .mapbox.routeview.style-dark #map .rs-time{fill:#ffc24b}
 .mapbox.routeview.style-dark #map .rs-delay{fill:#ff8a93 !important}
+
+/* official notices from the railway */
+.notice-official{border-left:4px solid var(--warn);background:var(--warn-bg)}
+.notice-official h3{display:flex;align-items:center;gap:8px}
+.notice-official .warn-ico{color:var(--warn)}
+.notice-official .alert-item{padding:10px 0;border-top:1px solid color-mix(in srgb,var(--warn) 25%,transparent)}
+.notice-official .alert-item:first-of-type{border-top:0;padding-top:2px}
+.notice-official .alert-item p{margin:6px 0 0}
+.notice-official .small{font-size:12.5px}
+.noticetag{margin-left:8px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--warn);white-space:nowrap}

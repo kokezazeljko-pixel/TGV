@@ -9,9 +9,31 @@ import { REASON_KEYS } from "@/lib/i18n";
 import { useLang } from "@/components/LangProvider";
 import TrainMap from "@/components/TrainMap";
 import { getGeo } from "@/lib/geo";
+import { fetchAlertsForTrain } from "@/lib/queries";
 
 // The train's own country map, or France + Switzerland together when the trip leaves that country
 const routeMapFor = (train) => (getGeo(train.country || "fr").fitsTrain(train) ? train.country || "fr" : "all");
+
+// Notices come as simple HTML from the railway: keep only the text, one paragraph per block (never inject their HTML)
+const paragraphs = (html) => (html || "").replace(/<br\s*\/?>/gi, "\n").split(/<\/p>|\n/i)
+  .map((p) => p.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#39;|&rsquo;/g, "’").replace(/&quot;/g, "\"").trim()).filter(Boolean);
+
+function OfficialNotices({ alerts }) {
+  const { t, lang } = useLang();
+  const time = (iso) => new Date(iso).toLocaleTimeString(lang === "en" ? "en-GB" : lang, { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
+  return (
+    <section className="card notice-official">
+      <h3><span className="warn-ico" aria-hidden="true">⚠</span> {t("officialTitle")}</h3>
+      {alerts.map((a) => (
+        <div key={a.id} className="alert-item">
+          {a.header && <b>{a.header}</b>}
+          {paragraphs(a.description).map((p, i) => <p key={i}>{p}</p>)}
+          <p className="muted small">{t("officialSource", a.country === "ch" ? "opentransportdata.swiss" : "SNCF")}{a.active_from ? ` · ${t("officialSince", time(a.active_from))}` : ""}</p>
+        </div>
+      ))}
+    </section>
+  );
+}
 
 const COMMENT_FIELDS = "id,kind,reason,rating,body,onboard,created_at,author_name,is_mine";
 
@@ -22,16 +44,19 @@ export default function TrainDetail({ initialTrain }) {
   const [comments, setComments] = useState([]);
   const [lineRatings, setLineRatings] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const [alerts, setAlerts] = useState([]);
   const routeKey = `${train.origin} – ${train.destination}`;
 
   const load = useCallback(async () => {
     const sb = getBrowserClient();
     if (!sb) return;
-    const [{ data: t }, { data: c }, { data: r }] = await Promise.all([
+    const [{ data: t }, { data: c }, { data: r }, al] = await Promise.all([
       sb.from("trains").select(TRAIN_FIELDS).eq("id", initialTrain.id).maybeSingle(),
       sb.from("comments_feed").select(COMMENT_FIELDS).eq("train_id", initialTrain.id).order("created_at", { ascending: false }).limit(200),
       sb.from("comments_feed").select("rating").eq("route_key", routeKey).not("rating", "is", null).order("created_at", { ascending: false }).limit(500),
+      fetchAlertsForTrain(sb, initialTrain.id),
     ]);
+    setAlerts(al);
     if (t) setTrain(t);
     if (c) setComments(c);
     if (r) setLineRatings(r.map((x) => x.rating));
@@ -79,6 +104,8 @@ export default function TrainDetail({ initialTrain }) {
           </section>
 
           <Stops train={train} />
+
+          {alerts.length > 0 && <OfficialNotices alerts={alerts} />}
 
           <section className="card">
             <h3>{t("routeMap")}</h3>

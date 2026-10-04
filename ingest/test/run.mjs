@@ -51,4 +51,16 @@ const upch = JSON.parse(readFileSync(join(dir, "updates-ch.json"), "utf8"));
 assert.equal(upch.length, 1, "S-Bahn iz feeda se preskače");
 assert.deepEqual(upch[0].stops.map((s) => s.delay), [0, 0, 4, 4, 4], "kašnjenje od Berna dalje");
 
+// Zvanična obaveštenja (Service Alerts)
+{
+  const { decodeFeed } = await import("../lib/gtfs-rt.mjs");
+  const { alertRows, alertStats } = await import("../lib/alerts.mjs");
+  const feedA = decodeFeed(readFileSync(join(dir, "alerts.pb")));
+  assert.deepEqual(alertStats(feedA), { alerts: 3, withTrip: 2, withRoute: 1, withStop: 0 });
+  const rowsA = alertRows(feedA, "fr", Number(now));
+  assert.equal(rowsA.length, 1, "samo aktuelno obaveštenje vezano za voz");
+  assert.equal(rowsA[0].header, "Train retardé");
+  assert.equal(rowsA[0].description, "Panne de signalisation à Mâcon");
+  assert.deepEqual(rowsA[0].trip_ids, ["OCESN006611F01"]);
+}
 console.log("✔ Svi testovi su prošli");

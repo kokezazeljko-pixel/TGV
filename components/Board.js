@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase";
-import { fetchTrainsForDay, fetchTrainsUpdatedSince, fetchCommentCounts } from "@/lib/queries";
+import { fetchTrainsForDay, fetchTrainsUpdatedSince, fetchCommentCounts, fetchAlertTrainIds } from "@/lib/queries";
 import { statusOf, toMin, fromMin, trainHref, ago, filterTrains, isShuttle, parisNowMin } from "@/lib/format";
 import { getGeo } from "@/lib/geo";
 
@@ -33,6 +33,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
   const [running, setRunning] = useState([]);
   const [country, setCountry] = useState(DEFAULT_COUNTRY);
   const [loading, setLoading] = useState(false);
+  const [alertIds, setAlertIds] = useState(() => new Set()); // trains with an official notice from the railway
   const usedInitial = useRef(false); // the trains sent with the page are used only once, for the default view
 
   // Remember the chosen country in this browser
@@ -58,7 +59,8 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
     const newest = (rows, from = "") => rows.reduce((a, x) => (ms(x.rt_updated_at) > ms(a) ? new Date(ms(x.rt_updated_at)).toISOString() : a), from);
     const full = async (showLoading) => {
       if (showLoading) setLoading(true);
-      const [{ data: tr, error }, c] = await Promise.all([fetchTrainsForDay(sb, today, country), fetchCommentCounts(sb, today)]);
+      const [{ data: tr, error }, c, al] = await Promise.all([fetchTrainsForDay(sb, today, country), fetchCommentCounts(sb, today), fetchAlertTrainIds(sb)]);
+      setAlertIds(al);
       if (!alive) return;
       if (!error) { setTrains(tr); latest.current = newest(tr); }
       setCounts(c);
@@ -66,7 +68,8 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
     };
     const changes = async () => {
       if (!latest.current) return full(false);
-      const [{ data: upd, error }, c] = await Promise.all([fetchTrainsUpdatedSince(sb, today, country, latest.current), fetchCommentCounts(sb, today)]);
+      const [{ data: upd, error }, c, al] = await Promise.all([fetchTrainsUpdatedSince(sb, today, country, latest.current), fetchCommentCounts(sb, today), fetchAlertTrainIds(sb)]);
+      setAlertIds(al);
       if (!alive) return;
       setCounts(c);
       if (error || !upd.length) return;
@@ -74,7 +77,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
       const byId = new Map(upd.map((x) => [x.id, x]));
       setTrains((old) => old.map((x) => byId.get(x.id) || x));
     };
-    if (country === DEFAULT_COUNTRY && !usedInitial.current) { usedInitial.current = true; latest.current = newest(initialTrains); }
+    if (country === DEFAULT_COUNTRY && !usedInitial.current) { usedInitial.current = true; latest.current = newest(initialTrains); fetchAlertTrainIds(sb).then((al) => alive && setAlertIds(al)); }
     else { usedInitial.current = true; setTrains([]); full(true); }
     const id = setInterval(() => { ticks++; ticks % 30 === 0 ? full(false) : changes(); }, 60000);
     return () => { alive = false; clearInterval(id); };
@@ -214,7 +217,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
         ) : !sorted.length ? (
           <div className="empty">{t("nomatch")}</div>
         ) : (
-          sorted.map((tr) => <Row key={tr.id} tr={tr} n={counts[tr.id] || 0} live={runningIds.has(tr.id)} flag={country === "all"} />)
+          sorted.map((tr) => <Row key={tr.id} tr={tr} n={counts[tr.id] || 0} live={runningIds.has(tr.id)} flag={country === "all"} notice={alertIds.has(tr.id)} />)
         )}
       </section>
     </>
@@ -230,7 +233,7 @@ function Stat({ k, v, unit, live }) {
   );
 }
 
-function Row({ tr, n, live, flag }) {
+function Row({ tr, n, live, flag, notice }) {
   const { t } = useLang();
   const st = statusOf(tr, t);
   const late = !tr.cancelled && (tr.delay_min || 0) >= 5;
@@ -240,7 +243,7 @@ function Row({ tr, n, live, flag }) {
       <div className="time num c-time">{late ? <>{fromMin(toMin(tr.dep) + tr.delay_min)}<s>{tr.dep}</s></> : tr.dep}</div>
       <div className="c-train"><div className="tnum num">{flag && <span className={`flag mini flag-${tr.country}`} aria-hidden="true" />}{tr.number}</div><span className="ttype">{tr.type}</span></div>
       <div className="route">
-        <b>{tr.origin} → {tr.destination}{live && <span className="livetag">● {t("live")}</span>}</b>
+        <b>{tr.origin} → {tr.destination}{live && <span className="livetag">● {t("live")}</span>}{notice && <span className="noticetag" title={t("hasNotice")}>⚠ {t("hasNotice")}</span>}</b>
         {via.length > 0 && <span className="via">{t("via")} {via.join(", ")}</span>}
       </div>
       <div className="c-status"><span className={`pill ${st.cls}`}>{st.label}</span></div>

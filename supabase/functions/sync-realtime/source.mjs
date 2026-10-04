@@ -1,9 +1,11 @@
-// Supabase Edge funkcija: osvežava kašnjenja za jednu zemlju (?country=fr ili ?country=ch).
+// Supabase Edge funkcija: osvežava kašnjenja za jednu zemlju (?country=fr ili ?country=ch),
+// a sa &kind=alerts zvanična obaveštenja prevoznika (GTFS-RT Service Alerts).
 // Pokreće je pg_cron (vidi supabase/realtime-cron.sql) uz tajni žeton iz Vault-a.
 // Izvorni kod je ovde; za objavljivanje se spaja sa ingest/lib u jedan fajl index.ts (bun build).
 import { decodeFeed } from "../../../ingest/lib/gtfs-rt.mjs";
 import { applyTripUpdate, matchRow } from "../../../ingest/lib/realtime.mjs";
 import { FEEDS, fetchFeed } from "../../../ingest/lib/realtime-run.mjs";
+import { ALERT_FEEDS, alertRows, alertStats } from "../../../ingest/lib/alerts.mjs";
 
 const URL_ = Deno.env.get("SUPABASE_URL");
 const KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -28,6 +30,8 @@ Deno.serve(async (req) => {
 
   const swissKey = Deno.env.get("SWISS_API_KEY") || "";
   if (country === "ch" && !swissKey) return json({ error: "SWISS_API_KEY is not set (Edge Functions → Secrets)" }, 500);
+
+  if (new URL(req.url).searchParams.get("kind") === "alerts") return syncAlerts(country, swissKey);
 
   try {
     const t0 = Date.now();
@@ -60,3 +64,21 @@ Deno.serve(async (req) => {
     return json({ country, error: String(e) }, 500);
   }
 });
+
+async function syncAlerts(country, swissKey) {
+  try {
+    const f = ALERT_FEEDS[country];
+    const res = await fetch(f.url, { headers: { "User-Agent": "train-punctuality-ingest/1.0", ...f.headers(swissKey) } });
+    if (!res.ok) return json({ country, kind: "alerts", error: `feed ${res.status}` }, 502);
+    const feed = decodeFeed(new Uint8Array(await res.arrayBuffer()));
+    const rows = alertRows(feed, country, Math.floor(Date.now() / 1000));
+    let stored = 0;
+    for (let i = 0; i < rows.length; i += 300) stored += await rpc("apply_alerts", { p_country: country, payload: rows.slice(i, i + 300) });
+    const out = { country, kind: "alerts", ...alertStats(feed), linkedToTrips: rows.length, stored };
+    console.log(JSON.stringify(out));
+    return json(out);
+  } catch (e) {
+    console.error(String(e));
+    return json({ country, kind: "alerts", error: String(e) }, 500);
+  }
+}

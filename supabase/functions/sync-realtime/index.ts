@@ -1,4 +1,5 @@
 // GENERISANO iz source.mjs (bun build source.mjs --target=browser --format=esm --outfile index.ts) – ne menjati ručno.
+// Auth: custom x-cron-token header checked against a Vault secret (verify_jwt is off on purpose).
 // ../../../ingest/lib/gtfs-rt.mjs
 function reader(buf) {
   let pos = 0;
@@ -100,6 +101,25 @@ var TripUpdate = (b) => {
   o.stopTimeUpdates = raw.map(StopTimeUpdate);
   return o;
 };
+var Translation = (b) => parse(b, { 1: [2, (o, v) => o.text = str(v)], 2: [2, (o, v) => o.lang = str(v)] }, () => ({}));
+var TranslatedString = (b) => parse(b, { 1: [2, (o, v) => o.t.push(Translation(v))] }, () => ({ t: [] })).t;
+var TimeRange = (b) => parse(b, { 1: [0, (o, v) => o.start = int(v)], 2: [0, (o, v) => o.end = int(v)] }, () => ({}));
+var EntitySelector = (b) => parse(b, {
+  1: [2, (o, v) => o.agencyId = str(v)],
+  2: [2, (o, v) => o.routeId = str(v)],
+  3: [0, (o, v) => o.routeType = int(v)],
+  4: [2, (o, v) => o.trip = TripDescriptor(v)],
+  5: [2, (o, v) => o.stopId = str(v)]
+}, () => ({}));
+var Alert = (b) => parse(b, {
+  1: [2, (o, v) => o.activePeriods.push(TimeRange(v))],
+  5: [2, (o, v) => o.informed.push(EntitySelector(v))],
+  6: [0, (o, v) => o.cause = int(v)],
+  7: [0, (o, v) => o.effect = int(v)],
+  8: [2, (o, v) => o.url = TranslatedString(v)],
+  10: [2, (o, v) => o.header = TranslatedString(v)],
+  11: [2, (o, v) => o.description = TranslatedString(v)]
+}, () => ({ activePeriods: [], informed: [] }));
 var FeedEntity = (b) => parse(b, {
   1: [2, (o, v) => o.id = str(v)],
   2: [0, (o, v) => o.isDeleted = v !== 0],
@@ -107,7 +127,8 @@ var FeedEntity = (b) => parse(b, {
     const tu = TripUpdate(v);
     if (tu)
       o.tripUpdate = tu;
-  }]
+  }],
+  5: [2, (o, v) => o.alert = Alert(v)]
 }, () => ({}));
 var FeedHeader = (b) => parse(b, {
   1: [2, (o, v) => o.version = str(v)],
@@ -120,7 +141,7 @@ function decodeFeed(buf, keep = null) {
       1: [2, (o, v) => o.header = FeedHeader(v)],
       2: [2, (o, v) => {
         const e = FeedEntity(v);
-        if (e.tripUpdate || !keep)
+        if (e.tripUpdate || e.alert || !keep)
           o.entities.push(e);
       }]
     }, () => ({ header: {}, entities: [] }));
@@ -220,6 +241,66 @@ async function fetchFeed(country, swissKey) {
   return new Uint8Array(await res.arrayBuffer());
 }
 
+// ../../../ingest/lib/alerts.mjs
+var ALERT_FEEDS = {
+  fr: { url: "https://proxy.transport.data.gouv.fr/resource/sncf-gtfs-rt-service-alerts", headers: () => ({}), langs: ["fr", "en"] },
+  ch: { url: "https://api.opentransportdata.swiss/la/gtfs-sa", headers: (key) => ({ Authorization: `Bearer ${key}`, "Accept-Encoding": "br, gzip, deflate" }), langs: ["de", "fr", "it", "en"] }
+};
+var pick = (tr, langs) => {
+  if (!tr?.length)
+    return null;
+  for (const l of langs) {
+    const x = tr.find((t) => (t.lang || "").toLowerCase().startsWith(l));
+    if (x?.text)
+      return x.text;
+  }
+  return tr[0].text || null;
+};
+function alertRows(feed, country, nowSec) {
+  const langs = ALERT_FEEDS[country].langs;
+  const rows = [];
+  for (const e of feed.entities) {
+    const a = e.alert;
+    if (!a || e.isDeleted)
+      continue;
+    const periods = a.activePeriods.length ? a.activePeriods : [{}];
+    const live = periods.some((p) => (p.end == null || p.end === 0 || p.end > nowSec) && (p.start == null || p.start < nowSec + 36 * 3600));
+    if (!live)
+      continue;
+    const trip_ids = [...new Set(a.informed.map((i) => i.trip?.tripId).filter(Boolean))];
+    if (!trip_ids.length)
+      continue;
+    const p = periods.find((x) => x.start || x.end) || {};
+    rows.push({
+      id: e.id,
+      header: pick(a.header, langs),
+      description: pick(a.description, langs),
+      cause: a.cause ?? null,
+      effect: a.effect ?? null,
+      url: pick(a.url, langs),
+      active_from: p.start ? new Date(p.start * 1000).toISOString() : null,
+      active_to: p.end ? new Date(p.end * 1000).toISOString() : null,
+      trip_ids
+    });
+  }
+  return rows;
+}
+function alertStats(feed) {
+  const s = { alerts: 0, withTrip: 0, withRoute: 0, withStop: 0 };
+  for (const e of feed.entities) {
+    if (!e.alert)
+      continue;
+    s.alerts++;
+    if (e.alert.informed.some((i) => i.trip?.tripId))
+      s.withTrip++;
+    if (e.alert.informed.some((i) => i.routeId))
+      s.withRoute++;
+    if (e.alert.informed.some((i) => i.stopId))
+      s.withStop++;
+  }
+  return s;
+}
+
 // source.mjs
 var URL_ = Deno.env.get("SUPABASE_URL");
 var KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -244,6 +325,8 @@ Deno.serve(async (req) => {
   const swissKey = Deno.env.get("SWISS_API_KEY") || "";
   if (country === "ch" && !swissKey)
     return json({ error: "SWISS_API_KEY is not set (Edge Functions → Secrets)" }, 500);
+  if (new URL(req.url).searchParams.get("kind") === "alerts")
+    return syncAlerts(country, swissKey);
   try {
     const t0 = Date.now();
     const [rows, feedBuf] = await Promise.all([rpc("rt_candidates", { p_country: country }), fetchFeed(country, swissKey)]);
@@ -278,3 +361,22 @@ Deno.serve(async (req) => {
     return json({ country, error: String(e) }, 500);
   }
 });
+async function syncAlerts(country, swissKey) {
+  try {
+    const f = ALERT_FEEDS[country];
+    const res = await fetch(f.url, { headers: { "User-Agent": "train-punctuality-ingest/1.0", ...f.headers(swissKey) } });
+    if (!res.ok)
+      return json({ country, kind: "alerts", error: `feed ${res.status}` }, 502);
+    const feed = decodeFeed(new Uint8Array(await res.arrayBuffer()));
+    const rows = alertRows(feed, country, Math.floor(Date.now() / 1000));
+    let stored = 0;
+    for (let i = 0;i < rows.length; i += 300)
+      stored += await rpc("apply_alerts", { p_country: country, payload: rows.slice(i, i + 300) });
+    const out = { country, kind: "alerts", ...alertStats(feed), linkedToTrips: rows.length, stored };
+    console.log(JSON.stringify(out));
+    return json(out);
+  } catch (e) {
+    console.error(String(e));
+    return json({ country, kind: "alerts", error: String(e) }, 500);
+  }
+}

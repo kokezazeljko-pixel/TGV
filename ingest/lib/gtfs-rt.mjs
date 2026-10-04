@@ -90,10 +90,32 @@ const TripUpdate = (b) => {
   return o;
 };
 
+// Service Alerts: official notices (works, disruptions…) with the trips/routes/stops they concern
+const Translation = (b) => parse(b, { 1: [2, (o, v) => (o.text = str(v))], 2: [2, (o, v) => (o.lang = str(v))] }, () => ({}));
+const TranslatedString = (b) => parse(b, { 1: [2, (o, v) => o.t.push(Translation(v))] }, () => ({ t: [] })).t;
+const TimeRange = (b) => parse(b, { 1: [0, (o, v) => (o.start = int(v))], 2: [0, (o, v) => (o.end = int(v))] }, () => ({}));
+const EntitySelector = (b) => parse(b, {
+  1: [2, (o, v) => (o.agencyId = str(v))],
+  2: [2, (o, v) => (o.routeId = str(v))],
+  3: [0, (o, v) => (o.routeType = int(v))],
+  4: [2, (o, v) => (o.trip = TripDescriptor(v))],
+  5: [2, (o, v) => (o.stopId = str(v))],
+}, () => ({}));
+const Alert = (b) => parse(b, {
+  1: [2, (o, v) => o.activePeriods.push(TimeRange(v))],
+  5: [2, (o, v) => o.informed.push(EntitySelector(v))],
+  6: [0, (o, v) => (o.cause = int(v))],
+  7: [0, (o, v) => (o.effect = int(v))],
+  8: [2, (o, v) => (o.url = TranslatedString(v))],
+  10: [2, (o, v) => (o.header = TranslatedString(v))],
+  11: [2, (o, v) => (o.description = TranslatedString(v))],
+}, () => ({ activePeriods: [], informed: [] }));
+
 const FeedEntity = (b) => parse(b, {
   1: [2, (o, v) => (o.id = str(v))],
   2: [0, (o, v) => (o.isDeleted = v !== 0)],
   3: [2, (o, v) => { const tu = TripUpdate(v); if (tu) o.tripUpdate = tu; }],
+  5: [2, (o, v) => (o.alert = Alert(v))],
 }, () => ({}));
 
 const FeedHeader = (b) => parse(b, {
@@ -107,7 +129,7 @@ export function decodeFeed(buf, keep = null) {
   try {
     return parse(buf, {
       1: [2, (o, v) => (o.header = FeedHeader(v))],
-      2: [2, (o, v) => { const e = FeedEntity(v); if (e.tripUpdate || !keep) o.entities.push(e); }],
+      2: [2, (o, v) => { const e = FeedEntity(v); if (e.tripUpdate || e.alert || !keep) o.entities.push(e); }],
     }, () => ({ header: {}, entities: [] }));
   } finally { keepTrip = null; }
 }
