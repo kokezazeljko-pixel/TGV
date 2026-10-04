@@ -1,8 +1,11 @@
 // Official notices (GTFS-RT Service Alerts) -> rows for apply_alerts. Used by the Supabase Edge function.
+import { BE_ALERTS_URL } from "./belgium.mjs";
 export const ALERT_FEEDS = {
   fr: { url: "https://proxy.transport.data.gouv.fr/resource/sncf-gtfs-rt-service-alerts", headers: () => ({}), langs: ["fr", "en"] },
   // the Swiss notices have their own API token (SWISS_SA_API_KEY); the delays token is used if it is missing
   ch: { url: "https://api.opentransportdata.swiss/la/gtfs-sa", headers: (key) => ({ Authorization: `Bearer ${key}`, "Accept-Encoding": "br, gzip, deflate" }), langs: ["de", "fr", "it", "en"] },
+  // SNCB: JSON, linked to the network only -> matched to trains by the station names (belgianAlertRows)
+  be: { url: BE_ALERTS_URL, headers: () => ({ Accept: "application/json" }), langs: ["fr", "nl", "de", "en"], json: true },
 };
 
 const lang2 = (l) => (l || "").toLowerCase().slice(0, 2);

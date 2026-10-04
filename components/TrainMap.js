@@ -6,10 +6,10 @@ import { parisNowMin, statusOf } from "@/lib/format";
 import { useLang } from "@/components/LangProvider";
 
 const ARROW = "M1.45 0L-0.95 1.05L-0.45 0L-0.95 -1.05Z"; // points right, rotated to the direction of travel
-const TIER_A = new Set(["Lille", "Strasbourg", "Lyon", "Marseille", "Bordeaux", "Nantes", "Rennes", "Toulouse", "Montpellier", "Nice", "Genève", "Lausanne", "Bern", "Zürich", "Basel", "Lugano"]);
+const TIER_A = new Set(["Lille", "Strasbourg", "Lyon", "Marseille", "Bordeaux", "Nantes", "Rennes", "Toulouse", "Montpellier", "Nice", "Genève", "Lausanne", "Bern", "Zürich", "Basel", "Lugano", "Antwerpen", "Gent", "Liège"]);
 
 /**
- * Stylized map of France, Switzerland or both together, with its lines, stations and trains running now.
+ * Stylized map of France, Switzerland, Belgium or all together, with its lines, stations and trains running now.
  * Give it a new `key` when the country changes so it starts fresh.
  * Pan/zoom is applied directly to the SVG (no React re-render while dragging);
  * sizes that must stay constant on screen use the CSS variables --u (map units per pixel),
@@ -166,7 +166,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
     const pts = [pt, ...trains.map((tr) => trainPos(tr, nowMin)).filter(Boolean).map((p) => p.xy)];
     let x0 = Math.min(...pts.map((p) => p[0])), x1 = Math.max(...pts.map((p) => p[0]));
     let y0 = Math.min(...pts.map((p) => p[1])), y1 = Math.max(...pts.map((p) => p[1]));
-    const minW = W / (country === "ch" ? 2.6 : country === "all" ? 6 : 4.5);
+    const minW = W / (country === "ch" || country === "be" ? 2.6 : country === "all" ? 6 : 4.5);
     let w = Math.max(minW, (x1 - x0) * 1.25, ((y1 - y0) * 1.25 * W) / H);
     w = Math.min(W, w);
     const h = (w * H) / W, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
@@ -255,7 +255,7 @@ function GeoLabels({ geo }) {
     <g>
       {geo.NET.labels.map(([k, lon, lat]) => {
         const [x, y] = geo.proj(lat, lon);
-        return <text key={k} x={x.toFixed(1)} y={y.toFixed(1)} textAnchor="middle" className={"geo" + (["atl", "man", "med"].includes(k) ? " sea" : "")}>{names[k]}</text>;
+        return <text key={k} x={x.toFixed(1)} y={y.toFixed(1)} textAnchor="middle" className={"geo" + (["atl", "man", "med", "ns"].includes(k) ? " sea" : "")}>{names[k]}</text>;
       })}
     </g>
   );
@@ -282,7 +282,8 @@ export function PinShape({ airport }) {
 
 function Stations({ geo, selected, onClick }) {
   const { stations } = geo;
-  const paris = geo.nodes.PGL;
+  // one city label per group of fanned-out stations (Paris, Bruxelles / Brussel), at the group's first station
+  const groupLabels = useMemo(() => { const g = {}; for (const n of stations) if (n.group && !g[n.group]) g[n.group] = n; return Object.entries(g); }, [stations]);
   const pins = useMemo(() => stations.filter((n) => n.lvl === 1 || n.group || isAirport(n.name)), [stations]);
   // Stations of one city (Paris) are only a few hundred metres apart and would cover each other,
   // so their pins are fanned out side by side (west to east) with a thin line to the real spot.
@@ -327,7 +328,7 @@ function Stations({ geo, selected, onClick }) {
         })}
       </g>
       <g>
-        {paris && <text x={paris.x.toFixed(1)} y={paris.y.toFixed(1)} textAnchor="end" className="lbl major a grp pos-l">Paris</text>}
+        {groupLabels.map(([name, n]) => <text key={name} x={n.x.toFixed(1)} y={n.y.toFixed(1)} textAnchor="end" className="lbl major a grp pos-l">{name}</text>)}
         {stations.filter((n) => n.lvl).map((n) => {
           const cls = n.lvl === 1 ? "lbl major " + (TIER_A.has(n.short) ? "a" : "b") : n.lvl === 5 ? "lbl l5" : "lbl l2";
           if (n.group) return null; // their names sit on the fanned-out pins

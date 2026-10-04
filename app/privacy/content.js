@@ -1,4 +1,4 @@
-// Privacy policy text in English, German and French.
+// Privacy policy text in English, German, French and Dutch.
 // Each section: h (heading), p (paragraphs before the list), list, after (paragraphs after the list).
 // Placeholders: {site} = site name, {email} = contact email.
 
@@ -6,7 +6,7 @@ export const PRIVACY = {
   en: {
     title: "Privacy policy",
     updated: "Last updated",
-    intro: "{site} shows how late trains in France and Switzerland are and lets passengers share what is happening on board. This page explains what personal data the site handles, why, and what your rights are under the EU General Data Protection Regulation (GDPR) and the Swiss Federal Act on Data Protection (FADP).",
+    intro: "{site} shows how late trains in France, Switzerland and Belgium are and lets passengers share what is happening on board. This page explains what personal data the site handles, why, and what your rights are under the EU General Data Protection Regulation (GDPR) and the Swiss Federal Act on Data Protection (FADP).",
     sections: [
       { h: "Who is responsible", p: ["The site is run by the operator of {site}, who is the data controller. You can reach the operator at {email} for any question about your data."] },
       {
@@ -35,12 +35,12 @@ export const PRIVACY = {
           "Supabase: database and sign-in. Data is stored in the European Union (Frankfurt, Germany).",
           "Vercel: hosting of the website. Vercel may process technical data, such as IP addresses, outside the EU under the European Commission's standard contractual clauses.",
           "Vercel Web Analytics: counts page visits so we know how many people use the site (pages viewed, country, device type, the site you came from). It uses no cookies, does not store your IP address and does not build a profile of you; we only see totals.",
-          "GitHub: runs the scripts that fetch train data from SNCF and opentransportdata.swiss. These scripts do not handle any visitor data.",
+          "GitHub: runs the scripts that fetch train data from SNCF, opentransportdata.swiss and SNCB. These scripts do not handle any visitor data.",
         ],
       },
       {
         h: "Train data",
-        p: ["Timetables and real-time delays come from SNCF open data (transport.data.gouv.fr) and, for Switzerland, from opentransportdata.swiss. They contain no personal data."],
+        p: ["Timetables and real-time delays come from SNCF open data (transport.data.gouv.fr), for Switzerland from opentransportdata.swiss and for Belgium from SNCB open data (data.belgianmobility.io). They contain no personal data."],
       },
       {
         h: "How long we keep data",
@@ -54,7 +54,7 @@ export const PRIVACY = {
         h: "Your rights",
         p: ["Under the GDPR you can ask to access your data, correct it, delete it, receive a copy of it, or object to how we use it. Write to {email} and we will answer within one month. You can also delete any of your comments yourself at any time."],
         list2h: "If you are not satisfied",
-        list2: "You can file a complaint with a data protection authority, for example the Federal Data Protection and Information Commissioner in Switzerland (www.edoeb.admin.ch), the CNIL in France (www.cnil.fr) or the authority in your own country.",
+        list2: "You can file a complaint with a data protection authority, for example the Federal Data Protection and Information Commissioner in Switzerland (www.edoeb.admin.ch), the CNIL in France (www.cnil.fr), the Data Protection Authority in Belgium (www.dataprotectionauthority.be) or the authority in your own country.",
       },
       { h: "Children", p: ["The site is not intended for children under 15. Do not create an account if you are under 15."] },
       { h: "Changes to this policy", p: ["If we change how we handle data, we will update this page and the date at the top."] },
@@ -63,7 +63,7 @@ export const PRIVACY = {
   de: {
     title: "Datenschutzerklärung",
     updated: "Zuletzt aktualisiert",
-    intro: "{site} zeigt, wie verspätet Züge in Frankreich und der Schweiz sind, und lässt Reisende teilen, was an Bord passiert. Diese Seite erklärt, welche personenbezogenen Daten die Website verarbeitet, warum, und welche Rechte Sie nach der EU-Datenschutz-Grundverordnung (DSGVO) und dem Schweizer Datenschutzgesetz (DSG) haben.",
+    intro: "{site} zeigt, wie verspätet Züge in Frankreich, der Schweiz und Belgien sind, und lässt Reisende teilen, was an Bord passiert. Diese Seite erklärt, welche personenbezogenen Daten die Website verarbeitet, warum, und welche Rechte Sie nach der EU-Datenschutz-Grundverordnung (DSGVO) und dem Schweizer Datenschutzgesetz (DSG) haben.",
     sections: [
       { h: "Verantwortlicher", p: ["Die Website wird vom Betreiber von {site} betrieben, der für die Datenverarbeitung verantwortlich ist. Bei Fragen zu Ihren Daten erreichen Sie den Betreiber unter {email}."] },
       {
@@ -92,10 +92,10 @@ export const PRIVACY = {
           "Supabase: Datenbank und Anmeldung. Die Daten werden in der Europäischen Union gespeichert (Frankfurt, Deutschland).",
           "Vercel: Hosting der Website. Vercel kann technische Daten wie IP-Adressen auf Grundlage der Standardvertragsklauseln der Europäischen Kommission außerhalb der EU verarbeiten.",
           "Vercel Web Analytics: zählt Seitenaufrufe, damit wir wissen, wie viele Menschen die Website nutzen (besuchte Seiten, Land, Gerätetyp, vorherige Website). Es verwendet keine Cookies, speichert Ihre IP-Adresse nicht und erstellt kein Profil von Ihnen; wir sehen nur Gesamtzahlen.",
-          "GitHub: führt die Skripte aus, die Zugdaten von SNCF und opentransportdata.swiss abrufen. Diese Skripte verarbeiten keine Besucherdaten.",
+          "GitHub: führt die Skripte aus, die Zugdaten von SNCF, opentransportdata.swiss und SNCB abrufen. Diese Skripte verarbeiten keine Besucherdaten.",
         ],
       },
-      { h: "Zugdaten", p: ["Fahrpläne und Echtzeit-Verspätungen stammen aus den Open Data der SNCF (transport.data.gouv.fr) und für die Schweiz von opentransportdata.swiss. Sie enthalten keine personenbezogenen Daten."] },
+      { h: "Zugdaten", p: ["Fahrpläne und Echtzeit-Verspätungen stammen aus den Open Data der SNCF (transport.data.gouv.fr), für die Schweiz von opentransportdata.swiss und für Belgien aus den Open Data der SNCB (data.belgianmobility.io). Sie enthalten keine personenbezogenen Daten."] },
       {
         h: "Wie lange wir Daten speichern",
         list: [
@@ -108,7 +108,7 @@ export const PRIVACY = {
         h: "Ihre Rechte",
         p: ["Sie können Auskunft über Ihre Daten verlangen, sie berichtigen oder löschen lassen, eine Kopie erhalten oder der Verarbeitung widersprechen. Schreiben Sie an {email}, wir antworten innerhalb eines Monats. Ihre Kommentare können Sie jederzeit selbst löschen."],
         list2h: "Wenn Sie nicht zufrieden sind",
-        list2: "Sie können sich bei einer Datenschutzbehörde beschweren, zum Beispiel beim Eidgenössischen Datenschutz- und Öffentlichkeitsbeauftragten in der Schweiz (www.edoeb.admin.ch), bei der CNIL in Frankreich (www.cnil.fr) oder bei der Behörde in Ihrem Land.",
+        list2: "Sie können sich bei einer Datenschutzbehörde beschweren, zum Beispiel beim Eidgenössischen Datenschutz- und Öffentlichkeitsbeauftragten in der Schweiz (www.edoeb.admin.ch), bei der CNIL in Frankreich (www.cnil.fr), bei der Datenschutzbehörde in Belgien (www.dataprotectionauthority.be) oder bei der Behörde in Ihrem Land.",
       },
       { h: "Kinder", p: ["Die Website richtet sich nicht an Kinder unter 15 Jahren. Erstellen Sie kein Konto, wenn Sie jünger als 15 sind."] },
       { h: "Änderungen", p: ["Wenn wir den Umgang mit Daten ändern, aktualisieren wir diese Seite und das Datum oben."] },
@@ -117,7 +117,7 @@ export const PRIVACY = {
   fr: {
     title: "Politique de confidentialité",
     updated: "Dernière mise à jour",
-    intro: "{site} indique les retards des trains en France et en Suisse et permet aux voyageurs de partager ce qui se passe à bord. Cette page explique quelles données personnelles le site traite, pourquoi, et quels sont vos droits selon le Règlement général sur la protection des données (RGPD) et la loi suisse sur la protection des données (LPD).",
+    intro: "{site} indique les retards des trains en France, en Suisse et en Belgique et permet aux voyageurs de partager ce qui se passe à bord. Cette page explique quelles données personnelles le site traite, pourquoi, et quels sont vos droits selon le Règlement général sur la protection des données (RGPD) et la loi suisse sur la protection des données (LPD).",
     sections: [
       { h: "Responsable du traitement", p: ["Le site est géré par l’exploitant de {site}, responsable du traitement. Vous pouvez le contacter à {email} pour toute question sur vos données."] },
       {
@@ -146,10 +146,10 @@ export const PRIVACY = {
           "Supabase : base de données et connexion. Les données sont stockées dans l’Union européenne (Francfort, Allemagne).",
           "Vercel : hébergement du site. Vercel peut traiter des données techniques, comme les adresses IP, hors de l’UE, sous couvert des clauses contractuelles types de la Commission européenne.",
           "Vercel Web Analytics : compte les visites pour savoir combien de personnes utilisent le site (pages vues, pays, type d’appareil, site de provenance). Sans cookies, sans enregistrer votre adresse IP et sans créer de profil ; nous ne voyons que des totaux.",
-          "GitHub : exécute les scripts qui récupèrent les données SNCF et opentransportdata.swiss. Ces scripts ne traitent aucune donnée des visiteurs.",
+          "GitHub : exécute les scripts qui récupèrent les données SNCF, opentransportdata.swiss et SNCB. Ces scripts ne traitent aucune donnée des visiteurs.",
         ],
       },
-      { h: "Données ferroviaires", p: ["Les horaires et les retards en temps réel proviennent de l’open data SNCF (transport.data.gouv.fr) et, pour la Suisse, d’opentransportdata.swiss. Ils ne contiennent aucune donnée personnelle."] },
+      { h: "Données ferroviaires", p: ["Les horaires et les retards en temps réel proviennent de l’open data SNCF (transport.data.gouv.fr), pour la Suisse d’opentransportdata.swiss et pour la Belgique de l’open data SNCB (data.belgianmobility.io). Ils ne contiennent aucune donnée personnelle."] },
       {
         h: "Durée de conservation",
         list: [
@@ -162,10 +162,67 @@ export const PRIVACY = {
         h: "Vos droits",
         p: ["Selon le RGPD, vous pouvez demander l’accès à vos données, leur rectification, leur effacement, leur portabilité, ou vous opposer à leur traitement. Écrivez à {email}, nous répondrons dans un délai d’un mois. Vous pouvez aussi supprimer vous-même vos commentaires à tout moment."],
         list2h: "En cas de désaccord",
-        list2: "Vous pouvez introduire une réclamation auprès d’une autorité de protection des données, par exemple le Préposé fédéral à la protection des données et à la transparence en Suisse (www.edoeb.admin.ch), la CNIL en France (www.cnil.fr) ou l’autorité de votre pays.",
+        list2: "Vous pouvez introduire une réclamation auprès d’une autorité de protection des données, par exemple le Préposé fédéral à la protection des données et à la transparence en Suisse (www.edoeb.admin.ch), la CNIL en France (www.cnil.fr), l’Autorité de protection des données en Belgique (www.autoriteprotectiondonnees.be) ou l’autorité de votre pays.",
       },
       { h: "Mineurs", p: ["Le site ne s’adresse pas aux enfants de moins de 15 ans. Ne créez pas de compte si vous avez moins de 15 ans."] },
       { h: "Modifications", p: ["Si nous modifions la façon dont nous traitons les données, nous mettrons à jour cette page et la date indiquée en haut."] },
+    ],
+  },
+  nl: {
+    title: "Privacybeleid",
+    updated: "Laatst bijgewerkt",
+    intro: "{site} toont hoeveel vertraging treinen in Frankrijk, Zwitserland en België hebben en laat reizigers delen wat er aan boord gebeurt. Deze pagina legt uit welke persoonsgegevens de site verwerkt, waarom, en welke rechten je hebt volgens de Algemene Verordening Gegevensbescherming (AVG) van de EU en de Zwitserse federale wet op de gegevensbescherming (DSG/FADP).",
+    sections: [
+      { h: "Wie is verantwoordelijk", p: ["De site wordt beheerd door de uitbater van {site}, die de verwerkingsverantwoordelijke is. Je kunt de uitbater bereiken via {email} voor elke vraag over je gegevens."] },
+      {
+        h: "Wat we verzamelen",
+        list: [
+          "Je e-mailadres, alleen als je je aanmeldt. Het wordt gebruikt om je een aanmeldlink te sturen en je aangemeld te houden. Het wordt nooit aan andere bezoekers getoond.",
+          "De weergavenaam die je kiest. Die staat naast je reacties, tenzij je anoniem plaatst.",
+          "Je reacties: de tekst, de reden of score die je kiest, of je aangaf aan boord te zijn, de trein en het tijdstip van plaatsen.",
+          "Technische gegevens die nodig zijn om de site te laten werken, zoals je IP-adres en browsertype, die onze hostingproviders korte tijd in hun serverlogs bewaren.",
+          "Je keuze van taal en land en, als je aangemeld bent, je sessie. Die worden in je eigen browser opgeslagen.",
+        ],
+        after: ["Je kunt treinvertragingen bekijken zonder je aan te melden. Dan verzamelen we geen persoonsgegevens buiten de technische serverlogs."],
+      },
+      { h: "Wat we niet doen", list: ["We verkopen of verhuren je gegevens niet.", "We tonen geen advertenties.", "We gebruiken geen tracking- of advertentiecookies en geen analysetools die je over verschillende sites volgen."] },
+      {
+        h: "Waarom we je gegevens gebruiken (rechtsgrond)",
+        list: [
+          "Om je een account te geven en je reacties te publiceren: dit is nodig om de dienst te leveren waar je om vroeg (artikel 6, lid 1, b AVG).",
+          "Om de site veilig te houden en spam en misbruik te voorkomen, met serverlogs en limieten op het plaatsen: ons gerechtvaardigd belang (artikel 6, lid 1, f).",
+        ],
+      },
+      {
+        h: "Wie de gegevens voor ons verwerkt",
+        p: ["We werken met betrouwbare dienstverleners die gegevens in onze opdracht verwerken:"],
+        list: [
+          "Supabase: database en aanmelden. De gegevens worden in de Europese Unie opgeslagen (Frankfurt, Duitsland).",
+          "Vercel: hosting van de website. Vercel kan technische gegevens, zoals IP-adressen, buiten de EU verwerken op basis van de standaardcontractbepalingen van de Europese Commissie.",
+          "Vercel Web Analytics: telt paginabezoeken zodat we weten hoeveel mensen de site gebruiken (bekeken pagina's, land, soort toestel, de site waar je vandaan kwam). Het gebruikt geen cookies, bewaart je IP-adres niet en maakt geen profiel van je; we zien alleen totalen.",
+          "GitHub: voert de scripts uit die treingegevens ophalen bij SNCF, opentransportdata.swiss en NMBS. Die scripts verwerken geen gegevens van bezoekers.",
+        ],
+      },
+      {
+        h: "Treingegevens",
+        p: ["Dienstregelingen en realtime vertragingen komen uit de open data van SNCF (transport.data.gouv.fr), voor Zwitserland van opentransportdata.swiss en voor België uit de open data van de NMBS (data.belgianmobility.io). Ze bevatten geen persoonsgegevens."],
+      },
+      {
+        h: "Hoe lang we gegevens bewaren",
+        list: [
+          "Je account en weergavenaam: tot je ons vraagt ze te verwijderen.",
+          "Je reacties: tot je ze zelf verwijdert (met “Verwijderen” naast je reactie) of je account verwijdert.",
+          "Serverlogs: door onze hostingproviders beperkte tijd bewaard, meestal enkele dagen tot enkele weken.",
+        ],
+      },
+      {
+        h: "Je rechten",
+        p: ["Volgens de AVG kun je vragen om je gegevens in te zien, te verbeteren, te verwijderen, een kopie te krijgen of bezwaar te maken tegen hoe we ze gebruiken. Schrijf naar {email} en we antwoorden binnen een maand. Je kunt ook op elk moment zelf je reacties verwijderen."],
+        list2h: "Als je niet tevreden bent",
+        list2: "Je kunt een klacht indienen bij een gegevensbeschermingsautoriteit, bijvoorbeeld de Gegevensbeschermingsautoriteit in België (www.gegevensbeschermingsautoriteit.be), de federale functionaris voor gegevensbescherming in Zwitserland (www.edoeb.admin.ch), de CNIL in Frankrijk (www.cnil.fr) of de autoriteit in je eigen land.",
+      },
+      { h: "Kinderen", p: ["De site is niet bedoeld voor kinderen jonger dan 15 jaar. Maak geen account aan als je jonger bent dan 15."] },
+      { h: "Wijzigingen", p: ["Als we veranderen hoe we met gegevens omgaan, passen we deze pagina en de datum bovenaan aan."] },
     ],
   },
 };

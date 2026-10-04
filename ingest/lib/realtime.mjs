@@ -60,3 +60,15 @@ export function matchRow(index, trip) {
   }
   return rows[rows.length - 1];
 }
+
+// Belgium: the SNCB feed lists only trains that deviate from the timetable. A train that is running now
+// and is missing from the feed is on time -> all delays 0. A train that already arrived is left as it was
+// (its last known delay stays). Returns null when nothing should be written.
+export function onTimeUpdate(row, nowSec) {
+  const st = (row.stops || []).filter((s) => s.arr || s.dep);
+  if (st.length < 2) return null;
+  const first = gtfsToEpoch(row.service_date, st[0].dep || st[0].arr);
+  const last = gtfsToEpoch(row.service_date, st[st.length - 1].arr || st[st.length - 1].dep);
+  if (nowSec < first || nowSec > last + (row.delay_min || 0) * 60) return null;
+  return { id: row.id, delay_min: 0, cancelled: false, stops: row.stops.map((s) => ({ ...s, delay: 0, skipped: false })) };
+}

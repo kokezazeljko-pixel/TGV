@@ -1,21 +1,25 @@
 // Preuzima red vožnje (GTFS), bira međugradske vozove za danas i sutra
 // i upisuje ih u tabelu "trains" u Supabase-u.
 //
-// Zemlja se bira promenljivom COUNTRY: fr (SNCF, podrazumevano) ili ch (Švajcarska).
+// Zemlja se bira promenljivom COUNTRY: fr (SNCF, podrazumevano), ch (Švajcarska) ili be (Belgija, SNCB).
 // Pokretanje:  node ingest/sync-schedule.mjs          (Francuska)
 //              COUNTRY=ch node ingest/sync-schedule.mjs (Švajcarska)
+//              COUNTRY=be node ingest/sync-schedule.mjs (Belgija)
 // Za probu bez baze:  DRY_RUN=1 GTFS_FILE=putanja.zip node ingest/sync-schedule.mjs
 import { readFile, writeFile } from "node:fs/promises";
 import { listZip, openEntry } from "./lib/zip.mjs";
 import { eachRow } from "./lib/csv.mjs";
 import { parisDate, hhmm, detectType, detectSwissType, productFromStopId, env, supabaseRest, download, chunks, latestSwissGtfsUrl } from "./lib/util.mjs";
+import { BE_STATIC_URL, detectBelgianType, isBelgianStop, localName } from "./lib/belgium.mjs";
 
 const COUNTRY = env("COUNTRY", "fr");
 const CONFIG = {
   fr: { types: "TGV INOUI,OUIGO,TGV Lyria", gtfsUrl: "https://eu.ftp.opendatasoft.com/sncf/plandata/Export_OpenData_SNCF_GTFS_NewTripId.zip", idPrefix: "" },
   ch: { types: "IC,IR,EC,ICE,TGV Lyria,Railjet,Night train,Panorama", gtfsUrl: null, idPrefix: "ch_" },
+  be: { types: "IC,EC,Night train", gtfsUrl: BE_STATIC_URL, idPrefix: "be_" },
 }[COUNTRY];
-if (!CONFIG) throw new Error(`Nepoznata zemlja COUNTRY=${COUNTRY} (dozvoljeno: fr, ch)`);
+if (!CONFIG) throw new Error(`Nepoznata zemlja COUNTRY=${COUNTRY} (dozvoljeno: fr, ch, be)`);
+const routeType = { ch: detectSwissType, be: detectBelgianType }[COUNTRY]; // vrsta voza iz same linije (routes.txt)
 
 const TYPES = env("TRAIN_TYPES", CONFIG.types).split(",").map((s) => s.trim());
 const DAYS = Number(env("DAYS", "2"));
@@ -29,7 +33,9 @@ const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "frida
 
 // Švajcarski GTFS sadrži i mnoge strane vozove (npr. francuske TGV Lyon–Nica bez ijedne stanice u Švajcarskoj).
 // Zadržavamo samo one koji staju bar na jednoj švajcarskoj stanici (SLOID "ch:..." ili UIC broj 85xxxxx).
-const servesCountry = (t) => COUNTRY !== "ch" || t.stops.some((s) => /^(ch:|85\d{5})/.test(s.id));
+// Isto važi za Belgiju (belgijske stanice imaju UIC broj 88xxxxx).
+const servesCountry = (t) => COUNTRY === "ch" ? t.stops.some((s) => /^(ch:|85\d{5})/.test(s.id))
+  : COUNTRY === "be" ? t.stops.some((s) => isBelgianStop(s.id)) : true;
 
 // Šatl vozovi (npr. Avignon Centre ↔ Avignon TGV) imaju 6-cifrene brojeve i samo dve stanice
 const isShuttle = (t) => (COUNTRY === "fr" && /^\d{6,}$/.test(t.trip_short_name || t.trip_headsign || "")) || t.stops.length < 2;
@@ -65,16 +71,17 @@ async function main() {
   const routes = new Map();
   const descCount = {};
   await read("routes.txt", (r) => {
-    if (COUNTRY === "ch") {
-      descCount[r.route_desc] = (descCount[r.route_desc] || 0) + 1;
-      const type = detectSwissType(r);
+    if (routeType) {
+      const cat = COUNTRY === "be" ? ((r.route_short_name || "").match(/^[A-Za-z]+/) || [""])[0] : r.route_desc;
+      descCount[cat] = (descCount[cat] || 0) + 1;
+      const type = routeType(r);
       if (type && TYPES.includes(type)) routes.set(r.route_id, { ...r, type });
     } else routes.set(r.route_id, r);
   });
-  if (COUNTRY === "ch") console.log("Kategorije linija (route_desc):", Object.fromEntries(Object.entries(descCount).sort((a, b) => b[1] - a[1]).slice(0, 25)));
+  if (routeType) console.log("Kategorije linija:", Object.fromEntries(Object.entries(descCount).sort((a, b) => b[1] - a[1]).slice(0, 25)));
   const trips = new Map();
   await read("trips.txt", (r) => {
-    if (COUNTRY === "ch" && !routes.has(r.route_id)) return;
+    if (routeType && !routes.has(r.route_id)) return;
     const runs = dates.filter((d) => active.get(d).has(r.service_id));
     if (runs.length) trips.set(r.trip_id, { ...r, runs, stops: [] });
   });
@@ -93,19 +100,23 @@ async function main() {
     if (!t.stops.length) continue;
     t.stops.sort((a, b) => a.seq - b.seq);
     const route = routes.get(t.route_id) || {};
-    t.type = COUNTRY === "ch" ? route.type : detectType(productFromStopId(t.stops[0].id), route.route_short_name, route.route_long_name, route.route_desc);
+    t.type = routeType ? route.type : detectType(productFromStopId(t.stops[0].id), route.route_short_name, route.route_long_name, route.route_desc);
     typeCount[t.type] = (typeCount[t.type] || 0) + 1;
     if (TYPES.includes(t.type) && !isShuttle(t) && servesCountry(t)) keep.push(t);
   }
   console.log("Prepoznate vrste vozova:", typeCount);
 
   const needStops = new Set(keep.flatMap((t) => t.stops.map((s) => s.id)));
+  // Belgija: nazivi su u feedu na francuskom, holandski je u translations.txt -> naziv na lokalnom jeziku
+  const dutch = new Map();
+  if (COUNTRY === "be") await read("translations.txt", (r) => { if (r.table_name === "stops" && r.field_name === "stop_name" && r.language === "nl") dutch.set(r.field_value, r.translation); });
   const stopNames = new Map(), stopCoords = new Map();
   await read("stops.txt", (r) => {
     if (!needStops.has(r.stop_id)) return;
-    stopNames.set(r.stop_id, r.stop_name);
     const lat = parseFloat(r.stop_lat), lon = parseFloat(r.stop_lon);
-    if (Number.isFinite(lat) && Number.isFinite(lon)) stopCoords.set(r.stop_id, [Math.round(lat * 1e4) / 1e4, Math.round(lon * 1e4) / 1e4]);
+    const ok = Number.isFinite(lat) && Number.isFinite(lon);
+    stopNames.set(r.stop_id, COUNTRY === "be" ? localName(r.stop_name, dutch.get(r.stop_name), ok ? lat : null, ok ? lon : null) : r.stop_name);
+    if (ok) stopCoords.set(r.stop_id, [Math.round(lat * 1e4) / 1e4, Math.round(lon * 1e4) / 1e4]);
   });
 
   // 5) Redovi za bazu
@@ -118,7 +129,7 @@ async function main() {
     const first = stops[0], last = stops[stops.length - 1];
     for (const d of t.runs) {
       rows.push({
-        id: `${d}_${CONFIG.idPrefix}${t.trip_id}`,
+        id: `${d}_${CONFIG.idPrefix}${t.trip_id.replace(/^gt:nmbssncb:/, "")}`, // kraći id za Belgiju (bez "gt:nmbssncb:")
         trip_id: t.trip_id,
         service_date: d,
         country: COUNTRY,

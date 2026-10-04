@@ -65,4 +65,34 @@ assert.deepEqual(upch[0].stops.map((s) => s.delay), [0, 0, 4, 4, 4], "kašnjenje
   assert.equal(rowsA[0].orig_lang, "fr", "SNCF obaveštenje je na francuskom");
   assert.deepEqual(rowsA[0].header_tr, { fr: "Train retardé", en: "Train retardé (en)" }, "čuvaju se svi jezici iz feeda");
 }
+// ---- Belgija
+run("sync-schedule.mjs", { COUNTRY: "be", GTFS_FILE: join(dir, "gtfs-be.zip"), TODAY: DATE, DAYS: "1", OUT_FILE: join(dir, "trains-be.json") });
+const be = JSON.parse(readFileSync(join(dir, "trains-be.json"), "utf8"));
+assert.deepEqual(be.map((t) => t.number).sort(), ["1530", "2017", "2021", "9233"], "IC i EC sa belgijskom stanicom; bez L, autobusa i EC samo kroz Holandiju");
+const b1 = be.find((t) => t.number === "2017");
+assert.equal(b1.country, "be"); assert.equal(b1.type, "IC");
+assert.ok(b1.id.includes("_be_88____:007::8821006"), "kraći id bez gt:nmbssncb:");
+assert.equal(b1.origin, "Antwerpen-Centraal", "Flandrija: holandski naziv");
+assert.equal(b1.stops[1].name, "Bruxelles-Midi / Brussel-Zuid", "Brisel: oba jezika");
+assert.equal(b1.destination, "Namur", "Valonija: francuski naziv");
+assert.equal(be.find((t) => t.number === "1530").destination, "Leuven");
+assert.equal(be.find((t) => t.number === "9233").type, "EC");
+run("sync-realtime.mjs", { COUNTRY: "be", RT_FILE: join(dir, "feed-be.json"), TRAINS_FILE: join(dir, "trains-be.json"), NOW: now, OUT_FILE: join(dir, "updates-be.json") });
+const upbe = JSON.parse(readFileSync(join(dir, "updates-be.json"), "utf8"));
+const ub1 = upbe.find((u) => u.id === b1.id);
+assert.deepEqual(ub1.stops.map((s) => s.delay), [0, 5, 5], "kašnjenje od Brisela (po rednom broju, i kad se peron promeni)");
+assert.equal(ub1.delay_min, 5);
+const ub2 = upbe.find((u) => u.id.endsWith(":1330:20260101:1"));
+assert.ok(ub2 && ub2.delay_min === 0, "voz koji vozi a nema ga u feedu je tačan");
+assert.equal(upbe.length, 2, "voz koji još nije krenuo (16:00) i EC u 15:00 se ne diraju");
+{
+  const { feedFromJson, belgianAlertRows } = await import("../lib/belgium.mjs");
+  const fb = feedFromJson(JSON.parse(readFileSync(join(dir, "alerts-be.json"), "utf8")));
+  const rb = belgianAlertRows(fb, Number(now));
+  assert.equal(rb.length, 1, "isteklo obaveštenje se preskače");
+  assert.deepEqual(rb[0].stations.sort(), ["hoei", "huy", "namen", "namur"]);
+  assert.equal(rb[0].need, 2, "dve stanice u naslovu -> voz mora da staje na obe");
+  assert.equal(rb[0].header_tr.nl, "Namen - Hoei: Geen treinen");
+  assert.equal(rb[0].header, "Namur - Huy : Aucun train");
+}
 console.log("✔ Svi testovi su prošli");

@@ -1,14 +1,23 @@
 // Jedno osvežavanje kašnjenja za jednu zemlju. Koriste ga i GitHub skripta (sync-realtime.mjs)
 // i Supabase Edge funkcija (supabase/functions/sync-realtime), koja se pokreće na svakih nekoliko minuta.
 import { decodeFeed } from "./gtfs-rt.mjs";
-import { applyTripUpdate, matchRow } from "./realtime.mjs";
+import { applyTripUpdate, matchRow, onTimeUpdate } from "./realtime.mjs";
+import { BE_TRIPS_URL, feedFromJson } from "./belgium.mjs";
 import { parisDate, chunks } from "./util.mjs";
 
 export const FEEDS = {
   fr: { url: "https://proxy.transport.data.gouv.fr/resource/sncf-gtfs-rt-trip-updates", headers: () => ({}) },
   // https://opentransportdata.swiss/en/cookbook/realtime-prediction-cookbook/gtfs-rt/ (najviše 2 zahteva u minuti)
   ch: { url: "https://api.opentransportdata.swiss/la/gtfs-rt", headers: (key) => ({ Authorization: `Bearer ${key}`, "Accept-Encoding": "br, gzip, deflate" }) },
+  // SNCB: GTFS-RT as JSON, only trains with a deviation; missing running trains are on time (onlyDeviations)
+  be: { url: BE_TRIPS_URL, headers: () => ({ Accept: "application/json" }), json: true, onlyDeviations: true },
 };
+
+// protobuf (fr, ch) or JSON (be) -> decoded feed
+export function readFeed(country, buf, keep) {
+  if (FEEDS[country]?.json) return feedFromJson(JSON.parse(new TextDecoder().decode(buf)), keep);
+  return decodeFeed(buf, keep);
+}
 
 export async function loadTrains(db, country) {
   const days = [parisDate(-1), parisDate(0)].join(",");
@@ -29,13 +38,13 @@ export async function fetchFeed(country, swissKey) {
 }
 
 // trains: redovi iz baze; feedBuf: GTFS-RT bajtovi. Vraća izmene za apply_rt_updates.
-export function computeUpdates(trains, feedBuf, nowSec) {
+export function computeUpdates(trains, feedBuf, nowSec, country = "fr") {
   const index = new Map();
   for (const r of [...trains].sort((a, b) => a.service_date.localeCompare(b.service_date))) {
     if (!index.has(r.trip_id)) index.set(r.trip_id, []);
     index.get(r.trip_id).push(r);
   }
-  const feed = decodeFeed(feedBuf, (trip) => !!trip?.tripId && index.has(trip.tripId));
+  const feed = readFeed(country, feedBuf, (trip) => !!trip?.tripId && index.has(trip.tripId));
   let matched = 0, changed = 0;
   const updates = [];
   for (const ent of feed.entities) {
@@ -50,6 +59,14 @@ export function computeUpdates(trains, feedBuf, nowSec) {
     // Every train found in the feed is written, so the site knows it was checked (rt_updated_at)
     updates.push({ id: res.id, delay_min: res.delay_min, cancelled: res.cancelled, stops: res.stops });
     if (diff) changed++;
+  }
+  if (FEEDS[country]?.onlyDeviations) {
+    const seen = new Set(updates.map((u) => u.id));
+    for (const row of trains) {
+      if (seen.has(row.id)) continue;
+      const res = onTimeUpdate(row, nowSec);
+      if (res) updates.push(res);
+    }
   }
   return { updates, matched, changed, entities: feed.entities.length };
 }

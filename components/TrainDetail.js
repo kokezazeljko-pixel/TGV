@@ -11,15 +11,18 @@ import TrainMap from "@/components/TrainMap";
 import { getGeo } from "@/lib/geo";
 import { fetchAlertsForTrain } from "@/lib/queries";
 
-// The train's own country map, or France + Switzerland together when the trip leaves that country
+// The train's own country map, or all countries together when the trip leaves that country
 const routeMapFor = (train) => (getGeo(train.country || "fr").fitsTrain(train) ? train.country || "fr" : "all");
 
 // Notices come as simple HTML from the railway: keep only the text, one paragraph per block (never inject their HTML)
 const paragraphs = (html) => (html || "").replace(/<br\s*\/?>/gi, "\n").split(/<\/p>|\n/i)
   .map((p) => p.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#39;|&rsquo;/g, "’").replace(/&quot;/g, "\"").trim()).filter(Boolean);
 
-const SITE_LANGS = ["en", "de", "fr"];
-const LANG_NAMES = { en: "English", de: "Deutsch", fr: "Français", it: "Italiano" };
+const SITE_LANGS = ["en", "de", "fr", "nl"];
+const LANG_NAMES = { en: "English", de: "Deutsch", fr: "Français", it: "Italiano", nl: "Nederlands" };
+// Official languages of each country: a notice the railway published in the reader's language counts as original there
+const OFFICIAL = { fr: ["fr"], ch: ["de", "fr", "it"], be: ["nl", "fr", "de"] };
+const SOURCE = { fr: "SNCF", ch: "opentransportdata.swiss", be: "SNCB / NMBS" };
 const gtranslate = (text, to) => `https://translate.google.com/?sl=auto&tl=${to}&text=${encodeURIComponent(text.slice(0, 4500))}&op=translate`;
 
 // Shown in the railway's original language first; the reader can switch to the other site languages.
@@ -28,7 +31,13 @@ function OfficialNotices({ alerts }) {
   const { t, lang } = useLang();
   const [view, setView] = useState("orig");
   const time = (iso) => new Date(iso).toLocaleTimeString(lang === "en" ? "en-GB" : lang, { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
-  const origs = [...new Set(alerts.map((a) => a.orig_lang || (a.country === "ch" ? "de" : "fr")))];
+  // the original language shown first: the reader's own language when it is official in that country and the railway published it
+  const origOf = (a) => {
+    const official = OFFICIAL[a.country] || [];
+    if (official.includes(lang) && (a.header_tr?.[lang] || a.description_tr?.[lang])) return lang;
+    return a.orig_lang || official[0] || "fr";
+  };
+  const origs = [...new Set(alerts.map(origOf))];
   const choices = SITE_LANGS.filter((l) => !(origs.length === 1 && origs[0] === l));
   return (
     <section className="card notice-official">
@@ -44,7 +53,7 @@ function OfficialNotices({ alerts }) {
         ))}
       </div>
       {alerts.map((a) => {
-        const orig = a.orig_lang || (a.country === "ch" ? "de" : "fr");
+        const orig = origOf(a);
         const want = view === "orig" ? orig : view;
         const hTr = a.header_tr || {}, dTr = a.description_tr || {};
         const has = want === orig || hTr[want] || dTr[want];
@@ -57,7 +66,7 @@ function OfficialNotices({ alerts }) {
               <>
                 {header && <b>{header}</b>}
                 {paragraphs(desc).map((p, i) => <p key={i}>{p}</p>)}
-                {want !== orig && <p className="muted small">{t("noticeTranslatedBy")}</p>}
+                {want !== orig && !(OFFICIAL[a.country] || []).includes(want) && <p className="muted small">{t("noticeTranslatedBy")}</p>}
               </>
             ) : (
               <>
@@ -66,7 +75,7 @@ function OfficialNotices({ alerts }) {
                 <p className="small"><a href={gtranslate(origText, want)} target="_blank" rel="noopener noreferrer">{t("noticeGoogle", LANG_NAMES[want])} ↗</a></p>
               </>
             )}
-            <p className="muted small">{t("officialSource", a.country === "ch" ? "opentransportdata.swiss" : "SNCF")} · {t("noticeOriginal")}: {LANG_NAMES[orig] || orig.toUpperCase()}{a.active_from ? ` · ${t("officialSince", time(a.active_from))}` : ""}</p>
+            <p className="muted small">{t("officialSource", SOURCE[a.country] || "SNCF")} · {t("noticeOriginal")}: {LANG_NAMES[orig] || orig.toUpperCase()}{a.active_from ? ` · ${t("officialSince", time(a.active_from))}` : ""}</p>
           </div>
         );
       })}

@@ -227,12 +227,136 @@ function matchRow(index, trip) {
   }
   return rows[rows.length - 1];
 }
+function onTimeUpdate(row, nowSec) {
+  const st = (row.stops || []).filter((s) => s.arr || s.dep);
+  if (st.length < 2)
+    return null;
+  const first = gtfsToEpoch(row.service_date, st[0].dep || st[0].arr);
+  const last = gtfsToEpoch(row.service_date, st[st.length - 1].arr || st[st.length - 1].dep);
+  if (nowSec < first || nowSec > last + (row.delay_min || 0) * 60)
+    return null;
+  return { id: row.id, delay_min: 0, cancelled: false, stops: row.stops.map((s) => ({ ...s, delay: 0, skipped: false })) };
+}
+
+// ../../../ingest/lib/belgium.mjs
+var BE_BASE = "https://api-management-discovery-production.azure-api.net/api/gtfs/feed/nmbssncb";
+var BE_STATIC_URL = `${BE_BASE}/static`;
+var BE_TRIPS_URL = `${BE_BASE}/rt/trip-update`;
+var BE_ALERTS_URL = `${BE_BASE}/rt/alert`;
+var REL = { SCHEDULED: 0, SKIPPED: 1, NO_DATA: 2, ADDED: 1, UNSCHEDULED: 2, CANCELED: 3, CANCELLED: 3 };
+var num = (v) => v == null || v === "" ? undefined : Number(v);
+var rel = (v) => v == null ? undefined : typeof v === "number" ? v : REL[String(v).toUpperCase()] ?? Number(v);
+var tr = (x) => (x?.translation || []).map((t) => ({ text: t.text, lang: t.language }));
+var ev = (e) => e ? { delay: num(e.delay), time: num(e.time) } : undefined;
+var trip = (t) => t ? { tripId: t.tripId, startTime: t.startTime, startDate: t.startDate, scheduleRelationship: rel(t.scheduleRelationship), routeId: t.routeId } : undefined;
+function feedFromJson(json, keep = null) {
+  const entities = [];
+  for (const e of json?.entity || []) {
+    const out = { id: e.id, isDeleted: !!e.isDeleted };
+    if (e.tripUpdate) {
+      const t = trip(e.tripUpdate.trip);
+      if (keep && !keep(t))
+        continue;
+      out.tripUpdate = {
+        trip: t,
+        delay: num(e.tripUpdate.delay),
+        timestamp: num(e.tripUpdate.timestamp),
+        stopTimeUpdates: (e.tripUpdate.stopTimeUpdate || []).map((u) => ({
+          stopSequence: num(u.stopSequence),
+          stopId: u.stopId,
+          arrival: ev(u.arrival),
+          departure: ev(u.departure),
+          scheduleRelationship: rel(u.scheduleRelationship)
+        }))
+      };
+    }
+    if (e.alert) {
+      const a = e.alert;
+      out.alert = {
+        activePeriods: (a.activePeriod || []).map((p) => ({ start: num(p.start), end: num(p.end) })),
+        informed: (a.informedEntity || []).map((i) => ({ agencyId: i.agencyId, routeId: i.routeId, stopId: i.stopId, trip: trip(i.trip) })),
+        cause: num(a.cause),
+        effect: num(a.effect),
+        url: tr(a.url),
+        header: tr(a.headerText),
+        description: tr(a.descriptionText)
+      };
+    }
+    if (out.tripUpdate || out.alert)
+      entities.push(out);
+  }
+  return { header: json?.header || {}, entities };
+}
+var placeParts = (text = "") => text.split(":")[0].split(/\s+-\s+|\s*\/\s*/).map((s) => s.trim()).filter((s) => s.length >= 3 && /[A-Za-zÀ-ÿ]/.test(s));
+function alertStations(header = []) {
+  const names = new Set;
+  for (const t of header)
+    for (const p of placeParts(t.text))
+      names.add(p.toLowerCase());
+  const fr = header.find((t) => (t.lang || "").startsWith("fr")) || header[0];
+  const places = fr ? fr.text.split(":")[0].split(/\s+-\s+/).filter((s) => s.trim().length >= 3).length : 0;
+  return { stations: [...names], need: Math.min(2, Math.max(1, places)) };
+}
+var lang2 = (l) => (l || "").toLowerCase().slice(0, 2);
+var allLangs = (t) => {
+  const o = {};
+  for (const x of t || [])
+    if (x.text && lang2(x.lang) && !o[lang2(x.lang)])
+      o[lang2(x.lang)] = x.text;
+  return o;
+};
+var pick = (t, langs) => {
+  for (const l of langs) {
+    const x = (t || []).find((y) => lang2(y.lang) === l);
+    if (x?.text)
+      return x.text;
+  }
+  return t?.[0]?.text || null;
+};
+function belgianAlertRows(feed, nowSec) {
+  const rows = [];
+  for (const e of feed.entities) {
+    const a = e.alert;
+    if (!a || e.isDeleted)
+      continue;
+    const periods = a.activePeriods.length ? a.activePeriods : [{}];
+    const live = periods.some((p) => (!p.end || p.end > nowSec) && (!p.start || p.start < nowSec + 36 * 3600));
+    if (!live)
+      continue;
+    const { stations, need } = alertStations(a.header);
+    if (!stations.length)
+      continue;
+    const p = periods.find((x) => x.start || x.end) || {};
+    rows.push({
+      id: e.id,
+      orig_lang: "fr",
+      header_tr: allLangs(a.header),
+      description_tr: allLangs(a.description),
+      header: pick(a.header, ["fr", "nl"]),
+      description: pick(a.description, ["fr", "nl"]),
+      cause: a.cause ?? null,
+      effect: a.effect ?? null,
+      url: pick(a.url, ["fr", "nl", "en"]),
+      active_from: p.start ? new Date(p.start * 1000).toISOString() : null,
+      active_to: p.end ? new Date(p.end * 1000).toISOString() : null,
+      stations,
+      need
+    });
+  }
+  return rows;
+}
 
 // ../../../ingest/lib/realtime-run.mjs
 var FEEDS = {
   fr: { url: "https://proxy.transport.data.gouv.fr/resource/sncf-gtfs-rt-trip-updates", headers: () => ({}) },
-  ch: { url: "https://api.opentransportdata.swiss/la/gtfs-rt", headers: (key) => ({ Authorization: `Bearer ${key}`, "Accept-Encoding": "br, gzip, deflate" }) }
+  ch: { url: "https://api.opentransportdata.swiss/la/gtfs-rt", headers: (key) => ({ Authorization: `Bearer ${key}`, "Accept-Encoding": "br, gzip, deflate" }) },
+  be: { url: BE_TRIPS_URL, headers: () => ({ Accept: "application/json" }), json: true, onlyDeviations: true }
 };
+function readFeed(country, buf, keep) {
+  if (FEEDS[country]?.json)
+    return feedFromJson(JSON.parse(new TextDecoder().decode(buf)), keep);
+  return decodeFeed(buf, keep);
+}
 async function fetchFeed(country, swissKey) {
   const f = FEEDS[country];
   const res = await fetch(f.url, { headers: { "User-Agent": "train-punctuality-ingest/1.0", ...f.headers(swissKey) } });
@@ -244,23 +368,24 @@ async function fetchFeed(country, swissKey) {
 // ../../../ingest/lib/alerts.mjs
 var ALERT_FEEDS = {
   fr: { url: "https://proxy.transport.data.gouv.fr/resource/sncf-gtfs-rt-service-alerts", headers: () => ({}), langs: ["fr", "en"] },
-  ch: { url: "https://api.opentransportdata.swiss/la/gtfs-sa", headers: (key) => ({ Authorization: `Bearer ${key}`, "Accept-Encoding": "br, gzip, deflate" }), langs: ["de", "fr", "it", "en"] }
+  ch: { url: "https://api.opentransportdata.swiss/la/gtfs-sa", headers: (key) => ({ Authorization: `Bearer ${key}`, "Accept-Encoding": "br, gzip, deflate" }), langs: ["de", "fr", "it", "en"] },
+  be: { url: BE_ALERTS_URL, headers: () => ({ Accept: "application/json" }), langs: ["fr", "nl", "de", "en"], json: true }
 };
-var lang2 = (l) => (l || "").toLowerCase().slice(0, 2);
-var allLangs = (tr) => {
+var lang22 = (l) => (l || "").toLowerCase().slice(0, 2);
+var allLangs2 = (tr) => {
   const o = {};
   for (const t of tr || [])
-    if (t.text && lang2(t.lang) && !o[lang2(t.lang)])
-      o[lang2(t.lang)] = t.text;
+    if (t.text && lang22(t.lang) && !o[lang22(t.lang)])
+      o[lang22(t.lang)] = t.text;
   return o;
 };
 var origLang = (tr, country) => {
-  const langs = (tr || []).map((t) => lang2(t.lang)).filter(Boolean);
+  const langs = (tr || []).map((t) => lang22(t.lang)).filter(Boolean);
   if (country === "fr")
     return langs.includes("fr") ? "fr" : langs[0] || "fr";
   return langs.find((l) => ["de", "fr", "it"].includes(l)) || langs[0] || "de";
 };
-var pick = (tr, langs) => {
+var pick2 = (tr, langs) => {
   if (!tr?.length)
     return null;
   for (const l of langs) {
@@ -289,13 +414,13 @@ function alertRows(feed, country, nowSec) {
     rows.push({
       id: e.id,
       orig_lang: orig,
-      header_tr: allLangs(a.header),
-      description_tr: allLangs(a.description),
-      header: pick(a.header, [orig, ...langs]),
-      description: pick(a.description, [orig, ...langs]),
+      header_tr: allLangs2(a.header),
+      description_tr: allLangs2(a.description),
+      header: pick2(a.header, [orig, ...langs]),
+      description: pick2(a.description, [orig, ...langs]),
       cause: a.cause ?? null,
       effect: a.effect ?? null,
-      url: pick(a.url, langs),
+      url: pick2(a.url, langs),
       active_from: p.start ? new Date(p.start * 1000).toISOString() : null,
       active_to: p.end ? new Date(p.end * 1000).toISOString() : null,
       trip_ids
@@ -355,7 +480,7 @@ Deno.serve(async (req) => {
         index.set(r.trip_id, []);
       index.get(r.trip_id).push(r);
     }
-    const feed = decodeFeed(feedBuf, (trip) => !!trip?.tripId && index.has(trip.tripId));
+    const feed = readFeed(country, feedBuf, (trip) => !!trip?.tripId && index.has(trip.tripId));
     const now = Math.floor(Date.now() / 1000);
     const updates = [];
     for (const ent of feed.entities) {
@@ -368,10 +493,21 @@ Deno.serve(async (req) => {
       const res = applyTripUpdate(row, tu, now);
       updates.push({ id: res.id, delay_min: res.delay_min, cancelled: res.cancelled, d: res.stops.map((s) => [s.delay, !!s.skipped]) });
     }
+    const inFeed = updates.length;
+    if (FEEDS[country].onlyDeviations) {
+      const seen = new Set(updates.map((u) => u.id));
+      for (const r of trains) {
+        if (seen.has(r.id))
+          continue;
+        const res = onTimeUpdate(r, now);
+        if (res)
+          updates.push({ id: res.id, delay_min: 0, cancelled: false, d: res.stops.map(() => [0, false]) });
+      }
+    }
     let written = 0;
     for (let i = 0;i < updates.length; i += 400)
       written += await rpc("apply_rt_delays", { payload: updates.slice(i, i + 400) });
-    const out = { country, candidates: trains.length, feedBytes: feedBuf.length, matched: updates.length, written, ms: Date.now() - t0 };
+    const out = { country, candidates: trains.length, feedBytes: feedBuf.length, matched: inFeed, onTime: updates.length - inFeed, written, ms: Date.now() - t0 };
     console.log(JSON.stringify(out));
     return json(out);
   } catch (e) {
@@ -385,11 +521,13 @@ async function syncAlerts(country, swissKey) {
     const res = await fetch(f.url, { headers: { "User-Agent": "train-punctuality-ingest/1.0", ...f.headers(swissKey) } });
     if (!res.ok)
       return json({ country, kind: "alerts", error: `feed ${res.status}` }, 502);
-    const feed = decodeFeed(new Uint8Array(await res.arrayBuffer()));
-    const rows = alertRows(feed, country, Math.floor(Date.now() / 1000));
+    const nowSec = Math.floor(Date.now() / 1000);
+    const feed = f.json ? feedFromJson(await res.json()) : decodeFeed(new Uint8Array(await res.arrayBuffer()));
+    const rows = country === "be" ? belgianAlertRows(feed, nowSec) : alertRows(feed, country, nowSec);
+    const fn = country === "be" ? "apply_alerts_stations" : "apply_alerts";
     let stored = 0;
     for (let i = 0;i < rows.length; i += 300)
-      stored += await rpc("apply_alerts", { p_country: country, payload: rows.slice(i, i + 300) });
+      stored += await rpc(fn, { p_country: country, payload: rows.slice(i, i + 300) });
     const out = { country, kind: "alerts", ...alertStats(feed), linkedToTrips: rows.length, stored };
     console.log(JSON.stringify(out));
     return json(out);

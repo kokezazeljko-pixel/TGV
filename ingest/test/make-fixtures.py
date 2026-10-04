@@ -148,3 +148,78 @@ fa = ld(1, s(1, "2.0") + vi(3, epoch("14:00"))) \
    + alert("A2", route="R1", header="Travaux", desc="Ligne modifiée") \
    + alert("A3", trip="OCESN006611F01", start=epoch("06:00"), end=epoch("07:00"), header="Ancien", desc="Fini")
 open(os.path.join(out, "alerts.pb"), "wb").write(fa)
+
+# ---- Belgija (SNCB): GTFS kao u pravom feedu (gt:/gs:/gr: oznake, francuski nazivi + translations.txt),
+# GTFS-RT kao JSON sa samo vozovima koji kasne, obaveštenja vezana samo za mrežu
+P = "gs:nmbssncb:"
+be = {
+"agency.txt": "agency_id,agency_name,agency_url,agency_timezone,agency_lang\nnmbssncb,NMBS/SNCB,http://www.belgiantrain.be/,Europe/Brussels,fr\n",
+"routes.txt": "agency_id,route_color,route_desc,route_id,route_long_name,route_short_name,route_text_color,route_type,route_url\n"
+              "nmbssncb,,,gr:nmbssncb:1,Anvers-Central -- Namur,IC,,2,\n"
+              "nmbssncb,,,gr:nmbssncb:2,Genk -- Louvain,L,,2,\n"
+              "nmbssncb,,,gr:nmbssncb:3,Mons -- Soignies,BUS,,3,\n"
+              "nmbssncb,,,gr:nmbssncb:4,Rotterdam Centraal (NL) -- Bruxelles-Midi,EC,,2,\n",
+"calendar_dates.txt": f"date,exception_type,service_id\n{ymd},1,gc:nmbssncb:1\n",
+"trips.txt": "route_id,service_id,trip_headsign,trip_id,trip_short_name\n"
+             "gr:nmbssncb:1,gc:nmbssncb:1,Namur,gt:nmbssncb:88____:007::8821006:8863008:3:1300:20260101,2017\n"
+             "gr:nmbssncb:1,gc:nmbssncb:1,Louvain,gt:nmbssncb:88____:007::8841004:8833001:2:1330:20260101:1,1530\n"
+             "gr:nmbssncb:1,gc:nmbssncb:1,Namur,gt:nmbssncb:88____:007::8821006:8863008:3:1600:20260101,2021\n"
+             "gr:nmbssncb:2,gc:nmbssncb:1,Louvain,gt:nmbssncb:88____:007::8831807:8833001:2:1300:20260101,4123\n"
+             "gr:nmbssncb:3,gc:nmbssncb:1,Soignies,gt:nmbssncb:88____:007::8881000:8881166:2:1300:20260101,9001\n"
+             "gr:nmbssncb:4,gc:nmbssncb:1,Rotterdam Centraal (NL),gt:nmbssncb:88____:098::8814001:8400530:2:1500:20260101,9233\n"
+             "gr:nmbssncb:4,gc:nmbssncb:1,Rotterdam Centraal (NL),gt:nmbssncb:88____:098::8400131:8400530:2:1500:20260101,9235\n",
+"stops.txt": "stop_id,stop_name,stop_lat,stop_lon,location_type,parent_station,platform_code\n"
+             f"{P}8821006_3,Anvers-Central,51.2172,4.4211,0,{P}S8821006,3\n"
+             f"{P}8814001_14,Bruxelles-Midi,50.8357,4.3363,0,{P}S8814001,14\n"
+             f"{P}8863008_2,Namur,50.4686,4.8623,0,{P}S8863008,2\n"
+             f"{P}8841004_4,Liège-Guillemins,50.6244,5.5667,0,{P}S8841004,4\n"
+             f"{P}8833001_7,Louvain,50.8812,4.7160,0,{P}S8833001,7\n"
+             f"{P}8831807_1,Genk,50.9677,5.4999,0,{P}S8831807,1\n"
+             f"{P}8881000_BUS,Mons,50.4537,3.9425,0,{P}S8881000,BUS\n"
+             f"{P}8881166_BUS,Soignies,50.5790,4.0700,0,{P}S8881166,BUS\n"
+             f"{P}8400530,Rotterdam Centraal (NL),51.9250,4.4690,0,,\n"
+             f"{P}8400131,Breda (NL),51.5955,4.7801,0,,\n",
+"stop_times.txt": "trip_id,arrival_time,departure_time,stop_id,stop_sequence\n"
+             f"gt:nmbssncb:88____:007::8821006:8863008:3:1300:20260101,13:00:00,13:00:00,{P}8821006_3,1\n"
+             f"gt:nmbssncb:88____:007::8821006:8863008:3:1300:20260101,13:45:00,13:50:00,{P}8814001_14,2\n"
+             f"gt:nmbssncb:88____:007::8821006:8863008:3:1300:20260101,14:40:00,14:40:00,{P}8863008_2,3\n"
+             f"gt:nmbssncb:88____:007::8841004:8833001:2:1330:20260101:1,13:30:00,13:30:00,{P}8841004_4,1\n"
+             f"gt:nmbssncb:88____:007::8841004:8833001:2:1330:20260101:1,14:20:00,14:20:00,{P}8833001_7,2\n"
+             f"gt:nmbssncb:88____:007::8821006:8863008:3:1600:20260101,16:00:00,16:00:00,{P}8821006_3,1\n"
+             f"gt:nmbssncb:88____:007::8821006:8863008:3:1600:20260101,16:45:00,16:50:00,{P}8814001_14,2\n"
+             f"gt:nmbssncb:88____:007::8821006:8863008:3:1600:20260101,17:40:00,17:40:00,{P}8863008_2,3\n"
+             f"gt:nmbssncb:88____:007::8831807:8833001:2:1300:20260101,13:00:00,13:00:00,{P}8831807_1,1\n"
+             f"gt:nmbssncb:88____:007::8831807:8833001:2:1300:20260101,14:00:00,14:00:00,{P}8833001_7,2\n"
+             f"gt:nmbssncb:88____:007::8881000:8881166:2:1300:20260101,13:00:00,13:00:00,{P}8881000_BUS,1\n"
+             f"gt:nmbssncb:88____:007::8881000:8881166:2:1300:20260101,13:30:00,13:30:00,{P}8881166_BUS,2\n"
+             f"gt:nmbssncb:88____:098::8814001:8400530:2:1500:20260101,15:00:00,15:00:00,{P}8814001_14,1\n"
+             f"gt:nmbssncb:88____:098::8814001:8400530:2:1500:20260101,16:10:00,16:10:00,{P}8400530,2\n"
+             f"gt:nmbssncb:88____:098::8400131:8400530:2:1500:20260101,15:00:00,15:00:00,{P}8400131,1\n"
+             f"gt:nmbssncb:88____:098::8400131:8400530:2:1500:20260101,15:40:00,15:40:00,{P}8400530,2\n",
+"translations.txt": "table_name,field_name,record_id,record_sub_id,field_value,language,translation\n"
+             "stops,stop_name,,,Anvers-Central,nl,Antwerpen-Centraal\n"
+             "stops,stop_name,,,Anvers-Central,en,Anvers-Central / Antwerpen-Centraal\n"
+             "stops,stop_name,,,Bruxelles-Midi,nl,Brussel-Zuid\n"
+             "stops,stop_name,,,Namur,nl,Namen\n"
+             "stops,stop_name,,,Liège-Guillemins,nl,Luik-Guillemins\n"
+             "stops,stop_name,,,Louvain,nl,Leuven\n",
+}
+with zipfile.ZipFile(os.path.join(out, "gtfs-be.zip"), "w", zipfile.ZIP_DEFLATED) as z:
+    for k, v in be.items(): z.writestr(k, v)
+import json
+# IC 2017 kasni 5 min od Brisela; IC 1530 vozi tačno (nema ga u feedu); nepoznat voz se preskače
+feedbe = {"header": {"gtfsRealtimeVersion": "1.0", "incrementality": 0, "timestamp": epoch("14:00")}, "entity": [
+  {"id": "rt:x1", "tripUpdate": {"trip": {"tripId": "gt:nmbssncb:88____:007::8821006:8863008:3:1300:20260101", "startTime": "13:00:00", "startDate": ymd, "scheduleRelationship": 0},
+    "stopTimeUpdate": [{"departure": {"time": epoch("13:00"), "delay": 0}, "stopId": P + "8821006_3", "scheduleRelationship": 0, "stopSequence": 1},
+                       {"arrival": {"time": epoch("13:50"), "delay": 300}, "departure": {"time": epoch("13:55"), "delay": 300}, "stopId": P + "8814001_12", "scheduleRelationship": 0, "stopSequence": 2}]}},
+  {"id": "rt:x2", "tripUpdate": {"trip": {"tripId": "gt:nmbssncb:NEPOZNAT", "startDate": ymd}, "stopTimeUpdate": []}}]}
+open(os.path.join(out, "feed-be.json"), "w").write(json.dumps(feedbe))
+def trs(**kw): return {"translation": [{"language": k, "text": v} for k, v in kw.items()]}
+alertsbe = {"header": {"gtfsRealtimeVersion": "2.0"}, "entity": [
+  {"id": "rs:nmbssncb:a1", "alert": {"informedEntity": [{"agencyId": "nmbssncb"}], "activePeriod": [], "cause": 1, "effect": 8,
+    "headerText": trs(fr="Namur - Huy : Aucun train", nl="Namen - Hoei: Geen treinen", de="Namen / Namur - Hoei / Huy: Keine Züge", en="Namur / Namen - Huy / Hoei: No trains"),
+    "descriptionText": trs(fr="La circulation est interrompue.", nl="Het treinverkeer is onderbroken.", de="Unterbrochen.", en="Interrupted."),
+    "url": trs(fr="http://example.org/fr", nl="http://example.org/nl")}},
+  {"id": "rs:nmbssncb:a2", "alert": {"informedEntity": [{"agencyId": "nmbssncb"}], "activePeriod": [{"end": epoch("06:00")}],
+    "headerText": trs(fr="Ancien - Fini"), "descriptionText": trs(fr="x")}}]}
+open(os.path.join(out, "alerts-be.json"), "w").write(json.dumps(alertsbe))

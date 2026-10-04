@@ -9,7 +9,7 @@ import { useLang } from "@/components/LangProvider";
 import Logo from "@/components/Logo";
 
 // Language buttons show the flag of the language's country (English → United Kingdom)
-const LANG_NAMES = { en: "English", de: "Deutsch", fr: "Français" };
+const LANG_NAMES = { en: "English", de: "Deutsch", fr: "Français", nl: "Nederlands" };
 const FLAGS = {
   en: (
     <svg viewBox="0 0 60 30" aria-hidden="true">
@@ -29,6 +29,9 @@ const FLAGS = {
   ),
   fr: (
     <svg viewBox="0 0 3 2" aria-hidden="true"><path d="M0 0h3v2H0z" fill="#EF4135" /><path d="M0 0h2v2H0z" fill="#fff" /><path d="M0 0h1v2H0z" fill="#0055A4" /></svg>
+  ),
+  nl: (
+    <svg viewBox="0 0 9 6" aria-hidden="true"><path d="M0 0h9v6H0z" fill="#21468B" /><path d="M0 0h9v4H0z" fill="#fff" /><path d="M0 0h9v2H0z" fill="#AE1C28" /></svg>
   ),
 };
 
@@ -56,7 +59,7 @@ export default function Header() {
         </Link>
         <div className="top-right">
           {ready && <Link href="/prijava" className="userlink">{session ? t("myAccount") : t("signIn")}</Link>}
-          <div className="lang" role="group" aria-label="Language / Sprache / Langue">
+          <div className="lang" role="group" aria-label="Language / Sprache / Langue / Taal">
             {LANGS.map((l) => (
               <button key={l} type="button" aria-pressed={lang === l} onClick={() => setLang(l)} aria-label={LANG_NAMES[l]} title={LANG_NAMES[l]}>{FLAGS[l]}</button>
             ))}

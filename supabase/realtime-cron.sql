@@ -26,6 +26,7 @@ revoke all on function public.call_sync_realtime(text) from public, anon, authen
 
 select cron.schedule('rt-fr', '*/3 * * * *', $$select public.call_sync_realtime('fr')$$);
 select cron.schedule('rt-ch', '1-59/3 * * * *', $$select public.call_sync_realtime('ch')$$);
+select cron.schedule('rt-be', '2-59/3 * * * *', $$select public.call_sync_realtime('be')$$);
 
 -- Provera poslednjih poziva:
 --   select id, status_code, left(content::text, 300) from net._http_response order by id desc limit 10;

@@ -8,8 +8,9 @@ import { fetchTrainsForDay, fetchTrainsUpdatedSince, fetchCommentCounts, fetchAl
 import { statusOf, toMin, fromMin, trainHref, ago, filterTrains, isShuttle, parisNowMin } from "@/lib/format";
 import { getGeo } from "@/lib/geo";
 
-// Map views: both countries together first, then Switzerland, then France
-const COUNTRIES = ["all", "ch", "fr"];
+// Map views: all countries together first, then Switzerland, France and Belgium
+const COUNTRIES = ["all", "ch", "fr", "be"];
+const REAL = COUNTRIES.slice(1);
 const DEFAULT_COUNTRY = "all"; // the server sends this view's trains with the page
 import { useLang } from "@/components/LangProvider";
 import { LOCALES } from "@/lib/i18n";
@@ -115,7 +116,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
   // Stops that belong to a map station use its name, so spellings like "Paris-Est" / "Paris Est" become one entry.
   const stationGroups = useMemo(() => {
     const { stopNode } = getGeo(country);
-    const seen = new Map(); // name -> { fr: n, ch: n }
+    const seen = new Map(); // name -> { fr: n, ch: n, be: n }
     for (const tr of real) for (const s of tr.stops || []) {
       if (!s.name) continue;
       const n = stopNode(s);
@@ -124,13 +125,13 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
       c[tr.country] = (c[tr.country] || 0) + 1;
       seen.set(name, c);
     }
-    const groups = { ch: [], fr: [] };
-    for (const [name, c] of seen) groups[(c.ch || 0) > (c.fr || 0) ? "ch" : "fr"].push(name);
+    const groups = Object.fromEntries(REAL.map((k) => [k, []]));
+    for (const [name, c] of seen) groups[REAL.reduce((a, k) => ((c[k] || 0) > (c[a] || 0) ? k : a), "fr")].push(name);
     const loc = LOCALES[lang] || "en-GB";
     for (const g of Object.values(groups)) g.sort((a, b) => a.localeCompare(b, loc));
     return groups;
   }, [real, lang, country]);
-  const stationNames = useMemo(() => new Set([...stationGroups.ch, ...stationGroups.fr]), [stationGroups]);
+  const stationNames = useMemo(() => new Set(Object.values(stationGroups).flat()), [stationGroups]);
   const pickStation = (name) => {
     setStation(name || null);
     if (name) requestAnimationFrame(() => document.querySelector(".mapbox")?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
@@ -151,7 +152,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
       <div className="countries" role="group" aria-label={t("countryGroup")}>
         {COUNTRIES.map((c) => (
           <button key={c} type="button" className="countrybtn" aria-pressed={country === c} onClick={() => chooseCountry(c)}>
-            {(c === "all" ? ["ch", "fr"] : [c]).map((f) => <span key={f} className={`flag flag-${f}`} aria-hidden="true" />)}{t("country_" + c)}
+            {(c === "all" ? REAL : [c]).map((f) => <span key={f} className={`flag flag-${f}`} aria-hidden="true" />)}{t("country_" + c)}
           </button>
         ))}
       </div>
@@ -181,7 +182,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
           <span className="sr">{t("stationPick")}</span>
           <select value={station && stationNames.has(station) ? station : ""} onChange={(e) => pickStation(e.target.value)} aria-label={t("stationPick")}>
             <option value="">{t("stationChoose")}</option>
-            {(country === "all" ? ["ch", "fr"] : [country]).map((c) =>
+            {(country === "all" ? REAL : [country]).map((c) =>
               stationGroups[c].length ? (
                 country === "all"
                   ? <optgroup key={c} label={t("country_" + c)}>{stationGroups[c].map((n) => <option key={n} value={n}>{n}</option>)}</optgroup>

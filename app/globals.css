@@ -257,6 +257,7 @@ a.primary{display:inline-block;text-decoration:none}
 .countrybtn[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--surface-2)}
 .flag{display:inline-block;width:24px;height:16px;border-radius:3px;box-shadow:0 0 0 1px rgba(0,0,0,.15);flex:none}
 .flag-fr{background:linear-gradient(90deg,#0055a4 33.3%,#fff 33.3% 66.6%,#ef4135 66.6%)}
+.flag-be{background:linear-gradient(90deg,#000 33.3%,#fdda24 33.3% 66.6%,#ef3340 66.6%)}
 .flag-ch{width:16px;background:#da291c url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%23fff' d='M13 6h6v7h7v6h-7v7h-6v-7H6v-6h7z'/%3E%3C/svg%3E") center/100% no-repeat}
 .countrybtn .flag + .flag{margin-left:-4px}
 .flag.mini{width:15px;height:10px;border-radius:2px;margin-right:6px;vertical-align:1px}
