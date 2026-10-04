@@ -12,6 +12,7 @@ import { getGeo } from "@/lib/geo";
 const COUNTRIES = ["all", "ch", "fr"];
 const DEFAULT_COUNTRY = "all"; // the server sends this view's trains with the page
 import { useLang } from "@/components/LangProvider";
+import { LOCALES } from "@/lib/i18n";
 import TrainMap from "@/components/TrainMap";
 
 const STATUSES = [["all", "allStatus"], ["late", "delayed"], ["ontime", "ontime"]];
@@ -65,13 +66,22 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
   const real = useMemo(() => trains.filter((x) => !isShuttle(x)), [trains]);
   const list = useMemo(() => filterTrains(trains, { type, status, q }, t), [trains, type, status, q, t]);
 
+  // Punctuality and average delay are measured on the trains running right now (the ones on the map).
+  // Counting the whole day would mix in trains that have not left yet, which always show 0 min.
   const stats = useMemo(() => {
-    const moving = real.filter((x) => !x.cancelled);
-    const onTime = moving.filter((x) => (x.delay_min || 0) < 5).length;
-    const avg = moving.length ? Math.round(moving.reduce((a, x) => a + (x.delay_min || 0), 0) / moving.length) : 0;
+    const now = running.map((r) => r.tr).filter((x) => !x.cancelled);
+    const onTime = now.filter((x) => (x.delay_min || 0) < 5).length;
+    const sum = now.reduce((a, x) => a + (x.delay_min || 0), 0);
+    const avg = now.length ? sum / now.length : 0;
     const lastRt = real.reduce((a, x) => (x.rt_updated_at && x.rt_updated_at > a ? x.rt_updated_at : a), "");
-    return { total: real.length, onTimePct: real.length ? Math.round((onTime / real.length) * 100) : 0, avg, lastRt };
-  }, [real]);
+    return {
+      total: real.length,
+      running: now.length,
+      onTimePct: now.length ? Math.round((onTime / now.length) * 100) : 0,
+      avg: avg < 10 ? Math.round(avg * 10) / 10 : Math.round(avg),
+      lastRt,
+    };
+  }, [real, running]);
 
   // Train types offered as filters: the ones present in this country's data, most common first
   const types = useMemo(() => {
@@ -95,8 +105,8 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
 
       <section className="stats" aria-label={t("liveNow")}>
         <Stat k={t("stTotal")} v={stats.total || "–"} />
-        <Stat k={t("stOntime")} v={stats.total ? stats.onTimePct : "–"} unit={stats.total ? "%" : ""} />
-        <Stat k={t("stAvg")} v={stats.total ? stats.avg : "–"} unit={stats.total ? "min" : ""} />
+        <Stat k={t("stOntime")} v={stats.running ? stats.onTimePct : "–"} unit={stats.running ? "%" : ""} />
+        <Stat k={t("stAvg")} v={stats.running ? stats.avg.toLocaleString(LOCALES[lang]) : "–"} unit={stats.running ? "min" : ""} />
         <Stat k={t("stRunning")} v={stats.total ? running.length : "–"} live />
       </section>
 
