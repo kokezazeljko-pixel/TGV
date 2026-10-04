@@ -325,3 +325,33 @@ a.primary{display:inline-block;text-decoration:none}
 #map .pinlbl{display:none;font-family:var(--f-body);font-size:11px;font-weight:700;text-anchor:middle;fill:var(--fg);paint-order:stroke;stroke:var(--halo);stroke-width:3px;stroke-linejoin:round;pointer-events:none}
 #map.z3 .pinlbl{display:block}
 #map.z3 .lbl.grp{display:none}
+
+/* ===== route view (one train): focus on its route ===== */
+.mapbox.routeview #map .lbl,.mapbox.routeview #map .pinlbl{display:none}
+#map .rs-dot{transform:scale(calc(5 * var(--u,1)));stroke-width:2.2;vector-effect:non-scaling-stroke}
+#map .rs.end .rs-dot{transform:scale(calc(7 * var(--u,1)));stroke-width:3}
+#map .rs-lbl{font-family:var(--f-body);font-size:calc(12px * var(--u,1));font-weight:700;paint-order:stroke;stroke-width:calc(4px * var(--u,1));stroke-linejoin:round;pointer-events:none;transform:translate(calc(10px * var(--u,1)), calc(4px * var(--u,1)))}
+#map .rs-lbl.side-l{transform:translate(calc(-10px * var(--u,1)), calc(4px * var(--u,1)))}
+#map .rs-lbl.side-b{transform:translate(0px, calc(22px * var(--u,1)))}
+#map .rs-lbl.side-t{transform:translate(0px, calc(-12px * var(--u,1)))}
+#map .rs.end .rs-lbl{font-size:calc(13.5px * var(--u,1))}
+#map .rs-time,#map .rs-delay{font-family:var(--f-mono);font-weight:600;font-size:calc(11px * var(--u,1))}
+#map .rs-delay{fill:var(--bad) !important}
+/* Classic → focus: the rest of the network fades to light grey, the route is bold blue */
+.mapbox.routeview.style-classic{--sea:#e8eef5;--land:#fbfcfd}
+.mapbox.routeview.style-classic #map .rail:not(.hl){stroke:#d5dce6;stroke-dasharray:none}
+.mapbox.routeview.style-classic #map .rail.casing{display:none}
+.mapbox.routeview.style-classic #map .rail.hl{stroke:#1d3d8f;stroke-width:6;opacity:1}
+.mapbox.routeview.style-classic #map .rs-dot{fill:#fff;stroke:#1d3d8f}
+.mapbox.routeview.style-classic #map .rs.passed .rs-dot{fill:#1d3d8f}
+.mapbox.routeview.style-classic #map .rs-lbl{fill:#141a24;stroke:#fbfcfd}
+.mapbox.routeview.style-classic #map .rs-time{fill:#5b6575}
+/* Dark → dark focus: glowing light-blue route, amber stops */
+.mapbox.routeview.style-dark #map .rail:not(.hl){stroke:#25314d;stroke-dasharray:none}
+.mapbox.routeview.style-dark #map .rail.casing{display:none}
+.mapbox.routeview.style-dark #map .rail.hl{stroke:#4cc9f0;stroke-width:5;opacity:1;filter:drop-shadow(0 0 4px rgba(76,201,240,.8))}
+.mapbox.routeview.style-dark #map .rs-dot{fill:#0a1020;stroke:#ffc24b}
+.mapbox.routeview.style-dark #map .rs.passed .rs-dot{fill:#ffc24b}
+.mapbox.routeview.style-dark #map .rs-lbl{fill:#e6edf8;stroke:#141d33}
+.mapbox.routeview.style-dark #map .rs-time{fill:#ffc24b}
+.mapbox.routeview.style-dark #map .rs-delay{fill:#ff8a93 !important}

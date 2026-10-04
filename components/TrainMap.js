@@ -30,6 +30,8 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
   const zoomRef = useRef(1);
   const drag = useRef({ pts: new Map(), moved: false, start: null, pinch: null });
   const [now, setNow] = useState(null);
+  const [routeScale, setRouteScale] = useState(0);
+  const [routeBounds, setRouteBounds] = useState(null);
 
   // Clock for train movement (every 2 s)
   useEffect(() => {
@@ -68,6 +70,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
     svg.style.setProperty("--ts", (6.2 * 1.15 * Math.pow(zoom, 0.3) * Math.min(1, Math.sqrt(sc / 0.7)) * u).toFixed(4));
     svg.classList.toggle("z2", sc >= 1.45); svg.classList.toggle("z3", sc >= 2.2);
     svg.classList.toggle("z5", sc >= 3.6); svg.classList.toggle("small", sc < 0.55);
+    if (compact && highlight) { setRouteScale(Math.round(sc * 20) / 20); setRouteBounds({ ...v }); } // route view: labels follow the zoom
   }
   function zoomAt(px, py, factor) {
     const v = view.current;
@@ -135,6 +138,20 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
     anim.current = requestAnimationFrame(step);
   }
 
+  // Route view (one train): fit its route, leaving room on the right for the stop names
+  useEffect(() => {
+    if (!compact || !highlight || !hlPaths.length) return;
+    const pts = hlPaths.flat();
+    const x0 = Math.min(...pts.map((p) => p[0])), x1 = Math.max(...pts.map((p) => p[0]));
+    const y0 = Math.min(...pts.map((p) => p[1])), y1 = Math.max(...pts.map((p) => p[1]));
+    let w = Math.max(W / 9, (x1 - x0) * 1.8, ((y1 - y0) * 1.75 * W) / H);
+    w = Math.min(W, w);
+    const h = (w * H) / W;
+    view.current = { x: (x0 + x1) / 2 - w / 2, y: (y0 + y1) / 2 - h * 0.46, w, h }; // a bit lower: the style buttons sit top-left
+    applyView();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlight?.id]);
+
   // Selecting a station zooms the map onto it; going back shows the whole map again
   const firstSel = useRef(true);
   useEffect(() => {
@@ -158,7 +175,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
   }, [selectedStation]);
 
   return (
-    <div className={"mapbox style-" + mapStyle} style={{ aspectRatio: `${W} / ${H}` }}>
+    <div className={"mapbox style-" + mapStyle + (compact && highlight ? " routeview" : "")} style={{ aspectRatio: compact && highlight ? "16 / 10" : `${W} / ${H}` }}>
       <svg
         ref={svgRef} id="map" role="img" aria-label={t(country === "fr" ? "mapLabel" : "mapLabel_" + country)} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet"
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
@@ -167,11 +184,12 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
         <GeoLabels geo={geo} />
         <Rails geo={geo} />
         <g>{hlPaths.map((pts, i) => <path key={i} className="rail hl" d={"M" + pts.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join("L")} />)}</g>
-        <Stations
+        {compact && highlight && <RouteStops geo={geo} tr={highlight} now={now} scale={routeScale} bounds={routeBounds} />}
+        {!(compact && highlight) && <Stations
           geo={geo}
           selected={selectedStation}
           onClick={(n) => { if (d.moved || !onStationClick) return; onStationClick(n.name); }}
-        />
+        />}
         <g>
           {running.map(({ tr, p }) => {
             const st = statusOf(tr, t);
@@ -194,7 +212,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
         <button type="button" className="small" title={t("zreset")} aria-label={t("zreset")} onClick={() => { view.current = { x: 0, y: 0, w: W, h: H }; applyView(); }}>⤢</button>
       </div>
       {!compact && <div className="maphint">{t("hint")}</div>}
-      {!compact && (
+      {(!compact || highlight) && (
         <div className="mapstyle" role="group" aria-label={t("mapStyle")}>
           {MAP_STYLES.map((s) => (
             <button key={s} type="button" aria-pressed={mapStyle === s} onClick={() => chooseStyle(s)}>{t("style_" + s)}</button>
@@ -320,3 +338,62 @@ function Stations({ geo, selected, onClick }) {
     </>
   );
 }
+
+// Stops of one train on the route view (first/last also with time and delay). Stops already passed are filled.
+// Each name tries the right side, then left, below and above, and is left out if it would overlap
+// another name or run off the map. First/last stop and big cities get their place first.
+function RouteStops({ geo, tr, now, scale, bounds }) {
+  const st = (tr.stops || []).filter((s) => geo.stopNode(s));
+  const last = st.length - 1;
+  const px = scale || 0.7; // screen pixels per map unit
+  const clean = (s) => s.name.replace(/ Hall \d.*$/, "");
+  const rank = (i) => (i === 0 || i === last ? 3 : TIER_A.has(geo.stopNode(st[i]).short) ? 2 : geo.stopNode(st[i]).lvl === 1 ? 1 : 0);
+  const order = st.map((s, i) => i).sort((a, b) => rank(b) - rank(a) || a - b);
+  const placed = st.map((s) => { const n = geo.stopNode(s), r = 7 / px; return { x0: n.x - r, x1: n.x + r, y0: n.y - r, y1: n.y + r }; }); // the dots themselves
+  const show = new Map();
+  const b = bounds || { x: -1e9, y: -1e9, w: 2e9, h: 2e9 };
+  for (const i of order) {
+    const n = geo.stopNode(st[i]);
+    const end = i === 0 || i === last; // only the first and last stop show time and delay (the stop list below has the rest)
+    const wu = ((clean(st[i]).length + (end ? (st[i].delay >= 1 ? 10 : 7) : 0)) * 6.6 + 4) / px, hu = 16 / px, g = 10 / px;
+    const cands = [
+      ["r", n.x + g, n.y - hu / 2], ["l", n.x - g - wu, n.y - hu / 2],
+      ["b", n.x - wu / 2, n.y + g * 0.8], ["t", n.x - wu / 2, n.y - g * 0.8 - hu],
+    ];
+    for (const [side, x0, y0] of cands) {
+      const box = { x0, x1: x0 + wu, y0, y1: y0 + hu };
+      if (box.x0 < b.x || box.x1 > b.x + b.w || box.y0 < b.y || box.y1 > b.y + b.h) continue;
+      if (placed.some((q, k) => k !== i && q.x0 < box.x1 && box.x0 < q.x1 && q.y0 < box.y1 && box.y0 < q.y1)) continue;
+      placed.push(box); show.set(i, side); break;
+    }
+    if (end && !show.has(i)) { // the first and last stop are always named: take a side that stays on the map, even if it is tight
+      const fit = cands.find(([, x0, y0]) => x0 >= b.x && x0 + wu <= b.x + b.w && y0 >= b.y && y0 + hu <= b.y + b.h);
+      const [side, x0, y0] = fit || cands[1];
+      placed.push({ x0, x1: x0 + wu, y0, y1: y0 + hu }); show.set(i, side);
+    }
+  }
+  const ANCH = { r: "start", l: "end", b: "middle", t: "middle" };
+  return (
+    <g className="rstops">
+      {st.map((s, i) => {
+        const n = geo.stopNode(s);
+        const passed = now != null && toMinLocal(s.time) + (s.delay || 0) < now - 1;
+        const end = i === 0 || i === last;
+        const side = show.get(i);
+        return (
+          <g key={i} transform={`translate(${n.x.toFixed(1)} ${n.y.toFixed(1)})`} className={"rs" + (end ? " end" : "") + (passed ? " passed" : "")}>
+            <circle className="rs-dot" r="1"><title>{`${s.name} ${s.time}`}</title></circle>
+            {side && (
+              <text className={"rs-lbl side-" + side} textAnchor={ANCH[side]}>
+                {clean(s)}
+                {end && <tspan className="rs-time">{"  " + s.time}</tspan>}
+                {end && s.delay >= 1 && <tspan className="rs-delay">{` +${s.delay}`}</tspan>}
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+const toMinLocal = (hhmm) => { if (!hhmm) return 0; const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
