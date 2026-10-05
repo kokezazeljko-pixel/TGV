@@ -161,4 +161,20 @@ assert.equal(l1.country, "lu"); assert.ok(l1.id.endsWith("_lu_100"));
 assert.equal(l1.origin, "Luxembourg"); assert.equal(l1.destination, "Troisvierges");
 assert.equal(l1.stops[1].name, "Ettelbruck"); assert.equal(l1.dep, "13:20"); assert.equal(l1.stops[1].lat, 49.848);
 assert.equal(lux.find((t) => t.number === "2800").origin, "Metz-Ville");
+// ---- Španija
+{
+  const { buildSpanishSchedule, esTrainKey, esStopName } = await import("../lib/spain.mjs");
+  const { inflateRawSync } = await import("node:zlib");
+  const es = buildSpanishSchedule(new Uint8Array(readFileSync(join(dir, "gtfs-es.zip"))), [DATE], (b) => inflateRawSync(b));
+  assert.deepEqual(es.map((t) => `${t.type} ${t.number}`).sort(), ["AVE 3181", "Alvia 621"], "AVE i Alvia; bez MD i Avanta, voz 621 samo jednom");
+  const e1 = es.find((t) => t.number === "3181");
+  assert.equal(e1.country, "es"); assert.ok(e1.id.endsWith(`_es_031811${DATE}`));
+  assert.equal(e1.origin, "Madrid-Puerta de Atocha"); assert.equal(e1.dep, "08:30"); assert.equal(e1.stops[0].arr, "08:30:00");
+  assert.equal(e1.stops[1].lon, 2.141);
+  const e2 = es.find((t) => t.number === "621");
+  assert.equal(e2.origin, "Vigo Urzaiz", "cela vožnja, ne deo od Leóna"); assert.equal(e2.stops.length, 3);
+  assert.equal(esTrainKey(`006212${DATE}`), "621");
+  assert.equal(esStopName("Córdoba-Julio Anguita"), "Córdoba");
+  assert.equal(esStopName("Bilbao-Intermod. Abando Indalecio Prieto"), "Bilbao-Abando");
+}
 console.log("✔ Svi testovi su prošli");

@@ -68,8 +68,9 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
     svg.style.setProperty("--u", u.toFixed(4));
     svg.style.setProperty("--sr", (Math.pow(zoom, 0.25) * u).toFixed(4));
     svg.style.setProperty("--ts", (6.2 * 1.15 * Math.pow(zoom, 0.3) * Math.min(1, Math.sqrt(sc / 0.7)) * u).toFixed(4));
-    svg.classList.toggle("z2", sc >= 1.45); svg.classList.toggle("z3", sc >= 2.2);
-    svg.classList.toggle("z5", sc >= 3.6); svg.classList.toggle("small", sc < 0.55);
+    const all = geo.NET.allNames && sc >= 0.45; // small networks (Luxembourg): every station named from the start
+    svg.classList.toggle("z2", sc >= 1.45 || all); svg.classList.toggle("z3", sc >= 2.2);
+    svg.classList.toggle("z5", sc >= 3.6 || all); svg.classList.toggle("small", sc < 0.55);
     if (compact && highlight) { setRouteScale(Math.round(sc * 20) / 20); setRouteBounds({ ...v }); } // route view: labels follow the zoom
   }
   function zoomAt(px, py, factor) {
@@ -166,7 +167,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
     const pts = [pt, ...trains.map((tr) => trainPos(tr, nowMin)).filter(Boolean).map((p) => p.xy)];
     let x0 = Math.min(...pts.map((p) => p[0])), x1 = Math.max(...pts.map((p) => p[0]));
     let y0 = Math.min(...pts.map((p) => p[1])), y1 = Math.max(...pts.map((p) => p[1]));
-    const minW = W / (country === "ch" || country === "be" || country === "nl" || country === "lu" ? 2.6 : country === "all" ? 6 : 4.5);
+    const minW = W / (country === "ch" || country === "be" || country === "nl" || country === "lu" ? 2.6 : country === "es" ? 3.2 : country === "all" ? 6 : 4.5);
     let w = Math.max(minW, (x1 - x0) * 1.25, ((y1 - y0) * 1.25 * W) / H);
     w = Math.min(W, w);
     const h = (w * H) / W, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
@@ -330,7 +331,7 @@ function Stations({ geo, selected, onClick }) {
       <g>
         {groupLabels.map(([name, n]) => <text key={name} x={n.x.toFixed(1)} y={n.y.toFixed(1)} textAnchor="end" className="lbl major a grp pos-l">{name}</text>)}
         {stations.filter((n) => n.lvl).map((n) => {
-          const cls = n.lvl === 1 ? "lbl major " + (TIER_A.has(n.short) ? "a" : "b") : n.lvl === 5 ? "lbl l5" : "lbl l2";
+          const cls = n.lvl === 1 ? "lbl major " + (TIER_A.has(n.short) ? "a" : "b") : n.lvl === 5 ? "lbl l5" : n.lvl === 3 ? "lbl l3" : "lbl l2";
           if (n.group) return null; // their names sit on the fanned-out pins
           const pinned = n.lvl === 1 || isAirport(n.name) ? " pinned" : "";
           return <text key={n.k} x={n.x.toFixed(1)} y={n.y.toFixed(1)} textAnchor={ANCHOR[n.pos] || "start"} className={`${cls}${pinned} pos-${n.pos || "r"}`}>{n.short}</text>;

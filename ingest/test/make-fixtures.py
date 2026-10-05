@@ -323,3 +323,31 @@ lu = {
 }
 with zipfile.ZipFile(os.path.join(out, "gtfs-lu.zip"), "w", zipfile.ZIP_DEFLATED) as z:
     for k, v in lu.items(): z.writestr(k, v)
+
+# ---- Spain (Renfe): every line padded with spaces to a fixed width, single-digit hours, zero-padded train numbers,
+# one train listed as two trips (whole run + part of it)
+def padded(rows): return "\n".join(r.ljust(110) for r in rows) + "\n"
+d = ymd
+es = {
+    "routes.txt": padded(["route_id,agency_id,route_short_name,route_long_name,route_desc,route_type,route_url,route_color,route_text_color",
+                          "R1,1071,AVE,,,2,,F2F5F5,", "R2,1071,ALVIA,,,2,,F2F5F5,", "R3,1071,MD,,,2,,F2F5F5,", "R4,1071,AVANT,,,2,,,"]),
+    "calendar.txt": padded(["service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date",
+                            f"S1,1,1,1,1,1,1,1,{d},{d}"]),
+    "calendar_dates.txt": padded(["service_id,date,exception_type"]),
+    "trips.txt": padded(["route_id,service_id,trip_id,trip_headsign,trip_short_name,direction_id,block_id,shape_id,wheelchair_accessible",
+                         f"R1,S1,031811{date},,03181,,,,1", f"R2,S1,006211{date},,00621,,,,2", f"R2,S1,006212{date},,00621,,,,2",
+                         f"R3,S1,090721{date},,09072,,,,2", f"R4,S1,080581{date},,08058,,,,2"]),
+    "stop_times.txt": padded(["trip_id,arrival_time,departure_time,stop_id,stop_sequence,stop_headsign,pickup_type,drop_off_type,shape_dist_traveled",
+                              f"031811{date},8:30:00,8:30:00,60000,01,,0,1,", f"031811{date},11:14:00,11:14:00,71801,02,,1,0,",
+                              f"006211{date},7:32:00,7:32:00,22303,01,,,,", f"006211{date},13:35:00,13:36:00,15100,02,,,,", f"006211{date},21:40:00,21:40:00,71801,03,,,,",
+                              f"006212{date},13:35:00,13:36:00,15100,01,,,,", f"006212{date},21:40:00,21:40:00,71801,02,,,,",
+                              f"090721{date},9:00:00,9:00:00,60000,01,,,,", f"090721{date},10:00:00,10:00:00,71801,02,,,,",
+                              f"080581{date},9:00:00,9:00:00,60000,01,,,,", f"080581{date},10:00:00,10:00:00,71801,02,,,,"]),
+    "stops.txt": padded(["stop_id,stop_code,stop_name,stop_desc,stop_lat,stop_lon,zone_id,stop_url,location_type,parent_station,stop_timezone,wheelchair_boarding",
+                         "60000,,Madrid-Puerta de Atocha-Almudena Grandes,,40.4064,-3.6909,,,,,Europe/Madrid,1",
+                         "71801,,Barcelona-Sants,,41.3799,2.1410,,,,,Europe/Madrid,1",
+                         "22303,,Vigo Urzaiz,,42.2342,-8.7137,,,,,Europe/Madrid,1",
+                         "15100,,León,,42.5960,-5.5824,,,,,Europe/Madrid,1"]),
+}
+with zipfile.ZipFile(os.path.join(out, "gtfs-es.zip"), "w", zipfile.ZIP_DEFLATED) as z:
+    for k, v in es.items(): z.writestr(k, v)
