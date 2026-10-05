@@ -1,11 +1,13 @@
 // Ko-fi webhook: Ko-fi calls this address after every payment (donation, shop item, membership).
-// A payment of 1 or more (EUR, CHF, USD…) gives the site account with the same email 24 hours of access
-// to earlier days (public.kofi_grant). Set the secret KOFI_VERIFICATION_TOKEN in Supabase → Edge Functions →
+// A payment unlocks earlier days for the site account with the same email (public.kofi_grant):
+// 1 = 1 day, 20 or more = 30 days, a monthly Ko-fi membership payment = 31 days. Set the secret KOFI_VERIFICATION_TOKEN in Supabase → Edge Functions →
 // Secrets (Ko-fi → Settings → API → Webhooks shows the token), and put this function's URL in Ko-fi.
 // verify_jwt is off on purpose: Ko-fi cannot send a Supabase token, the verification token is checked instead.
 const URL_ = Deno.env.get("SUPABASE_URL")!;
 const KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const TOKEN = Deno.env.get("KOFI_VERIFICATION_TOKEN") || "";
+// tolerant of spaces or quotes picked up when the token was pasted into Secrets
+const clean = (v: unknown) => String(v ?? "").trim().replace(/^["']|["']$/g, "").trim();
+const TOKEN = clean(Deno.env.get("KOFI_VERIFICATION_TOKEN"));
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
@@ -19,7 +21,11 @@ Deno.serve(async (req) => {
   } catch {
     return json({ error: "bad request" }, 400);
   }
-  if (data.verification_token !== TOKEN) return json({ error: "forbidden" }, 403);
+  if (clean(data.verification_token) !== TOKEN) {
+    // say only what kind of mismatch it is (lengths), never the token itself
+    console.log(JSON.stringify({ rejected: "token mismatch", got_len: clean(data.verification_token).length, secret_len: TOKEN.length }));
+    return json({ error: "forbidden" }, 403);
+  }
 
   const args = {
     p_tx: String(data.kofi_transaction_id || data.message_id || ""),

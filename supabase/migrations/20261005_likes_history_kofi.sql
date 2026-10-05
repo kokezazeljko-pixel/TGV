@@ -8,3 +8,5 @@
 --    Edge function kofi-webhook (Ko-fi → Settings → API → Webhooks; secret KOFI_VERIFICATION_TOKEN).
 --    The trains read policy: today and later free, yesterday free until 06:00, earlier days only with access.
 -- (full bodies: see the live objects in Supabase)
+-- Update: kofi_grant gives 1 day per full 1 paid, 30 days for 20 or more, 31 days for a Ko-fi membership
+-- payment (type "Subscription").
