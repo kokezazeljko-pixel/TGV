@@ -6,10 +6,10 @@ import { parisNowMin, statusOf } from "@/lib/format";
 import { useLang } from "@/components/LangProvider";
 
 const ARROW = "M1.45 0L-0.95 1.05L-0.45 0L-0.95 -1.05Z"; // points right, rotated to the direction of travel
-const TIER_A = new Set(["Lille", "Strasbourg", "Lyon", "Marseille", "Bordeaux", "Nantes", "Rennes", "Toulouse", "Montpellier", "Nice", "Genève", "Lausanne", "Bern", "Zürich", "Basel", "Lugano", "Antwerpen", "Gent", "Liège"]);
+const TIER_A = new Set(["Lille", "Strasbourg", "Lyon", "Marseille", "Bordeaux", "Nantes", "Rennes", "Toulouse", "Montpellier", "Nice", "Genève", "Lausanne", "Bern", "Zürich", "Basel", "Lugano", "Antwerpen", "Gent", "Liège", "Rotterdam", "Utrecht", "Eindhoven", "Groningen"]);
 
 /**
- * Stylized map of France, Switzerland, Belgium or all together, with its lines, stations and trains running now.
+ * Stylized map of France, Switzerland, Belgium, the Netherlands or all together, with its lines, stations and trains running now.
  * Give it a new `key` when the country changes so it starts fresh.
  * Pan/zoom is applied directly to the SVG (no React re-render while dragging);
  * sizes that must stay constant on screen use the CSS variables --u (map units per pixel),
@@ -166,7 +166,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
     const pts = [pt, ...trains.map((tr) => trainPos(tr, nowMin)).filter(Boolean).map((p) => p.xy)];
     let x0 = Math.min(...pts.map((p) => p[0])), x1 = Math.max(...pts.map((p) => p[0]));
     let y0 = Math.min(...pts.map((p) => p[1])), y1 = Math.max(...pts.map((p) => p[1]));
-    const minW = W / (country === "ch" || country === "be" ? 2.6 : country === "all" ? 6 : 4.5);
+    const minW = W / (country === "ch" || country === "be" || country === "nl" ? 2.6 : country === "all" ? 6 : 4.5);
     let w = Math.max(minW, (x1 - x0) * 1.25, ((y1 - y0) * 1.25 * W) / H);
     w = Math.min(W, w);
     const h = (w * H) / W, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;

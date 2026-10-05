@@ -11,8 +11,8 @@ import { fetchTrainsForDay, fetchTrainsUpdatedSince, fetchCommentCounts, fetchAl
 import { statusOf, toMin, fromMin, trainHref, ago, filterTrains, isShuttle, parisNowMin, plannedPf } from "@/lib/format";
 import { getGeo } from "@/lib/geo";
 
-// Map views: all countries together first, then Switzerland, France and Belgium
-const COUNTRIES = ["all", "ch", "fr", "be"];
+// Map views: all countries together first, then Switzerland, France, Belgium and the Netherlands
+const COUNTRIES = ["all", "ch", "fr", "be", "nl"];
 const REAL = COUNTRIES.slice(1);
 const DEFAULT_COUNTRY = "all"; // the server sends this view's trains with the page
 import { useLang } from "@/components/LangProvider";

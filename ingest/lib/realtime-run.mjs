@@ -3,6 +3,7 @@
 import { decodeFeed } from "./gtfs-rt.mjs";
 import { applyTripUpdate, matchRow, onTimeUpdate } from "./realtime.mjs";
 import { BE_TRIPS_URL, feedFromJson } from "./belgium.mjs";
+import { NL_TRAINS_URL, NL_HEADERS } from "./netherlands.mjs";
 import { parisDate, chunks } from "./util.mjs";
 
 export const FEEDS = {
@@ -11,6 +12,8 @@ export const FEEDS = {
   ch: { url: "https://api.opentransportdata.swiss/la/gtfs-rt", headers: (key) => ({ Authorization: `Bearer ${key}`, "Accept-Encoding": "br, gzip, deflate" }) },
   // SNCB: GTFS-RT as JSON, only trains with a deviation; missing running trains are on time (onlyDeviations)
   be: { url: BE_TRIPS_URL, headers: () => ({ Accept: "application/json" }), json: true, onlyDeviations: true },
+  // NS / NDOV via OVapi: every train of today and tomorrow (protobuf), delays, cancellations and track changes
+  nl: { url: NL_TRAINS_URL, headers: () => NL_HEADERS },
 };
 
 // protobuf (fr, ch) or JSON (be) -> decoded feed

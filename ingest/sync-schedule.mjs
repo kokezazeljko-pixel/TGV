@@ -1,25 +1,28 @@
 // Preuzima red vožnje (GTFS), bira međugradske vozove za danas i sutra
 // i upisuje ih u tabelu "trains" u Supabase-u.
 //
-// Zemlja se bira promenljivom COUNTRY: fr (SNCF, podrazumevano), ch (Švajcarska) ili be (Belgija, SNCB).
+// Zemlja se bira promenljivom COUNTRY: fr (SNCF, podrazumevano), ch (Švajcarska), be (Belgija, SNCB) ili nl (Holandija, NS).
 // Pokretanje:  node ingest/sync-schedule.mjs          (Francuska)
 //              COUNTRY=ch node ingest/sync-schedule.mjs (Švajcarska)
 //              COUNTRY=be node ingest/sync-schedule.mjs (Belgija)
+//              COUNTRY=nl node ingest/sync-schedule.mjs (Holandija)
 // Za probu bez baze:  DRY_RUN=1 GTFS_FILE=putanja.zip node ingest/sync-schedule.mjs
 import { readFile, writeFile } from "node:fs/promises";
 import { listZip, openEntry } from "./lib/zip.mjs";
 import { eachRow } from "./lib/csv.mjs";
 import { parisDate, hhmm, detectType, detectSwissType, productFromStopId, env, supabaseRest, download, chunks, latestSwissGtfsUrl, platformOf } from "./lib/util.mjs";
 import { BE_STATIC_URL, detectBelgianType, isBelgianStop, localName } from "./lib/belgium.mjs";
+import { NL_STATIC_URL, NL_HEADERS, detectDutchType, stationCode } from "./lib/netherlands.mjs";
 
 const COUNTRY = env("COUNTRY", "fr");
 const CONFIG = {
   fr: { types: "TGV INOUI,OUIGO,TGV Lyria", gtfsUrl: "https://eu.ftp.opendatasoft.com/sncf/plandata/Export_OpenData_SNCF_GTFS_NewTripId.zip", idPrefix: "" },
   ch: { types: "IC,IR,EC,ICE,TGV Lyria,Railjet,Night train,Panorama", gtfsUrl: null, idPrefix: "ch_" },
   be: { types: "IC,EC,Night train", gtfsUrl: BE_STATIC_URL, idPrefix: "be_" },
+  nl: { types: "IC,ICD,ICE,Eurostar,EC,ECD,Night train", gtfsUrl: NL_STATIC_URL, idPrefix: "nl_", headers: NL_HEADERS },
 }[COUNTRY];
-if (!CONFIG) throw new Error(`Nepoznata zemlja COUNTRY=${COUNTRY} (dozvoljeno: fr, ch, be)`);
-const routeType = { ch: detectSwissType, be: detectBelgianType }[COUNTRY]; // vrsta voza iz same linije (routes.txt)
+if (!CONFIG) throw new Error(`Nepoznata zemlja COUNTRY=${COUNTRY} (dozvoljeno: fr, ch, be, nl)`);
+const routeType = { ch: detectSwissType, be: detectBelgianType, nl: detectDutchType }[COUNTRY]; // vrsta voza iz same linije (routes.txt)
 
 const TYPES = env("TRAIN_TYPES", CONFIG.types).split(",").map((s) => s.trim());
 const DAYS = Number(env("DAYS", "2"));
@@ -45,10 +48,10 @@ async function main() {
   let url = env("GTFS_URL", CONFIG.gtfsUrl || "");
   if (!url && !process.env.GTFS_FILE && COUNTRY === "ch") url = await latestSwissGtfsUrl(TODAY);
   if (url) console.log(`Izvor: ${url}`);
-  const zip = process.env.GTFS_FILE ? await readFile(process.env.GTFS_FILE) : await download(url);
+  const zip = process.env.GTFS_FILE ? await readFile(process.env.GTFS_FILE) : await download(url, CONFIG.headers);
   console.log(`GTFS: ${(zip.length / 1e6).toFixed(1)} MB`);
   const files = listZip(zip);
-  const read = async (name, fn) => { const e = files.get(name); if (e) await eachRow(openEntry(zip, e), fn); return !!e; };
+  const read = async (name, fn, first) => { const e = files.get(name); if (e) await eachRow(openEntry(zip, e), fn, first); return !!e; };
 
   // 1) Koji servisi (kalendari) voze kog dana
   const active = new Map(dates.map((d) => [d, new Set()]));
@@ -72,7 +75,7 @@ async function main() {
   const descCount = {};
   await read("routes.txt", (r) => {
     if (routeType) {
-      const cat = COUNTRY === "be" ? ((r.route_short_name || "").match(/^[A-Za-z]+/) || [""])[0] : r.route_desc;
+      const cat = COUNTRY === "be" ? ((r.route_short_name || "").match(/^[A-Za-z]+/) || [""])[0] : COUNTRY === "nl" ? `${r.agency_id} ${r.route_short_name}` : r.route_desc;
       descCount[cat] = (descCount[cat] || 0) + 1;
       const type = routeType(r);
       if (type && TYPES.includes(type)) routes.set(r.route_id, { ...r, type });
@@ -84,14 +87,14 @@ async function main() {
     if (routeType && !routes.has(r.route_id)) return;
     const runs = dates.filter((d) => active.get(d).has(r.service_id));
     if (runs.length) trips.set(r.trip_id, { ...r, runs, stops: [] });
-  });
+  }, routeType ? { col: "route_id", keep: (id) => routes.has(id) } : null);
   console.log(`Vožnji u izabranim danima: ${trips.size}`);
 
-  // 3) Stanice po vožnji (najveći fajl – čita se kao stream)
+  // 3) Stanice po vožnji (najveći fajl – čita se kao stream; redovi drugih vožnji se preskaču bez raščlanjivanja)
   await read("stop_times.txt", (r) => {
     const t = trips.get(r.trip_id);
     if (t) t.stops.push({ seq: Number(r.stop_sequence), id: r.stop_id, arr: r.arrival_time || null, dep: r.departure_time || null });
-  });
+  }, { col: "trip_id", keep: (id) => trips.has(id) });
 
   // 4) Vrsta voza i filtriranje
   const typeCount = {};
@@ -110,7 +113,7 @@ async function main() {
   // Belgija: nazivi su u feedu na francuskom, holandski je u translations.txt -> naziv na lokalnom jeziku
   const dutch = new Map();
   if (COUNTRY === "be") await read("translations.txt", (r) => { if (r.table_name === "stops" && r.field_name === "stop_name" && r.language === "nl") dutch.set(r.field_value, r.translation); });
-  const stopNames = new Map(), stopCoords = new Map(), stopPf = new Map();
+  const stopNames = new Map(), stopCoords = new Map(), stopPf = new Map(), stopSt = new Map();
   await read("stops.txt", (r) => {
     if (!needStops.has(r.stop_id)) return;
     const lat = parseFloat(r.stop_lat), lon = parseFloat(r.stop_lon);
@@ -119,6 +122,9 @@ async function main() {
     if (ok) stopCoords.set(r.stop_id, [Math.round(lat * 1e4) / 1e4, Math.round(lon * 1e4) / 1e4]);
     const pf = platformOf(r.stop_id, r.platform_code); // peron (Švajcarska, Belgija; SNCF ga ne objavljuje)
     if (pf) stopPf.set(r.stop_id, pf);
+    // Holandija: šifra stanice (zone_id "IFF:asd"), po njoj se spajaju podaci uživo kad se promeni peron
+    const st = COUNTRY === "nl" ? stationCode(r.zone_id) : null;
+    if (st) stopSt.set(r.stop_id, st);
   });
 
   // 5) Redovi za bazu
@@ -126,8 +132,8 @@ async function main() {
   for (const t of keep) {
     const stops = t.stops.map((s) => {
       const c = stopCoords.get(s.id);
-      const pf = stopPf.get(s.id);
-      return { ...s, name: stopNames.get(s.id) || s.id, time: hhmm(s.dep || s.arr), delay: 0, ...(c ? { lat: c[0], lon: c[1] } : {}), ...(pf ? { pf } : {}) };
+      const pf = stopPf.get(s.id), st = stopSt.get(s.id);
+      return { ...s, name: stopNames.get(s.id) || s.id, time: hhmm(s.dep || s.arr), delay: 0, ...(c ? { lat: c[0], lon: c[1] } : {}), ...(pf ? { pf } : {}), ...(st ? { st } : {}) };
     });
     const first = stops[0], last = stops[stops.length - 1];
     for (const d of t.runs) {

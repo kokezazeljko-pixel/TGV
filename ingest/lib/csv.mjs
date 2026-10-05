@@ -19,8 +19,10 @@ export function parseLine(line) {
   return out;
 }
 
-// Prolazi kroz CSV stream i za svaki red poziva onRow(objekat)
-export async function eachRow(stream, onRow) {
+// Prolazi kroz CSV stream i za svaki red poziva onRow(objekat).
+// first (optional): { col, keep } – a row whose first column is `col` is parsed only if keep(value) is true.
+// Big files (Dutch stop_times.txt: 1.2 GB) are then mostly skipped without splitting every line into fields.
+export async function eachRow(stream, onRow, first = null) {
   let header = null, rest = "";
   const decoder = new StringDecoder("utf8"); // ispravno spaja slova (é, è…) podeljena između delova
   const handle = (line) => {
@@ -28,7 +30,13 @@ export async function eachRow(stream, onRow) {
     if (!line) return;
     if (!header) {
       header = parseLine(line.replace(/^\uFEFF/, "")).map((h) => h.trim());
+      if (first && header[0] !== first.col) first = null;
       return;
+    }
+    if (first) {
+      const c = line.indexOf(",");
+      const v = c < 0 ? line : line.slice(0, c);
+      if (!first.keep(v.startsWith('"') ? v.slice(1, -1) : v)) return;
     }
     const vals = parseLine(line);
     const row = {};

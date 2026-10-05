@@ -9,10 +9,11 @@ const CANCELED = 3;
 // nowSec: trenutno vreme u Unix sekundama
 export function applyTripUpdate(row, tu, nowSec) {
   const stops = row.stops.map((s) => ({ ...s }));
-  const bySeq = new Map(), byId = new Map();
+  const bySeq = new Map(), byId = new Map(), byStation = new Map();
   for (const u of tu.stopTimeUpdates) {
     if (u.stopSequence != null) bySeq.set(u.stopSequence, u);
     if (u.stopId) byId.set(u.stopId, u);
+    if (u.ovapi?.station) byStation.set(u.ovapi.station.toLowerCase(), u); // Netherlands: station code, also when the track changed
   }
 
   const schedEpoch = (s) => gtfsToEpoch(row.service_date, s.arr || s.dep);
@@ -20,12 +21,13 @@ export function applyTripUpdate(row, tu, nowSec) {
   let carry = tu.delay ?? null; // kašnjenje se prenosi na sledeće stanice dok ne stigne nova vrednost
   let anyUpdate = carry != null;
   for (const s of stops) {
-    const u = bySeq.get(s.seq) ?? byId.get(s.id);
+    const u = bySeq.get(s.seq) ?? byId.get(s.id) ?? (s.st ? byStation.get(s.st) : undefined);
     s.skipped = false;
     delete s.apf;
     if (u) {
       // platform change: the feed names a different track of the same station (Belgium: "8814001_12" instead of "_14")
-      const apf = u.stopId && u.stopId !== s.id ? platformOf(u.stopId) : null;
+      // Netherlands: OVapi gives the actual track itself
+      const apf = u.ovapi?.actual ? platformOf("", u.ovapi.actual) : u.stopId && u.stopId !== s.id ? platformOf(u.stopId) : null;
       if (apf && apf !== s.pf) s.apf = apf;
       if (u.scheduleRelationship === SKIPPED) s.skipped = true;
       const ev = u.arrival ?? u.departure;

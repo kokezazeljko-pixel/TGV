@@ -223,3 +223,75 @@ alertsbe = {"header": {"gtfsRealtimeVersion": "2.0"}, "entity": [
   {"id": "rs:nmbssncb:a2", "alert": {"informedEntity": [{"agencyId": "nmbssncb"}], "activePeriod": [{"end": epoch("06:00")}],
     "headerText": trs(fr="Ancien - Fini"), "descriptionText": trs(fr="x")}}]}
 open(os.path.join(out, "alerts-be.json"), "w").write(json.dumps(alertsbe))
+
+# ---- Holandija (NS preko OVapi): GTFS za celu zemlju (svi prevoznici), trainUpdates sa OVapi dodatkom 1003
+nl = {
+"agency.txt": "agency_id,agency_name,agency_url,agency_timezone,agency_phone\n"
+             "IFF:NS,NS,http://www.ns.nl,Europe/Amsterdam,\nIFF:NS_INT,NS International,http://www.nsinternational.nl,Europe/Amsterdam,\n"
+             "IFF:ARRIVA,Arriva,https://www.arriva.nl,Europe/Amsterdam,\nARR,Arriva,https://www.arriva.nl,Europe/Amsterdam,\n",
+"routes.txt": "route_id,agency_id,route_short_name,route_long_name,route_desc,route_type,route_color,route_text_color,route_url\n"
+             "17562,IFF:NS,Intercity,Rotterdam Centraal <-> Utrecht Centraal IC2800,,2,,,\n"
+             "17627,IFF:NS,Sprinter,Utrecht Centraal <-> Baarn SPR5500,,2,,,\n"
+             "139894,IFF:NS_INT,ICE,Amsterdam Centraal <-> Frankfurt (M) Hbf ICE100,,2,,,\n"
+             "124450,IFF:NS,Intercity direct,Rotterdam Centraal <-> Amsterdam Zuid ICD11800,,2,,,\n"
+             "86488,IFF:ARRIVA,Stoptrein RS18,Kerkrade Centrum <-> Maastricht Randwyck ST32000,,2,,,\n"
+             "161232,IFF:NS,Taxibus ipv trein,Taxibus ipv trein Goes <-> Kapelle-Biezelinge,,3,,,\n"
+             "5001,ARR,1,Bus,,3,,,\n",
+"calendar_dates.txt": "service_id,date,exception_type\n" + "".join(f"{i},{ymd},1\n" for i in range(1, 8)),
+"trips.txt": "route_id,service_id,trip_id,realtime_trip_id,trip_headsign,trip_short_name,trip_long_name,direction_id,block_id,shape_id,wheelchair_accessible,bikes_allowed\n"
+             "17562,1,260620735,IFF:IC:2835,Utrecht Centraal,2835,Intercity,0,,1,0,1\n"
+             "17627,2,260620800,IFF:SPR:5500,Baarn,5500,Sprinter,0,,2,0,1\n"
+             "139894,3,270000001,IFF:ICE:123,Frankfurt (M) Hbf,123,ICE,0,,3,0,1\n"
+             "124450,4,280000001,IFF:ICD:1100,Amsterdam Zuid,1100,Intercity direct,0,,4,0,1\n"
+             "86488,5,290000001,IFF:ST:32000,Maastricht Randwyck,32000,Stoptrein,0,,5,0,1\n"
+             "161232,6,295000001,,Kapelle-Biezelinge,,Taxibus ipv trein,0,,6,0,0\n"
+             "5001,7,300000001,,Centrum,,,0,,7,0,0\n",
+"stop_times.txt": "trip_id,stop_sequence,stop_id,stop_headsign,arrival_time,departure_time,pickup_type,drop_off_type,timepoint,shape_dist_traveled,fare_units_traveled\n"
+             "260620735,1,2993758,,13:30:00,13:30:00,0,1,1,1,0\n260620735,3,2993739,,13:48:00,13:49:00,0,0,1,2,0\n260620735,6,2993985,,14:10:00,14:10:00,1,0,1,3,0\n"
+             "260620800,1,2993985,,13:00:00,13:00:00,0,1,1,1,0\n260620800,2,2993739,,13:30:00,13:30:00,1,0,1,2,0\n"
+             "270000001,1,2992168,,13:00:00,13:00:00,0,1,1,1,0\n270000001,2,2993990,,13:27:00,13:30:00,0,0,1,2,0\n"
+             "270000001,4,2990001,,14:05:00,14:08:00,0,0,1,3,0\n270000001,6,8000001,,15:00:00,15:00:00,1,0,1,4,0\n"
+             "280000001,1,2993759,,13:40:00,13:40:00,0,1,1,1,0\n280000001,2,2994100,,14:20:00,14:20:00,1,0,1,2,0\n"
+             "290000001,1,3000001,,13:00:00,13:00:00,0,1,1,1,0\n290000001,2,3000002,,13:30:00,13:30:00,1,0,1,2,0\n"
+             "295000001,1,3000003,,13:00:00,13:00:00,0,1,1,1,0\n295000001,2,3000004,,13:30:00,13:30:00,1,0,1,2,0\n"
+             "300000001,1,3000005,,13:00:00,13:00:00,0,1,1,1,0\n300000001,2,3000006,,13:30:00,13:30:00,1,0,1,2,0\n",
+"stops.txt": "stop_id,stop_code,stop_name,stop_lat,stop_lon,location_type,parent_station,stop_timezone,wheelchair_boarding,platform_code,zone_id\n"
+             "2993758,,Rotterdam Centraal,51.92522,4.46888,0,stoparea:1,,1,9,IFF:rtd\n"
+             "2993759,,Rotterdam Centraal,51.92522,4.46888,0,stoparea:1,,1,12,IFF:rtd\n"
+             "2993739,,Gouda,52.0184,4.706,0,stoparea:2,,1,3,IFF:gd\n"
+             "2993985,,Utrecht Centraal,52.08967,5.10994,0,stoparea:3,,1,11,IFF:ut\n"
+             "2993990,,Utrecht Centraal,52.08984,5.1095,0,stoparea:3,,1,12,IFF:ut\n"
+             "2992168,,Amsterdam Centraal,52.3791,4.9003,0,stoparea:4,,1,10a,IFF:asd\n"
+             "2990001,,Arnhem Centraal,51.985,5.9005,0,stoparea:5,,1,5,IFF:ah\n"
+             "8000001,,Duisburg Hbf,51.4298,6.7756,0,,,,,\n"
+             "2994100,,Amsterdam Zuid,52.3388,4.8728,0,stoparea:6,,1,2,IFF:asdz\n"
+             "3000001,,Kerkrade Centrum,50.86,6.06,0,,,,1,IFF:krd\n3000002,,Maastricht Randwyck,50.84,5.71,0,,,,2,IFF:mtr\n"
+             "3000003,,\"[Goes] Bushalte\",51.5,3.89,0,,,,,\n3000004,,Kapelle-Biezelinge,51.48,3.96,0,,,,,\n"
+             "3000005,,Centrum,52.0,5.0,0,,,,,\n3000006,,Station,52.01,5.01,0,,,,,\n",
+}
+with zipfile.ZipFile(os.path.join(out, "gtfs-nl.zip"), "w", zipfile.ZIP_DEFLATED) as z:
+    for k, v in nl.items(): z.writestr(k, v)
+
+# IC 2835: +2 u Rotterdamu, prolazna tačka (Wolfheze, nije u redu vožnje), +6 u Goudi, u Utrechtu peron 12 umesto 11
+# (drugi stop_id, bez stop_sequence – kao u pravom feedu); ICE 123 otkazan; ICD 1100 nije u feedu; nepoznat voz
+def ov(track=None, actual=None, station=None):
+    b = (s(2, track) if track else b"") + (s(3, actual) if actual else b"") + (s(4, station) if station else b"")
+    return ld(1003, b)
+def nstu(stop_id, arrival=None, departure=None, rel=None, ext=b""):
+    b = b""
+    if arrival: b += ld(2, arrival)
+    if departure: b += ld(3, departure)
+    b += s(4, stop_id)
+    if rel is not None: b += vi(5, rel)
+    return b + ext
+ntrip = lambda tid, rt, num, rel=0: s(1, tid) + s(2, "13:30:00") + s(3, ymd) + vi(4, rel) + s(5, "17562") + ld(1003, s(1, rt) + s(2, num))
+ntu1 = ld(1, ntrip("260620735", "IFF:IC:2835", "2835")) \
+     + ld(2, nstu("2993758", departure=vi(1, 120) + vi(2, epoch("13:32")), rel=0, ext=ov("9", station="rtd"))) \
+     + ld(2, nstu("2994174", rel=1, ext=ov(station="wf"))) \
+     + ld(2, nstu("2993739", arrival=vi(1, 300), departure=vi(1, 360), rel=0, ext=ov("3", station="gd"))) \
+     + ld(2, nstu("2993990", arrival=vi(1, 360), rel=0, ext=ov("11", "12", "ut")))
+ntu2 = ld(1, ntrip("270000001", "IFF:ICE:123", "123", 3))
+ntu3 = ld(1, ntrip("999999", "IFF:IC:1", "1")) + ld(2, nstu("2993758", departure=vi(1, 60)))
+feednl = ld(1, s(1, "1.0") + vi(3, epoch("14:00"))) \
+       + ld(2, s(1, "260620735") + ld(3, ntu1)) + ld(2, s(1, "270000001") + ld(3, ntu2)) + ld(2, s(1, "999999") + ld(3, ntu3))
+open(os.path.join(out, "feed-nl.pb"), "wb").write(feednl)

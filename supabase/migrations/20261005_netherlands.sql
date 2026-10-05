@@ -1,0 +1,6 @@
+-- Already applied in Supabase (migration "netherlands"); kept here as documentation.
+-- trains/alerts/profiles: country 'nl' allowed (check constraints).
+-- rt_candidates: stops now carry an 8th value, the Dutch station code (st), used to match OVapi updates
+-- when the track (and so the stop_id) changes.
+-- pg_cron job "rt-nl" (every 3 minutes): select public.call_sync_realtime('nl')
+-- The Netherlands has no official notices feed for trains in OVapi, so there is no alerts-nl job.

@@ -1,4 +1,4 @@
-// Supabase Edge funkcija: osvežava kašnjenja za jednu zemlju (?country=fr, ch ili be),
+// Supabase Edge funkcija: osvežava kašnjenja za jednu zemlju (?country=fr, ch, be ili nl),
 // a sa &kind=alerts zvanična obaveštenja prevoznika (GTFS-RT Service Alerts).
 // Pokreće je pg_cron (vidi supabase/realtime-cron.sql) uz tajni žeton iz Vault-a.
 // Izvorni kod je ovde; za objavljivanje se spaja sa ingest/lib u jedan fajl index.ts (bun build).
@@ -32,13 +32,16 @@ Deno.serve(async (req) => {
   const swissKey = Deno.env.get("SWISS_API_KEY") || "";
   if (country === "ch" && !swissKey) return json({ error: "SWISS_API_KEY is not set (Edge Functions → Secrets)" }, 500);
 
-  if (new URL(req.url).searchParams.get("kind") === "alerts") return syncAlerts(country, Deno.env.get("SWISS_SA_API_KEY") || swissKey);
+  if (new URL(req.url).searchParams.get("kind") === "alerts") {
+    if (!ALERT_FEEDS[country]) return json({ country, kind: "alerts", error: "no official notices feed for this country" }, 400);
+    return syncAlerts(country, Deno.env.get("SWISS_SA_API_KEY") || swissKey);
+  }
 
   try {
     const t0 = Date.now();
     const [rows, feedBuf] = await Promise.all([rpc("rt_candidates", { p_country: country }), fetchFeed(country, swissKey)]);
     // compact stops [[seq, id, arr, dep, delay, skipped]] -> objects
-    const trains = rows.map((r) => ({ ...r, stops: (r.stops || []).map(([seq, id, arr, dep, delay, skipped, pf]) => ({ seq, id, arr, dep, delay, skipped, pf })) }));
+    const trains = rows.map((r) => ({ ...r, stops: (r.stops || []).map(([seq, id, arr, dep, delay, skipped, pf, st]) => ({ seq, id, arr, dep, delay, skipped, pf, st })) }));
     const index = new Map();
     for (const r of trains.sort((a, b) => a.service_date.localeCompare(b.service_date))) {
       if (!index.has(r.trip_id)) index.set(r.trip_id, []);

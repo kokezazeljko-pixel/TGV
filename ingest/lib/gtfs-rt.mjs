@@ -59,12 +59,20 @@ const StopTimeEvent = (b) => parse(b, {
   2: [0, (o, v) => (o.time = int(v))],
 }, () => ({}));
 
+const OVapiStop = (b) => parse(b, {
+  2: [2, (o, v) => (o.track = str(v))],
+  3: [2, (o, v) => (o.actual = str(v))],
+  4: [2, (o, v) => (o.station = str(v))],
+}, () => ({}));
+
 const StopTimeUpdate = (b) => parse(b, {
   1: [0, (o, v) => (o.stopSequence = int(v))],
   2: [2, (o, v) => (o.arrival = StopTimeEvent(v))],
   3: [2, (o, v) => (o.departure = StopTimeEvent(v))],
   4: [2, (o, v) => (o.stopId = str(v))],
   5: [0, (o, v) => (o.scheduleRelationship = int(v))], // 0 SCHEDULED, 1 SKIPPED, 2 NO_DATA
+  // OVapi (Netherlands) extension: planned track, actual (changed) track, station code
+  1003: [2, (o, v) => (o.ovapi = OVapiStop(v))],
 }, () => ({}));
 
 const TripDescriptor = (b) => parse(b, {

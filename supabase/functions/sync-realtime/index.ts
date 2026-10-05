@@ -73,12 +73,18 @@ var StopTimeEvent = (b) => parse(b, {
   1: [0, (o, v) => o.delay = int(v)],
   2: [0, (o, v) => o.time = int(v)]
 }, () => ({}));
+var OVapiStop = (b) => parse(b, {
+  2: [2, (o, v) => o.track = str(v)],
+  3: [2, (o, v) => o.actual = str(v)],
+  4: [2, (o, v) => o.station = str(v)]
+}, () => ({}));
 var StopTimeUpdate = (b) => parse(b, {
   1: [0, (o, v) => o.stopSequence = int(v)],
   2: [2, (o, v) => o.arrival = StopTimeEvent(v)],
   3: [2, (o, v) => o.departure = StopTimeEvent(v)],
   4: [2, (o, v) => o.stopId = str(v)],
-  5: [0, (o, v) => o.scheduleRelationship = int(v)]
+  5: [0, (o, v) => o.scheduleRelationship = int(v)],
+  1003: [2, (o, v) => o.ovapi = OVapiStop(v)]
 }, () => ({}));
 var TripDescriptor = (b) => parse(b, {
   1: [2, (o, v) => o.tripId = str(v)],
@@ -179,22 +185,24 @@ var SKIPPED = 1;
 var CANCELED = 3;
 function applyTripUpdate(row, tu, nowSec) {
   const stops = row.stops.map((s) => ({ ...s }));
-  const bySeq = new Map, byId = new Map;
+  const bySeq = new Map, byId = new Map, byStation = new Map;
   for (const u of tu.stopTimeUpdates) {
     if (u.stopSequence != null)
       bySeq.set(u.stopSequence, u);
     if (u.stopId)
       byId.set(u.stopId, u);
+    if (u.ovapi?.station)
+      byStation.set(u.ovapi.station.toLowerCase(), u);
   }
   const schedEpoch = (s) => gtfsToEpoch(row.service_date, s.arr || s.dep);
   let carry = tu.delay ?? null;
   let anyUpdate = carry != null;
   for (const s of stops) {
-    const u = bySeq.get(s.seq) ?? byId.get(s.id);
+    const u = bySeq.get(s.seq) ?? byId.get(s.id) ?? (s.st ? byStation.get(s.st) : undefined);
     s.skipped = false;
     delete s.apf;
     if (u) {
-      const apf = u.stopId && u.stopId !== s.id ? platformOf(u.stopId) : null;
+      const apf = u.ovapi?.actual ? platformOf("", u.ovapi.actual) : u.stopId && u.stopId !== s.id ? platformOf(u.stopId) : null;
       if (apf && apf !== s.pf)
         s.apf = apf;
       if (u.scheduleRelationship === SKIPPED)
@@ -419,11 +427,17 @@ function belgianAlertRows(feed, nowSec, todayIso) {
   return rows;
 }
 
+// ../../../ingest/lib/netherlands.mjs
+var NL_TRAINS_URL = "https://gtfs.ovapi.nl/nl/trainUpdates.pb";
+var NL_HEADERS = { "User-Agent": "TrainPunctuality/1.0 (+https://www.trainpunctuality.com)" };
+var NL_AGENCIES = new Set(["IFF:NS", "IFF:NS_INT", "IFF:EU_SLEEPER", "IFF:BLAUWNET_K"]);
+
 // ../../../ingest/lib/realtime-run.mjs
 var FEEDS = {
   fr: { url: "https://proxy.transport.data.gouv.fr/resource/sncf-gtfs-rt-trip-updates", headers: () => ({}) },
   ch: { url: "https://api.opentransportdata.swiss/la/gtfs-rt", headers: (key) => ({ Authorization: `Bearer ${key}`, "Accept-Encoding": "br, gzip, deflate" }) },
-  be: { url: BE_TRIPS_URL, headers: () => ({ Accept: "application/json" }), json: true, onlyDeviations: true }
+  be: { url: BE_TRIPS_URL, headers: () => ({ Accept: "application/json" }), json: true, onlyDeviations: true },
+  nl: { url: NL_TRAINS_URL, headers: () => NL_HEADERS }
 };
 function readFeed(country, buf, keep) {
   if (FEEDS[country]?.json)
@@ -541,12 +555,15 @@ Deno.serve(async (req) => {
   const swissKey = Deno.env.get("SWISS_API_KEY") || "";
   if (country === "ch" && !swissKey)
     return json({ error: "SWISS_API_KEY is not set (Edge Functions → Secrets)" }, 500);
-  if (new URL(req.url).searchParams.get("kind") === "alerts")
+  if (new URL(req.url).searchParams.get("kind") === "alerts") {
+    if (!ALERT_FEEDS[country])
+      return json({ country, kind: "alerts", error: "no official notices feed for this country" }, 400);
     return syncAlerts(country, Deno.env.get("SWISS_SA_API_KEY") || swissKey);
+  }
   try {
     const t0 = Date.now();
     const [rows, feedBuf] = await Promise.all([rpc("rt_candidates", { p_country: country }), fetchFeed(country, swissKey)]);
-    const trains = rows.map((r) => ({ ...r, stops: (r.stops || []).map(([seq, id, arr, dep, delay, skipped, pf]) => ({ seq, id, arr, dep, delay, skipped, pf })) }));
+    const trains = rows.map((r) => ({ ...r, stops: (r.stops || []).map(([seq, id, arr, dep, delay, skipped, pf, st]) => ({ seq, id, arr, dep, delay, skipped, pf, st })) }));
     const index = new Map;
     for (const r of trains.sort((a, b) => a.service_date.localeCompare(b.service_date))) {
       if (!index.has(r.trip_id))

@@ -123,4 +123,33 @@ assert.equal(upbe.length, 2, "voz koji još nije krenuo (16:00) i EC u 15:00 se 
   const rw = belgianAlertRows({ entities: [works("w1", `Works on ${d}/${m}.`), works("w2", "Works on 1/1 and 2/1."), works("w3", "Works.")] }, Number(now), today);
   assert.deepEqual(rw.map((r) => r.description_tr.en), [`Works on ${d}/${m}.`], "samo radovi danas/sutra; bez datuma se ne prikazuju");
 }
+// ---- Holandija
+run("sync-schedule.mjs", { COUNTRY: "nl", GTFS_FILE: join(dir, "gtfs-nl.zip"), TODAY: DATE, DAYS: "1", OUT_FILE: join(dir, "trains-nl.json") });
+const nl = JSON.parse(readFileSync(join(dir, "trains-nl.json"), "utf8"));
+assert.deepEqual(nl.map((t) => `${t.type} ${t.number}`).sort(), ["IC 2835", "ICD 1100", "ICE 123"], "NS IC, IC direct i ICE; bez Sprintera, Arrive i autobusa");
+const n1 = nl.find((t) => t.number === "2835");
+assert.equal(n1.country, "nl"); assert.ok(n1.id.endsWith("_nl_260620735"));
+assert.equal(n1.origin, "Rotterdam Centraal"); assert.equal(n1.destination, "Utrecht Centraal");
+assert.deepEqual(n1.stops.map((s) => s.pf), ["9", "3", "11"], "peroni iz platform_code");
+assert.deepEqual(n1.stops.map((s) => s.st), ["rtd", "gd", "ut"], "šifre stanica iz zone_id");
+const n2 = nl.find((t) => t.number === "123");
+assert.equal(n2.stops[0].pf, "10A"); assert.equal(n2.stops[3].pf, undefined); assert.equal(n2.stops[3].st, undefined, "nemačka stanica bez šifre");
+{
+  const { detectDutchType } = await import("../lib/netherlands.mjs");
+  assert.equal(detectDutchType({ agency_id: "IFF:NS_INT", route_short_name: "Eurostar", route_type: "2" }), "Eurostar");
+  assert.equal(detectDutchType({ agency_id: "IFF:NS_INT", route_short_name: "Nightjet", route_type: "2" }), "Night train");
+  assert.equal(detectDutchType({ agency_id: "IFF:NS_INT", route_short_name: "Eurocity Direct", route_type: "2" }), "ECD");
+  assert.equal(detectDutchType({ agency_id: "IFF:NS", route_short_name: "Drempelvrije bus", route_type: "2" }), null);
+  assert.equal(detectDutchType({ agency_id: "IFF:BLAUWNET_K", route_short_name: "Intercity IC23", route_type: "2" }), "IC");
+}
+run("sync-realtime.mjs", { COUNTRY: "nl", RT_FILE: join(dir, "feed-nl.pb"), TRAINS_FILE: join(dir, "trains-nl.json"), NOW: now, OUT_FILE: join(dir, "updates-nl.json") });
+const upnl = JSON.parse(readFileSync(join(dir, "updates-nl.json"), "utf8"));
+assert.equal(upnl.length, 2, "ICD koji nije u feedu i nepoznat voz se ne diraju");
+const un1 = upnl.find((u) => u.id === n1.id);
+assert.deepEqual(un1.stops.map((s) => s.delay), [2, 5, 6], "kašnjenje po stanicama, dolazak (bez rednog broja, i kad se peron promeni)");
+assert.equal(un1.delay_min, 6, "u 14:00 sledeća stanica je Utrecht");
+assert.equal(un1.stops[2].apf, "12", "promena perona u Utrechtu (11 -> 12) iz OVapi dodatka");
+assert.equal(un1.stops[0].apf, undefined);
+assert.ok(!un1.stops.some((s) => s.skipped), "prolazna tačka koja nije u redu vožnje ne otkazuje stanicu");
+assert.equal(upnl.find((u) => u.id === n2.id).cancelled, true, "otkazan ICE");
 console.log("✔ Svi testovi su prošli");

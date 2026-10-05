@@ -22,8 +22,8 @@ const paragraphs = (html) => (html || "").replace(/<br\s*\/?>/gi, "\n").split(/<
 const SITE_LANGS = ["en", "de", "fr", "nl"];
 const LANG_NAMES = { en: "English", de: "Deutsch", fr: "Français", it: "Italiano", nl: "Nederlands" };
 // Official languages of each country: a notice the railway published in the reader's language counts as original there
-const OFFICIAL = { fr: ["fr"], ch: ["de", "fr", "it"], be: ["nl", "fr", "de"] };
-const SOURCE = { fr: "SNCF", ch: "opentransportdata.swiss", be: "SNCB / NMBS" };
+const OFFICIAL = { fr: ["fr"], ch: ["de", "fr", "it"], be: ["nl", "fr", "de"], nl: ["nl"] };
+const SOURCE = { fr: "SNCF", ch: "opentransportdata.swiss", be: "SNCB / NMBS", nl: "NS / NDOV" };
 const gtranslate = (text, to) => `https://translate.google.com/?sl=auto&tl=${to}&text=${encodeURIComponent(text.slice(0, 4500))}&op=translate`;
 
 // Shown in the railway's original language first; the reader can switch to the other site languages.
