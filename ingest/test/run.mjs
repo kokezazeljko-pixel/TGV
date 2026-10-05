@@ -152,4 +152,13 @@ assert.equal(un1.stops[2].apf, "12", "promena perona u Utrechtu (11 -> 12) iz OV
 assert.equal(un1.stops[0].apf, undefined);
 assert.ok(!un1.stops.some((s) => s.skipped), "prolazna tačka koja nije u redu vožnje ne otkazuje stanicu");
 assert.equal(upnl.find((u) => u.id === n2.id).cancelled, true, "otkazan ICE");
+// ---- Luksemburg
+run("sync-schedule.mjs", { COUNTRY: "lu", GTFS_FILE: join(dir, "gtfs-lu.zip"), TODAY: DATE, DAYS: "1", OUT_FILE: join(dir, "trains-lu.json") });
+const lux = JSON.parse(readFileSync(join(dir, "trains-lu.json"), "utf8"));
+assert.deepEqual(lux.map((t) => `${t.type} ${t.number}`).sort(), ["RE 3234", "TGV 2800"], "RE i TGV; bez RB, autobusa i TER-a samo kroz Francusku");
+const l1 = lux.find((t) => t.number === "3234");
+assert.equal(l1.country, "lu"); assert.ok(l1.id.endsWith("_lu_100"));
+assert.equal(l1.origin, "Luxembourg"); assert.equal(l1.destination, "Troisvierges");
+assert.equal(l1.stops[1].name, "Ettelbruck"); assert.equal(l1.dep, "13:20"); assert.equal(l1.stops[1].lat, 49.848);
+assert.equal(lux.find((t) => t.number === "2800").origin, "Metz-Ville");
 console.log("✔ Svi testovi su prošli");

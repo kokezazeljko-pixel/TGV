@@ -1,11 +1,12 @@
 // Preuzima red vožnje (GTFS), bira međugradske vozove za danas i sutra
 // i upisuje ih u tabelu "trains" u Supabase-u.
 //
-// Zemlja se bira promenljivom COUNTRY: fr (SNCF, podrazumevano), ch (Švajcarska), be (Belgija, SNCB) ili nl (Holandija, NS).
+// Zemlja se bira promenljivom COUNTRY: fr (SNCF, podrazumevano), ch (Švajcarska), be (Belgija, SNCB), nl (Holandija, NS) ili lu (Luksemburg, CFL).
 // Pokretanje:  node ingest/sync-schedule.mjs          (Francuska)
 //              COUNTRY=ch node ingest/sync-schedule.mjs (Švajcarska)
 //              COUNTRY=be node ingest/sync-schedule.mjs (Belgija)
 //              COUNTRY=nl node ingest/sync-schedule.mjs (Holandija)
+//              COUNTRY=lu node ingest/sync-schedule.mjs (Luksemburg)
 // Za probu bez baze:  DRY_RUN=1 GTFS_FILE=putanja.zip node ingest/sync-schedule.mjs
 import { readFile, writeFile } from "node:fs/promises";
 import { listZip, openEntry } from "./lib/zip.mjs";
@@ -13,6 +14,7 @@ import { eachRow } from "./lib/csv.mjs";
 import { parisDate, hhmm, detectType, detectSwissType, productFromStopId, env, supabaseRest, download, chunks, latestSwissGtfsUrl, platformOf } from "./lib/util.mjs";
 import { BE_STATIC_URL, detectBelgianType, isBelgianStop, localName } from "./lib/belgium.mjs";
 import { NL_STATIC_URL, NL_HEADERS, detectDutchType, stationCode } from "./lib/netherlands.mjs";
+import { latestLuxGtfsUrl, detectLuxType, isLuxStop, luxStopName, luxNumber } from "./lib/luxembourg.mjs";
 
 const COUNTRY = env("COUNTRY", "fr");
 const CONFIG = {
@@ -20,9 +22,10 @@ const CONFIG = {
   ch: { types: "IC,IR,EC,ICE,TGV Lyria,Railjet,Night train,Panorama", gtfsUrl: null, idPrefix: "ch_" },
   be: { types: "IC,EC,Night train", gtfsUrl: BE_STATIC_URL, idPrefix: "be_" },
   nl: { types: "IC,ICD,ICE,Eurostar,EC,ECD,Night train", gtfsUrl: NL_STATIC_URL, idPrefix: "nl_", headers: NL_HEADERS },
+  lu: { types: "RE,IC,EC,TGV,TER,ICE", gtfsUrl: null, idPrefix: "lu_" },
 }[COUNTRY];
-if (!CONFIG) throw new Error(`Nepoznata zemlja COUNTRY=${COUNTRY} (dozvoljeno: fr, ch, be, nl)`);
-const routeType = { ch: detectSwissType, be: detectBelgianType, nl: detectDutchType }[COUNTRY]; // vrsta voza iz same linije (routes.txt)
+if (!CONFIG) throw new Error(`Nepoznata zemlja COUNTRY=${COUNTRY} (dozvoljeno: fr, ch, be, nl, lu)`);
+const routeType = { ch: detectSwissType, be: detectBelgianType, nl: detectDutchType, lu: detectLuxType }[COUNTRY]; // vrsta voza iz same linije (routes.txt)
 
 const TYPES = env("TRAIN_TYPES", CONFIG.types).split(",").map((s) => s.trim());
 const DAYS = Number(env("DAYS", "2"));
@@ -38,7 +41,8 @@ const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "frida
 // Zadržavamo samo one koji staju bar na jednoj švajcarskoj stanici (SLOID "ch:..." ili UIC broj 85xxxxx).
 // Isto važi za Belgiju (belgijske stanice imaju UIC broj 88xxxxx).
 const servesCountry = (t) => COUNTRY === "ch" ? t.stops.some((s) => /^(ch:|85\d{5})/.test(s.id))
-  : COUNTRY === "be" ? t.stops.some((s) => isBelgianStop(s.id)) : true;
+  : COUNTRY === "be" ? t.stops.some((s) => isBelgianStop(s.id))
+  : COUNTRY === "lu" ? t.stops.some((s) => isLuxStop(s.id)) : true;
 
 // Šatl vozovi (npr. Avignon Centre ↔ Avignon TGV) imaju 6-cifrene brojeve i samo dve stanice
 const isShuttle = (t) => (COUNTRY === "fr" && /^\d{6,}$/.test(t.trip_short_name || t.trip_headsign || "")) || t.stops.length < 2;
@@ -47,6 +51,7 @@ async function main() {
   console.log(`Zemlja: ${COUNTRY} · red vožnje za: ${dates.join(", ")} · vrste: ${TYPES.join(", ")}`);
   let url = env("GTFS_URL", CONFIG.gtfsUrl || "");
   if (!url && !process.env.GTFS_FILE && COUNTRY === "ch") url = await latestSwissGtfsUrl(TODAY);
+  if (!url && !process.env.GTFS_FILE && COUNTRY === "lu") url = await latestLuxGtfsUrl(TODAY);
   if (url) console.log(`Izvor: ${url}`);
   const zip = process.env.GTFS_FILE ? await readFile(process.env.GTFS_FILE) : await download(url, CONFIG.headers);
   console.log(`GTFS: ${(zip.length / 1e6).toFixed(1)} MB`);
@@ -75,7 +80,7 @@ async function main() {
   const descCount = {};
   await read("routes.txt", (r) => {
     if (routeType) {
-      const cat = COUNTRY === "be" ? ((r.route_short_name || "").match(/^[A-Za-z]+/) || [""])[0] : COUNTRY === "nl" ? `${r.agency_id} ${r.route_short_name}` : r.route_desc;
+      const cat = COUNTRY === "be" ? ((r.route_short_name || "").match(/^[A-Za-z]+/) || [""])[0] : COUNTRY === "nl" || COUNTRY === "lu" ? `${r.agency_id} ${r.route_short_name}` : r.route_desc;
       descCount[cat] = (descCount[cat] || 0) + 1;
       const type = routeType(r);
       if (type && TYPES.includes(type)) routes.set(r.route_id, { ...r, type });
@@ -118,7 +123,7 @@ async function main() {
     if (!needStops.has(r.stop_id)) return;
     const lat = parseFloat(r.stop_lat), lon = parseFloat(r.stop_lon);
     const ok = Number.isFinite(lat) && Number.isFinite(lon);
-    stopNames.set(r.stop_id, COUNTRY === "be" ? localName(r.stop_name, dutch.get(r.stop_name), ok ? lat : null, ok ? lon : null) : r.stop_name);
+    stopNames.set(r.stop_id, COUNTRY === "be" ? localName(r.stop_name, dutch.get(r.stop_name), ok ? lat : null, ok ? lon : null) : COUNTRY === "lu" ? luxStopName(r.stop_name) : r.stop_name);
     if (ok) stopCoords.set(r.stop_id, [Math.round(lat * 1e4) / 1e4, Math.round(lon * 1e4) / 1e4]);
     const pf = platformOf(r.stop_id, r.platform_code); // peron (Švajcarska, Belgija; SNCF ga ne objavljuje)
     if (pf) stopPf.set(r.stop_id, pf);
@@ -142,7 +147,7 @@ async function main() {
         trip_id: t.trip_id,
         service_date: d,
         country: COUNTRY,
-        number: t.trip_short_name || t.trip_headsign || t.trip_id,
+        number: COUNTRY === "lu" ? luxNumber(t.trip_short_name || t.trip_id) : t.trip_short_name || t.trip_headsign || t.trip_id,
         type: t.type,
         origin: first.name,
         destination: last.name,

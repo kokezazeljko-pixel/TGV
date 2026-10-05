@@ -295,3 +295,31 @@ ntu3 = ld(1, ntrip("999999", "IFF:IC:1", "1")) + ld(2, nstu("2993758", departure
 feednl = ld(1, s(1, "1.0") + vi(3, epoch("14:00"))) \
        + ld(2, s(1, "260620735") + ld(3, ntu1)) + ld(2, s(1, "270000001") + ld(3, ntu2)) + ld(2, s(1, "999999") + ld(3, ntu3))
 open(os.path.join(out, "feed-nl.pb"), "wb").write(feednl)
+
+# ---- Luksemburg (CFL): GTFS sa navodnicima, kategorije u route_short_name, brojevi vozova sa nulama
+wd2 = datetime.datetime.strptime(date, "%Y-%m-%d").weekday()
+cal = ["0"] * 7; cal[wd2] = "1"
+lu = {
+"agency.txt": '"agency_id","agency_name","agency_url","agency_timezone","agency_lang","agency_phone"\n11,"Chemins de Fer Luxembourgeois","https://www.cfl.lu/","Europe/Berlin","",""\n171,"Société Nationale des Chemins de Fer Luxembourgeois","https://www.cfl.lu/","Europe/Berlin","",""\n',
+"routes.txt": '"route_id","agency_id","route_short_name","route_long_name","route_type","route_color","route_text_color","route_desc"\n'
+             '"302",11,"TGV","",2,"","",""\n"301",11,"TER","",2,"","",""\n"300",11,"RE","",2,"","",""\n"299",11,"RB","",2,"","",""\n"297",11,"IC","",2,"","",""\n"3841",171,"L34","",3,"","",""\n',
+"calendar.txt": "service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date\n" + f"1,{','.join(cal)},20260101,20261231\n",
+"trips.txt": '"route_id","service_id","trip_id","trip_headsign","trip_short_name","direction_id","block_id","shape_id","wheelchair_accessible","bikes_allowed"\n'
+             '"300",1,100,"Troisvierges, Gare","03234",0,,1,0,0\n"302",1,101,"Luxembourg, Gare Centrale","02800",0,,2,0,0\n'
+             '"299",1,102,"Diekirch, Gare","05001",0,,3,0,0\n"301",1,103,"Metz-Ville, Gare","88001",0,,4,0,0\n"3841",1,104,"Bus","",0,,5,0,0\n',
+"stop_times.txt": "trip_id,stop_id,stop_sequence,pickup_type,drop_off_type,stop_headsign,arrival_time,departure_time\n"
+             '100,000200405060,0,0,0,"",13:20:00,13:20:00\n100,000140701022,1,0,0,"",13:52:00,13:53:00\n100,000110606008,2,0,0,"",14:35:00,14:35:00\n'
+             '101,000400000071,0,0,0,"",12:50:00,12:50:00\n101,000200405060,1,0,0,"",13:55:00,13:55:00\n'
+             '102,000140701022,0,0,0,"",13:00:00,13:00:00\n102,000140401018,1,0,0,"",13:06:00,13:06:00\n'
+             '103,000400000098,0,0,0,"",13:00:00,13:00:00\n103,000400000071,1,0,0,"",13:20:00,13:20:00\n'
+             '104,000200405060,0,0,0,"",9:05:00,9:05:00\n104,000140701022,1,0,0,"",9:45:00,9:45:00\n',
+"stops.txt": '"stop_id","stop_code","stop_name","stop_desc","stop_lat","stop_lon","location_type","parent_station","wheelchair_boarding","platform_code"\n'
+             '000200405060,"","Luxembourg, Gare Centrale",,"49.599969000000","6.134240000000",0,,0,""\n'
+             '000140701022,"","Ettelbruck, Gare",,"49.847968000000","6.107725000000",0,,0,""\n'
+             '000110606008,"","Troisvierges, Gare",,"50.119334000000","5.991007000000",0,,0,""\n'
+             '000140401018,"","Diekirch, Gare",,"49.864733000000","6.154070000000",0,,0,""\n'
+             '000400000071,"","Metz-Ville, Gare",,"49.109459000000","6.177050000000",0,,0,""\n'
+             '000400000098,"","Thionville, Gare",,"49.353975000000","6.169669000000",0,,0,""\n',
+}
+with zipfile.ZipFile(os.path.join(out, "gtfs-lu.zip"), "w", zipfile.ZIP_DEFLATED) as z:
+    for k, v in lu.items(): z.writestr(k, v)

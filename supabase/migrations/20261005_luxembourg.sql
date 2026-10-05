@@ -1,0 +1,3 @@
+-- Already applied in Supabase (migration "luxembourg"); kept here as documentation.
+-- trains/alerts/profiles: country 'lu' allowed (check constraints).
+-- Realtime for Luxembourg (mobiliteit.lu API) is added once the API key is available.

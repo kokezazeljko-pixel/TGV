@@ -6,7 +6,7 @@ export const PRIVACY = {
   en: {
     title: "Privacy policy",
     updated: "Last updated",
-    intro: "{site} shows how late trains in France, Switzerland, Belgium and the Netherlands are and lets passengers share what is happening on board. This page explains what personal data the site handles, why, and what your rights are under the EU General Data Protection Regulation (GDPR) and the Swiss Federal Act on Data Protection (FADP).",
+    intro: "{site} shows how late trains in France, Switzerland, Belgium, the Netherlands and Luxembourg are and lets passengers share what is happening on board. This page explains what personal data the site handles, why, and what your rights are under the EU General Data Protection Regulation (GDPR) and the Swiss Federal Act on Data Protection (FADP).",
     sections: [
       { h: "Who is responsible", p: ["The site is run by the operator of {site}, who is the data controller. You can reach the operator at {email} for any question about your data."] },
       {
@@ -36,13 +36,13 @@ export const PRIVACY = {
           "Supabase: database and sign-in. Data is stored in the European Union (Frankfurt, Germany).",
           "Vercel: hosting of the website. Vercel may process technical data, such as IP addresses, outside the EU under the European Commission's standard contractual clauses.",
           "Vercel Web Analytics: counts page visits so we know how many people use the site (pages viewed, country, device type, the site you came from). It uses no cookies, does not store your IP address and does not build a profile of you; we only see totals.",
-          "GitHub: runs the scripts that fetch train data from SNCF, opentransportdata.swiss, SNCB and OVapi (Netherlands). These scripts do not handle any visitor data.",
+          "GitHub: runs the scripts that fetch train data from SNCF, opentransportdata.swiss, SNCB, OVapi (Netherlands) and data.public.lu (Luxembourg). These scripts do not handle any visitor data.",
           "Ko-fi: donations and payments for access to earlier days. Ko-fi (with PayPal or Stripe) handles the payment; we only receive the email address, the amount and a transaction number, and use them to unlock access for the account with that email.",
         ],
       },
       {
         h: "Train data",
-        p: ["Timetables and real-time delays come from SNCF open data (transport.data.gouv.fr), for Switzerland from opentransportdata.swiss for Belgium from SNCB open data (data.belgianmobility.io) and for the Netherlands from NS / NDOV open data via OVapi (gtfs.ovapi.nl). They contain no personal data."],
+        p: ["Timetables and real-time delays come from SNCF open data (transport.data.gouv.fr), for Switzerland from opentransportdata.swiss for Belgium from SNCB open data (data.belgianmobility.io) for the Netherlands from NS / NDOV open data via OVapi (gtfs.ovapi.nl) and for Luxembourg from the open data of the Administration des transports publics (data.public.lu, mobiliteit.lu). They contain no personal data."],
       },
       {
         h: "How long we keep data",
@@ -65,7 +65,7 @@ export const PRIVACY = {
   de: {
     title: "Datenschutzerklärung",
     updated: "Zuletzt aktualisiert",
-    intro: "{site} zeigt, wie verspätet Züge in Frankreich, der Schweiz, Belgien und den Niederlanden sind, und lässt Reisende teilen, was an Bord passiert. Diese Seite erklärt, welche personenbezogenen Daten die Website verarbeitet, warum, und welche Rechte Sie nach der EU-Datenschutz-Grundverordnung (DSGVO) und dem Schweizer Datenschutzgesetz (DSG) haben.",
+    intro: "{site} zeigt, wie verspätet Züge in Frankreich, der Schweiz, Belgien, den Niederlanden und Luxemburg sind, und lässt Reisende teilen, was an Bord passiert. Diese Seite erklärt, welche personenbezogenen Daten die Website verarbeitet, warum, und welche Rechte Sie nach der EU-Datenschutz-Grundverordnung (DSGVO) und dem Schweizer Datenschutzgesetz (DSG) haben.",
     sections: [
       { h: "Verantwortlicher", p: ["Die Website wird vom Betreiber von {site} betrieben, der für die Datenverarbeitung verantwortlich ist. Bei Fragen zu Ihren Daten erreichen Sie den Betreiber unter {email}."] },
       {
@@ -95,11 +95,11 @@ export const PRIVACY = {
           "Supabase: Datenbank und Anmeldung. Die Daten werden in der Europäischen Union gespeichert (Frankfurt, Deutschland).",
           "Vercel: Hosting der Website. Vercel kann technische Daten wie IP-Adressen auf Grundlage der Standardvertragsklauseln der Europäischen Kommission außerhalb der EU verarbeiten.",
           "Vercel Web Analytics: zählt Seitenaufrufe, damit wir wissen, wie viele Menschen die Website nutzen (besuchte Seiten, Land, Gerätetyp, vorherige Website). Es verwendet keine Cookies, speichert Ihre IP-Adresse nicht und erstellt kein Profil von Ihnen; wir sehen nur Gesamtzahlen.",
-          "GitHub: führt die Skripte aus, die Zugdaten von SNCF, opentransportdata.swiss, SNCB und OVapi (Niederlande) abrufen. Diese Skripte verarbeiten keine Besucherdaten.",
+          "GitHub: führt die Skripte aus, die Zugdaten von SNCF, opentransportdata.swiss, SNCB, OVapi (Niederlande) und data.public.lu (Luxemburg) abrufen. Diese Skripte verarbeiten keine Besucherdaten.",
           "Ko-fi: Spenden und Zahlungen für den Zugang zu früheren Tagen. Ko-fi (mit PayPal oder Stripe) wickelt die Zahlung ab; wir erhalten nur die E-Mail-Adresse, den Betrag und eine Transaktionsnummer und nutzen sie, um den Zugang für das Konto mit dieser E-Mail freizuschalten.",
         ],
       },
-      { h: "Zugdaten", p: ["Fahrpläne und Echtzeit-Verspätungen stammen aus den Open Data der SNCF (transport.data.gouv.fr), für die Schweiz von opentransportdata.swiss für Belgien aus den Open Data der SNCB (data.belgianmobility.io) und für die Niederlande aus den Open Data von NS / NDOV über OVapi (gtfs.ovapi.nl). Sie enthalten keine personenbezogenen Daten."] },
+      { h: "Zugdaten", p: ["Fahrpläne und Echtzeit-Verspätungen stammen aus den Open Data der SNCF (transport.data.gouv.fr), für die Schweiz von opentransportdata.swiss für Belgien aus den Open Data der SNCB (data.belgianmobility.io) für die Niederlande aus den Open Data von NS / NDOV über OVapi (gtfs.ovapi.nl) und für Luxemburg aus den Open Data der Administration des transports publics (data.public.lu, mobiliteit.lu). Sie enthalten keine personenbezogenen Daten."] },
       {
         h: "Wie lange wir Daten speichern",
         list: [
@@ -121,7 +121,7 @@ export const PRIVACY = {
   fr: {
     title: "Politique de confidentialité",
     updated: "Dernière mise à jour",
-    intro: "{site} indique les retards des trains en France, en Suisse, en Belgique et aux Pays-Bas et permet aux voyageurs de partager ce qui se passe à bord. Cette page explique quelles données personnelles le site traite, pourquoi, et quels sont vos droits selon le Règlement général sur la protection des données (RGPD) et la loi suisse sur la protection des données (LPD).",
+    intro: "{site} indique les retards des trains en France, en Suisse, en Belgique, aux Pays-Bas et au Luxembourg et permet aux voyageurs de partager ce qui se passe à bord. Cette page explique quelles données personnelles le site traite, pourquoi, et quels sont vos droits selon le Règlement général sur la protection des données (RGPD) et la loi suisse sur la protection des données (LPD).",
     sections: [
       { h: "Responsable du traitement", p: ["Le site est géré par l’exploitant de {site}, responsable du traitement. Vous pouvez le contacter à {email} pour toute question sur vos données."] },
       {
@@ -151,11 +151,11 @@ export const PRIVACY = {
           "Supabase : base de données et connexion. Les données sont stockées dans l’Union européenne (Francfort, Allemagne).",
           "Vercel : hébergement du site. Vercel peut traiter des données techniques, comme les adresses IP, hors de l’UE, sous couvert des clauses contractuelles types de la Commission européenne.",
           "Vercel Web Analytics : compte les visites pour savoir combien de personnes utilisent le site (pages vues, pays, type d’appareil, site de provenance). Sans cookies, sans enregistrer votre adresse IP et sans créer de profil ; nous ne voyons que des totaux.",
-          "GitHub : exécute les scripts qui récupèrent les données SNCF, opentransportdata.swiss, SNCB et OVapi (Pays-Bas). Ces scripts ne traitent aucune donnée des visiteurs.",
+          "GitHub : exécute les scripts qui récupèrent les données SNCF, opentransportdata.swiss, SNCB, OVapi (Pays-Bas) et data.public.lu (Luxembourg). Ces scripts ne traitent aucune donnée des visiteurs.",
           "Ko-fi : dons et paiements pour l’accès aux jours précédents. Ko-fi (avec PayPal ou Stripe) traite le paiement ; nous recevons uniquement l’adresse e-mail, le montant et un numéro de transaction, utilisés pour débloquer l’accès du compte ayant cet e-mail.",
         ],
       },
-      { h: "Données ferroviaires", p: ["Les horaires et les retards en temps réel proviennent de l’open data SNCF (transport.data.gouv.fr), pour la Suisse d’opentransportdata.swiss pour la Belgique de l’open data SNCB (data.belgianmobility.io) et pour les Pays-Bas de l’open data NS / NDOV via OVapi (gtfs.ovapi.nl). Ils ne contiennent aucune donnée personnelle."] },
+      { h: "Données ferroviaires", p: ["Les horaires et les retards en temps réel proviennent de l’open data SNCF (transport.data.gouv.fr), pour la Suisse d’opentransportdata.swiss pour la Belgique de l’open data SNCB (data.belgianmobility.io) pour les Pays-Bas de l’open data NS / NDOV via OVapi (gtfs.ovapi.nl) et pour le Luxembourg de l’open data de l’Administration des transports publics (data.public.lu, mobiliteit.lu). Ils ne contiennent aucune donnée personnelle."] },
       {
         h: "Durée de conservation",
         list: [
@@ -177,7 +177,7 @@ export const PRIVACY = {
   nl: {
     title: "Privacybeleid",
     updated: "Laatst bijgewerkt",
-    intro: "{site} toont hoeveel vertraging treinen in Frankrijk, Zwitserland, België en Nederland hebben en laat reizigers delen wat er aan boord gebeurt. Deze pagina legt uit welke persoonsgegevens de site verwerkt, waarom, en welke rechten je hebt volgens de Algemene Verordening Gegevensbescherming (AVG) van de EU en de Zwitserse federale wet op de gegevensbescherming (DSG/FADP).",
+    intro: "{site} toont hoeveel vertraging treinen in Frankrijk, Zwitserland, België, Nederland en Luxemburg hebben en laat reizigers delen wat er aan boord gebeurt. Deze pagina legt uit welke persoonsgegevens de site verwerkt, waarom, en welke rechten je hebt volgens de Algemene Verordening Gegevensbescherming (AVG) van de EU en de Zwitserse federale wet op de gegevensbescherming (DSG/FADP).",
     sections: [
       { h: "Wie is verantwoordelijk", p: ["De site wordt beheerd door de uitbater van {site}, die de verwerkingsverantwoordelijke is. Je kunt de uitbater bereiken via {email} voor elke vraag over je gegevens."] },
       {
@@ -207,13 +207,13 @@ export const PRIVACY = {
           "Supabase: database en aanmelden. De gegevens worden in de Europese Unie opgeslagen (Frankfurt, Duitsland).",
           "Vercel: hosting van de website. Vercel kan technische gegevens, zoals IP-adressen, buiten de EU verwerken op basis van de standaardcontractbepalingen van de Europese Commissie.",
           "Vercel Web Analytics: telt paginabezoeken zodat we weten hoeveel mensen de site gebruiken (bekeken pagina's, land, soort toestel, de site waar je vandaan kwam). Het gebruikt geen cookies, bewaart je IP-adres niet en maakt geen profiel van je; we zien alleen totalen.",
-          "GitHub: voert de scripts uit die treingegevens ophalen bij SNCF, opentransportdata.swiss, NMBS en OVapi (Nederland). Die scripts verwerken geen gegevens van bezoekers.",
+          "GitHub: voert de scripts uit die treingegevens ophalen bij SNCF, opentransportdata.swiss, NMBS, OVapi (Nederland) en data.public.lu (Luxemburg). Die scripts verwerken geen gegevens van bezoekers.",
           "Ko-fi: giften en betalingen voor toegang tot eerdere dagen. Ko-fi (met PayPal of Stripe) verwerkt de betaling; wij ontvangen alleen het e-mailadres, het bedrag en een transactienummer, en gebruiken die om de toegang te ontgrendelen voor het account met dat e-mailadres.",
         ],
       },
       {
         h: "Treingegevens",
-        p: ["Dienstregelingen en realtime vertragingen komen uit de open data van SNCF (transport.data.gouv.fr), voor Zwitserland van opentransportdata.swiss voor België uit de open data van de NMBS (data.belgianmobility.io) en voor Nederland uit de open data van NS / NDOV via OVapi (gtfs.ovapi.nl). Ze bevatten geen persoonsgegevens."],
+        p: ["Dienstregelingen en realtime vertragingen komen uit de open data van SNCF (transport.data.gouv.fr), voor Zwitserland van opentransportdata.swiss voor België uit de open data van de NMBS (data.belgianmobility.io) voor Nederland uit de open data van NS / NDOV via OVapi (gtfs.ovapi.nl) en voor Luxemburg uit de open data van de Administration des transports publics (data.public.lu, mobiliteit.lu). Ze bevatten geen persoonsgegevens."],
       },
       {
         h: "Hoe lang we gegevens bewaren",
