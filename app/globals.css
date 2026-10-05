@@ -432,3 +432,4 @@ a.primary{display:inline-block;text-decoration:none}
 .paywall .kofi{background:#13c3ff;color:#06263a}
 .ghost{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;padding:9px 16px;font-weight:700;cursor:pointer}
 .bsec.unlocked{color:var(--accent)}
+.paywall .kofi.monthly{background:var(--accent);color:var(--accent-fg)}

@@ -297,6 +297,7 @@ function HistoryPaywall({ signedIn, onCheck }) {
       </ol>
       <div className="pw-actions">
         <a className="primary kofi" href={KOFI_URL} target="_blank" rel="noopener noreferrer">☕ {t("histPay")}</a>
+        <a className="primary kofi monthly" href={`${KOFI_URL}/tiers`} target="_blank" rel="noopener noreferrer">💎 {t("histMonthly")}</a>
         {signedIn && <button type="button" className="ghost" onClick={check} disabled={busy}>{busy ? t("loading") : t("histCheck")}</button>}
       </div>
       {msg && <p className="note err">{msg}</p>}

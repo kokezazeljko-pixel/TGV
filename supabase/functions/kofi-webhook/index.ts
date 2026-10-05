@@ -1,6 +1,6 @@
 // Ko-fi webhook: Ko-fi calls this address after every payment (donation, shop item, membership).
 // A payment unlocks earlier days for the site account with the same email (public.kofi_grant):
-// 1 = 1 day, 20 or more = 30 days, a monthly Ko-fi membership payment = 31 days. Set the secret KOFI_VERIFICATION_TOKEN in Supabase → Edge Functions →
+// 1 = 1 day, 20 or more = 30 days, a monthly payment of 20 or more (membership tier) = 31 days. Set the secret KOFI_VERIFICATION_TOKEN in Supabase → Edge Functions →
 // Secrets (Ko-fi → Settings → API → Webhooks shows the token), and put this function's URL in Ko-fi.
 // verify_jwt is off on purpose: Ko-fi cannot send a Supabase token, the verification token is checked instead.
 const URL_ = Deno.env.get("SUPABASE_URL")!;

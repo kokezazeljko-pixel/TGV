@@ -10,3 +10,4 @@
 -- (full bodies: see the live objects in Supabase)
 -- Update: kofi_grant gives 1 day per full 1 paid, 30 days for 20 or more, 31 days for a Ko-fi membership
 -- payment (type "Subscription").
+-- Update 2: a monthly payment gives 31 days only when it is 20 or more (Ko-fi monthly tips can be any amount).
