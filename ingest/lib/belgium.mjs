@@ -122,11 +122,21 @@ export function worksDays(text = "", todayIso) {
   return out.length ? out : null;
 }
 
+// SNCB gives every notice a new entity id on each refresh, so the id would change every 5 minutes and the
+// same notice would pile up. The stable id is SNCB's own messageID from the notice link
+// (…help.exe?…&messageID=113828&…); without a link, a short hash of the French title and text.
+function hash(str) { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) >>> 0; return h.toString(36); }
+export function stableId(a) {
+  for (const u of a.url || []) { const m = (u.text || "").match(/messageID=(\d+)/i); if (m) return "msg" + m[1]; }
+  return "h" + hash((pick(a.header, ["fr", "nl"]) || "") + "|" + (pick(a.description, ["fr", "nl"]) || ""));
+}
+
 // rows for apply_alerts_stations (Belgium); French is listed first by SNCB, Dutch is equally official
 export function belgianAlertRows(feed, nowSec, todayIso) {
   const rows = [];
   const today = todayIso || new Date(nowSec * 1000).toLocaleDateString("en-CA", { timeZone: "Europe/Brussels" });
   const tomorrow = new Date(Date.parse(today + "T12:00:00Z") + 86400000).toISOString().slice(0, 10);
+  const seen = new Set();
   for (const e of feed.entities) {
     const a = e.alert;
     if (!a || e.isDeleted) continue;
@@ -142,8 +152,11 @@ export function belgianAlertRows(feed, nowSec, todayIso) {
       if (!days?.length) continue;
       p = { start: Date.parse(days[0] + "T00:00:00+02:00") / 1000 + 3600, end: Date.parse(days[days.length - 1] + "T23:00:00+02:00") / 1000 };
     }
+    const id = stableId(a);
+    if (seen.has(id)) continue; // the same notice twice in one feed
+    seen.add(id);
     rows.push({
-      id: e.id, orig_lang: "fr", header_tr: allLangs(a.header), description_tr: allLangs(a.description),
+      id, orig_lang: "fr", header_tr: allLangs(a.header), description_tr: allLangs(a.description),
       header: pick(a.header, ["fr", "nl"]), description: pick(a.description, ["fr", "nl"]),
       cause: a.cause ?? null, effect: a.effect ?? null, url: pick(a.url, ["fr", "nl", "en"]),
       active_from: p.start ? new Date(p.start * 1000).toISOString() : null,

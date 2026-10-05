@@ -27,8 +27,10 @@ const gtranslate = (text, to) => `https://translate.google.com/?sl=auto&tl=${to}
 
 // Shown in the railway's original language first; the reader can switch to the other site languages.
 // Uses the railway's own translation when the feed has one, otherwise offers a Google Translate link.
-function OfficialNotices({ alerts }) {
+function OfficialNotices({ alerts: all }) {
   const { t, lang } = useLang();
+  // the same notice can arrive twice (e.g. under an old and a new id): show it once
+  const alerts = all.filter((a, i) => all.findIndex((b) => b.country === a.country && b.header === a.header && b.description === a.description) === i);
   const [view, setView] = useState("orig");
   const time = (iso) => new Date(iso).toLocaleTimeString(lang === "en" ? "en-GB" : lang, { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
   // the original language shown first: the reader's own language when it is official in that country and the railway published it

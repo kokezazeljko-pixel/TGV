@@ -347,10 +347,25 @@ function worksDays(text = "", todayIso) {
     out = out.filter((d) => ![0, 6].includes(new Date(d + "T12:00:00Z").getUTCDay()));
   return out.length ? out : null;
 }
+function hash(str) {
+  let h = 5381;
+  for (let i = 0;i < str.length; i++)
+    h = (h << 5) + h + str.charCodeAt(i) >>> 0;
+  return h.toString(36);
+}
+function stableId(a) {
+  for (const u of a.url || []) {
+    const m = (u.text || "").match(/messageID=(\d+)/i);
+    if (m)
+      return "msg" + m[1];
+  }
+  return "h" + hash((pick(a.header, ["fr", "nl"]) || "") + "|" + (pick(a.description, ["fr", "nl"]) || ""));
+}
 function belgianAlertRows(feed, nowSec, todayIso) {
   const rows = [];
   const today = todayIso || new Date(nowSec * 1000).toLocaleDateString("en-CA", { timeZone: "Europe/Brussels" });
   const tomorrow = new Date(Date.parse(today + "T12:00:00Z") + 86400000).toISOString().slice(0, 10);
+  const seen = new Set;
   for (const e of feed.entities) {
     const a = e.alert;
     if (!a || e.isDeleted)
@@ -369,8 +384,12 @@ function belgianAlertRows(feed, nowSec, todayIso) {
         continue;
       p = { start: Date.parse(days[0] + "T00:00:00+02:00") / 1000 + 3600, end: Date.parse(days[days.length - 1] + "T23:00:00+02:00") / 1000 };
     }
+    const id = stableId(a);
+    if (seen.has(id))
+      continue;
+    seen.add(id);
     rows.push({
-      id: e.id,
+      id,
       orig_lang: "fr",
       header_tr: allLangs(a.header),
       description_tr: allLangs(a.description),

@@ -94,6 +94,11 @@ assert.equal(upbe.length, 2, "voz koji još nije krenuo (16:00) i EC u 15:00 se 
   assert.equal(rb[0].need, 2, "dve stanice u naslovu -> voz mora da staje na obe");
   assert.equal(rb[0].header_tr.nl, "Namen - Hoei: Geen treinen");
   assert.equal(rb[0].header, "Namur - Huy : Aucun train");
+  assert.equal(rb[0].id, "h" + rb[0].id.slice(1), "stalni id");
+  const again = belgianAlertRows(feedFromJson(JSON.parse(readFileSync(join(dir, "alerts-be.json"), "utf8").replace("rs:nmbssncb:a1", "rs:nmbssncb:zz9"))), Number(now));
+  assert.equal(again[0].id, rb[0].id, "isto obaveštenje pod novim SNCB brojem dobija isti id");
+  const { stableId } = await import("../lib/belgium.mjs");
+  assert.equal(stableId({ url: [{ lang: "fr", text: "http://www.belgianrail.be/jp/nmbs-realtime/help.exe/fr?tpl=x&messageID=113828&channelFilter=y" }] }), "msg113828");
   const { worksDays } = await import("../lib/belgium.mjs");
   assert.deepEqual(worksDays("During the weekend of 10-11/10 Infrabel is working", "2026-10-04"), ["2026-10-10", "2026-10-11"]);
   assert.deepEqual(worksDays("weekends of 3-4, 17-18 and 24-25/10", "2026-10-04"), ["2026-10-03", "2026-10-04", "2026-10-17", "2026-10-18", "2026-10-24", "2026-10-25"]);
@@ -105,6 +110,6 @@ assert.equal(upbe.length, 2, "voz koji još nije krenuo (16:00) i EC u 15:00 se 
   const today = new Date(Number(now) * 1000).toLocaleDateString("en-CA", { timeZone: "Europe/Brussels" });
   const [y, m, d] = today.split("-").map(Number);
   const rw = belgianAlertRows({ entities: [works("w1", `Works on ${d}/${m}.`), works("w2", "Works on 1/1 and 2/1."), works("w3", "Works.")] }, Number(now), today);
-  assert.deepEqual(rw.map((r) => r.id), ["w1"], "samo radovi danas/sutra; bez datuma se ne prikazuju");
+  assert.deepEqual(rw.map((r) => r.description_tr.en), [`Works on ${d}/${m}.`], "samo radovi danas/sutra; bez datuma se ne prikazuju");
 }
 console.log("✔ Svi testovi su prošli");
