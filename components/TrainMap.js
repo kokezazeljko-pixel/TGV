@@ -26,6 +26,9 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
   const geo = getGeo(country);
   const { W, H, trainPos, trainRoute } = geo;
   const svgRef = useRef(null);
+  // the wheel / resize handlers are set up once: they read the current map from here, not the one of the first render
+  // (otherwise, after switching from Luxembourg to Europe, zooming named every station of Europe)
+  const geoRef = useRef(geo); geoRef.current = geo;
   const view = useRef({ x: 0, y: 0, w: W, h: H });
   const zoomRef = useRef(1);
   const drag = useRef({ pts: new Map(), moved: false, start: null, pinch: null });
@@ -59,7 +62,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
   }
   function applyView() {
     const svg = svgRef.current; if (!svg) return;
-    const v = view.current;
+    const v = view.current, { H, NET } = geoRef.current;
     v.w = Math.min(W, Math.max(W / 10, v.w)); v.h = (v.w * H) / W;
     v.x = Math.min(W - v.w, Math.max(0, v.x)); v.y = Math.min(H - v.h, Math.max(0, v.y));
     const zoom = W / v.w; zoomRef.current = zoom;
@@ -68,13 +71,15 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
     svg.style.setProperty("--u", u.toFixed(4));
     svg.style.setProperty("--sr", (Math.pow(zoom, 0.25) * u).toFixed(4));
     svg.style.setProperty("--ts", (6.2 * 1.15 * Math.pow(zoom, 0.3) * Math.min(1, Math.sqrt(sc / 0.7)) * u).toFixed(4));
-    const all = geo.NET.allNames && sc >= 0.45; // small networks (Luxembourg): every station named from the start
-    svg.classList.toggle("z2", sc >= 1.45 || all); svg.classList.toggle("z3", sc >= 2.2);
-    svg.classList.toggle("z5", sc >= 3.6 || all); svg.classList.toggle("small", sc < 0.55);
+    const all = !!NET.allNames && sc >= 0.45; // small networks (Luxembourg): every station named from the start. Always true/false: classList.toggle(c, undefined) flips the class
+    // smaller stations are named only after zooming in: the screen scale alone is not enough on a big screen,
+    // in full-screen mode or with the browser zoomed out (the whole map would otherwise be covered in names)
+    svg.classList.toggle("z2", (sc >= 1.45 && zoom >= 1.4) || all); svg.classList.toggle("z3", sc >= 2.2 && zoom >= 1.8);
+    svg.classList.toggle("z5", (sc >= 3.6 && zoom >= 2.6) || all); svg.classList.toggle("small", sc < 0.55);
     if (compact && highlight) { setRouteScale(Math.round(sc * 20) / 20); setRouteBounds({ ...v }); } // route view: labels follow the zoom
   }
   function zoomAt(px, py, factor) {
-    const v = view.current;
+    const v = view.current, { H } = geoRef.current;
     const nw = Math.min(W, Math.max(W / 10, v.w / factor)), f = nw / v.w;
     v.x = px - (px - v.x) * f; v.y = py - (py - v.y) * f; v.w = nw; v.h = (nw * H) / W;
     applyView();
