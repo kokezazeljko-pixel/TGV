@@ -51,6 +51,16 @@ jobs:
           COUNTRY: be
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      - name: Holandija – red vožnje
+        if: github.event.schedule != '20 14 * * *'
+        continue-on-error: true
+        run: node ingest/sync-schedule.mjs
+        env:
+          COUNTRY: nl
+          NODE_OPTIONS: --max-old-space-size=4096
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }} 
+
 
   kasnjenja:
     needs: [red-voznje]
