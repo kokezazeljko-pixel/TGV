@@ -7,6 +7,7 @@ import { LANGS } from "@/lib/i18n";
 import { useSession } from "@/components/useSession";
 import { useLang } from "@/components/LangProvider";
 import Logo from "@/components/Logo";
+import SupportButton from "@/components/Support";
 
 // Language buttons show the flag of the language's country (English → United Kingdom)
 const LANG_NAMES = { en: "English", de: "Deutsch", fr: "Français", nl: "Nederlands" };
@@ -58,6 +59,7 @@ export default function Header() {
           </div>
         </Link>
         <div className="top-right">
+          <SupportButton className="supportbtn top" />
           {ready && <Link href="/prijava" className="userlink">{session ? t("myAccount") : t("signIn")}</Link>}
           <div className="lang" role="group" aria-label="Language / Sprache / Langue / Taal">
             {LANGS.map((l) => (

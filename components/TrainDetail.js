@@ -85,7 +85,7 @@ function OfficialNotices({ alerts: all }) {
   );
 }
 
-const COMMENT_FIELDS = "id,kind,reason,rating,body,onboard,created_at,author_name,is_mine";
+const COMMENT_FIELDS = "id,kind,reason,rating,body,onboard,created_at,author_name,is_mine,likes,liked";
 
 export default function TrainDetail({ initialTrain }) {
   const { t, lang } = useLang();
@@ -193,7 +193,7 @@ export default function TrainDetail({ initialTrain }) {
               <p className="muted">{t("reportsEmpty")}</p>
             ) : (
               <ul className="clist">
-                {comments.map((c) => <Comment key={c.id} c={c} onDeleted={load} reasonLabel={reasonLabel} />)}
+                {comments.map((c) => <Comment key={c.id} c={c} onDeleted={load} onLiked={load} reasonLabel={reasonLabel} />)}
               </ul>
             )}
           </section>
@@ -335,7 +335,36 @@ function CommentForm({ train, routeKey, onPosted }) {
   );
 }
 
-function Comment({ c, onDeleted, reasonLabel }) {
+// "True" button: passengers confirm a report they can see is right (one per account, can be taken back)
+function LikeButton({ c, onLiked }) {
+  const { t } = useLang();
+  const { session } = useSession();
+  const [state, setState] = useState({ liked: !!c.liked, likes: c.likes || 0 });
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setState({ liked: !!c.liked, likes: c.likes || 0 }); }, [c.liked, c.likes]);
+  if (c.is_mine) return state.likes ? <span className="likecount">✓ {t("likeTrue")} · {state.likes}</span> : null;
+  async function toggle() {
+    if (!session || busy) return;
+    setBusy(true);
+    const sb = getBrowserClient();
+    const next = { liked: !state.liked, likes: state.likes + (state.liked ? -1 : 1) };
+    setState(next); // show it at once
+    const { error } = state.liked
+      ? await sb.from("comment_likes").delete().eq("comment_id", c.id).eq("user_id", session.user.id)
+      : await sb.from("comment_likes").insert({ comment_id: c.id, user_id: session.user.id });
+    if (error) setState(state);
+    setBusy(false);
+    onLiked?.();
+  }
+  return (
+    <button type="button" className="likebtn" aria-pressed={state.liked} disabled={!session} onClick={toggle}
+      title={session ? t("likeHint") : t("likeSignIn")}>
+      ✓ {t("likeTrue")}{state.likes ? ` · ${state.likes}` : ""}
+    </button>
+  );
+}
+
+function Comment({ c, onDeleted, onLiked, reasonLabel }) {
   const { t, lang } = useLang();
   const [confirm, setConfirm] = useState(false);
   async function remove() {
@@ -343,7 +372,7 @@ function Comment({ c, onDeleted, reasonLabel }) {
     onDeleted();
   }
   return (
-    <li className="cm">
+    <li className="cm plain">
       <div className="who">
         {c.author_name || t("anonName")}
         <span className="when">{ago(c.created_at, t, lang)}</span>
@@ -362,6 +391,7 @@ function Comment({ c, onDeleted, reasonLabel }) {
         {c.rating ? <span className="minis" aria-label={t("of5", c.rating)}>{"★".repeat(c.rating)}{"☆".repeat(5 - c.rating)}</span> : null}
       </div>
       {c.body && <p>{c.body}</p>}
+      <div className="cm-actions"><LikeButton c={c} onLiked={onLiked} /></div>
     </li>
   );
 }

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase";
+import { useSession } from "@/components/useSession";
+import { KOFI_URL } from "@/lib/site";
 import { fetchTrainsForDay, fetchTrainsUpdatedSince, fetchCommentCounts, fetchAlertTrainIds } from "@/lib/queries";
 import { statusOf, toMin, fromMin, trainHref, ago, filterTrains, isShuttle, parisNowMin, plannedPf } from "@/lib/format";
 import { getGeo } from "@/lib/geo";
@@ -22,8 +24,27 @@ const sameStation = (a, b) => { const x = normName(a), y = normName(b); return x
 
 const STATUSES = [["all", "allStatus"], ["late", "delayed"], ["ontime", "ontime"]];
 
+// Earlier days (paid): the 7 days before today
+const HISTORY_DAYS = 7;
+const shiftDay = (iso, n) => new Date(Date.parse(iso + "T12:00:00Z") + n * 86400000).toISOString().slice(0, 10);
+
 export default function Board({ initialTrains, initialCounts, today, loadError }) {
   const { t, lang } = useLang();
+  const { session } = useSession();
+  const [day, setDay] = useState(today); // which day the board shows
+  const isPast = day < today;
+  const [access, setAccess] = useState(null); // until when this account may see earlier days
+  const checkAccess = async () => {
+    const sb = getBrowserClient();
+    if (!sb || !session) { setAccess(null); return null; }
+    const { data } = await sb.from("history_access").select("until").maybeSingle();
+    const until = data?.until && Date.parse(data.until) > Date.now() ? data.until : null;
+    setAccess(until);
+    return until;
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { checkAccess(); }, [session]);
+  const locked = isPast && !access;
   const router = useRouter();
   const [trains, setTrains] = useState(initialTrains);
   const [counts, setCounts] = useState(initialCounts);
@@ -61,7 +82,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
     const newest = (rows, from = "") => rows.reduce((a, x) => (ms(x.rt_updated_at) > ms(a) ? new Date(ms(x.rt_updated_at)).toISOString() : a), from);
     const full = async (showLoading) => {
       if (showLoading) setLoading(true);
-      const [{ data: tr, error }, c, al] = await Promise.all([fetchTrainsForDay(sb, today, country), fetchCommentCounts(sb, today), fetchAlertTrainIds(sb)]);
+      const [{ data: tr, error }, c, al] = await Promise.all([fetchTrainsForDay(sb, day, country), fetchCommentCounts(sb, day), fetchAlertTrainIds(sb)]);
       setAlertIds(al);
       if (!alive) return;
       if (!error) { setTrains(tr); latest.current = newest(tr); }
@@ -70,7 +91,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
     };
     const changes = async () => {
       if (!latest.current) return full(false);
-      const [{ data: upd, error }, c, al] = await Promise.all([fetchTrainsUpdatedSince(sb, today, country, latest.current), fetchCommentCounts(sb, today), fetchAlertTrainIds(sb)]);
+      const [{ data: upd, error }, c, al] = await Promise.all([fetchTrainsUpdatedSince(sb, day, country, latest.current), fetchCommentCounts(sb, day), fetchAlertTrainIds(sb)]);
       setAlertIds(al);
       if (!alive) return;
       setCounts(c);
@@ -79,12 +100,12 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
       const byId = new Map(upd.map((x) => [x.id, x]));
       setTrains((old) => old.map((x) => byId.get(x.id) || x));
     };
-    if (country === DEFAULT_COUNTRY && !usedInitial.current) { usedInitial.current = true; latest.current = newest(initialTrains); fetchAlertTrainIds(sb).then((al) => alive && setAlertIds(al)); }
+    if (country === DEFAULT_COUNTRY && day === today && !usedInitial.current) { usedInitial.current = true; latest.current = newest(initialTrains); fetchAlertTrainIds(sb).then((al) => alive && setAlertIds(al)); }
     else { usedInitial.current = true; setTrains([]); full(true); }
     const id = setInterval(() => { ticks++; ticks % 30 === 0 ? full(false) : changes(); }, 60000);
     return () => { alive = false; clearInterval(id); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [today, country]);
+  }, [day, country, access]);
 
   const real = useMemo(() => trains.filter((x) => !isShuttle(x)), [trains]);
   const list = useMemo(() => filterTrains(trains, { type, status, q }, t), [trains, type, status, q, t]);
@@ -218,24 +239,68 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
 
       <div className="boardbar">
         <h3>{t("listTitle")}</h3>
+        <label className="daypick">
+          <span className="sr">{t("dayPick")}</span>
+          <select value={day} onChange={(e) => setDay(e.target.value)} aria-label={t("dayPick")}>
+            {Array.from({ length: HISTORY_DAYS + 1 }, (_, i) => shiftDay(today, -i)).map((d, i) => (
+              <option key={d} value={d}>
+                {i === 0 ? t("dayToday") : i === 1 ? t("dayYesterday") : new Date(d + "T12:00:00Z").toLocaleDateString(LOCALES[lang] || "en-GB", { weekday: "long", day: "numeric", month: "long" })}
+                {i > 0 && !access ? " 🔒" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
         <CountryPicker value={country === "all" ? listCountry : country} locked={country !== "all"} onChange={setListCountry} />
       </div>
       <section className="board" aria-label={t("hDep")} style={{ marginTop: 10 }}>
-        <div className="bhead"><span>{t("hDep")}</span><span>{t("hTrain")}</span><span>{t("hRoute")}</span><span>{t("hStatus")}</span><span style={{ textAlign: "right" }}>{t("hReports")}</span></div>
-        {!real.length ? (
-          <div className="empty">{loading ? t("loading") : t("noTrainsToday")}</div>
+        {!locked && <div className="bhead"><span>{t("hDep")}</span><span>{t("hTrain")}</span><span>{t("hRoute")}</span><span>{t("hStatus")}</span><span style={{ textAlign: "right" }}>{t("hReports")}</span></div>}
+        {locked ? (
+          <HistoryPaywall signedIn={!!session} onCheck={checkAccess} />
+        ) : !real.length ? (
+          <div className="empty">{loading ? t("loading") : isPast ? t("noTrainsDay") : t("noTrainsToday")}</div>
         ) : !sorted.length ? (
           <div className="empty">{t("nomatch")}</div>
         ) : (
           <>
             {liveRows.length > 0 && <div className="bsec live">● {t("secRunning")} <span className="n">({liveRows.length})</span></div>}
             {liveRows.map((tr) => <Row key={tr.id} tr={tr} n={counts[tr.id] || 0} live flag={rowFlag} notice={alertIds.has(tr.id)} />)}
-            {dayRows.length > 0 && <div className="bsec">{t("secDay")} <span className="n">({dayRows.length})</span></div>}
+            {isPast && access && <div className="bsec unlocked">🔓 {t("histActive", new Date(access).toLocaleString(LOCALES[lang] || "en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" }))}</div>}
+            {dayRows.length > 0 && <div className="bsec">{isPast ? t("secDate") : t("secDay")} <span className="n">({dayRows.length})</span></div>}
             {dayRows.map((tr) => <Row key={tr.id} tr={tr} n={counts[tr.id] || 0} flag={rowFlag} notice={alertIds.has(tr.id)} />)}
           </>
         )}
       </section>
     </>
+  );
+}
+
+// Earlier days are a paid extra: €1 or more on Ko-fi (same email as the account) = 24 hours of access
+function HistoryPaywall({ signedIn, onCheck }) {
+  const { t } = useLang();
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function check() {
+    setBusy(true); setMsg("");
+    const until = await onCheck();
+    setBusy(false);
+    if (!until) setMsg(t("histNotYet"));
+  }
+  return (
+    <div className="paywall">
+      <div className="pw-icon" aria-hidden="true">🔒</div>
+      <h3>{t("histTitle")}</h3>
+      <p>{t("histText")}</p>
+      <ol>
+        <li className={signedIn ? "done" : ""}>{signedIn ? "✓ " : ""}{t("histStep1")}{!signedIn && <> <Link href="/prijava">{t("signIn")} →</Link></>}</li>
+        <li>{t("histStep2")}</li>
+        <li>{t("histStep3")}</li>
+      </ol>
+      <div className="pw-actions">
+        <a className="primary kofi" href={KOFI_URL} target="_blank" rel="noopener noreferrer">☕ {t("histPay")}</a>
+        {signedIn && <button type="button" className="ghost" onClick={check} disabled={busy}>{busy ? t("loading") : t("histCheck")}</button>}
+      </div>
+      {msg && <p className="note err">{msg}</p>}
+    </div>
   );
 }
 

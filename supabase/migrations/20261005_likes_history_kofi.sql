@@ -1,0 +1,10 @@
+-- Applied in Supabase on 2026-10-05 (this file documents it).
+-- 1) New passengers are called "Passenger xxxx" (was "Putnik xxxx"); existing names were renamed.
+-- 2) public.comment_likes (comment_id, user_id): "True" on passenger comments, one per account.
+--    comments_feed got two columns: likes (count) and liked (by me).
+-- 3) Paid access to earlier days:
+--    public.history_access (user_id, until), public.kofi_payments (log, server only),
+--    public.has_history_access(), public.kofi_grant(tx, email, amount, currency, kind) called by the
+--    Edge function kofi-webhook (Ko-fi → Settings → API → Webhooks; secret KOFI_VERIFICATION_TOKEN).
+--    The trains read policy: today and later free, yesterday free until 06:00, earlier days only with access.
+-- (full bodies: see the live objects in Supabase)

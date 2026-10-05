@@ -394,3 +394,41 @@ a.primary{display:inline-block;text-decoration:none}
 .stops .pf:empty{display:none}
 .stops .pf.changed{color:var(--bad)}
 .stops .pf s{font-weight:500;margin-left:5px;color:var(--muted)}
+
+/* "True" (like) on passenger comments */
+.cm-actions{margin-top:6px}
+.likebtn{border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:999px;padding:3px 11px;font-size:13px;font-weight:700;cursor:pointer}
+.likebtn[aria-pressed="true"]{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
+.likebtn:disabled{cursor:default;opacity:.7}
+.likecount{font-size:13px;font-weight:700;color:var(--ok)}
+
+/* support (donations) button and window */
+.supportbtn{border:0;cursor:pointer;font:inherit}
+.supportbtn.top{background:#e2475b;color:#fff;border-radius:999px;padding:7px 14px;font-weight:700;font-size:14px}
+.supportbtn.top:hover{filter:brightness(1.08)}
+.supportbtn.foot-link{background:none;color:inherit;text-decoration:underline;padding:0}
+.modal-back{position:fixed;inset:0;z-index:100;background:rgba(10,15,25,.55);display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{position:relative;background:var(--surface);color:var(--fg);border-radius:16px;max-width:440px;width:100%;padding:26px 24px 20px;box-shadow:0 20px 60px rgba(0,0,0,.35);max-height:calc(100vh - 32px);overflow:auto}
+.modal h3{margin:6px 0 10px;font-size:21px}
+.modal p{margin:0 0 10px;line-height:1.5}
+.modal-x{position:absolute;right:10px;top:8px;border:0;background:none;color:var(--muted);font-size:26px;line-height:1;cursor:pointer;padding:4px 8px}
+.modal-heart{width:44px;height:44px;border-radius:50%;background:#fde8eb;color:#e2475b;display:flex;align-items:center;justify-content:center;font-size:22px}
+.modal-list{margin:0 0 16px;padding-left:20px;line-height:1.6}
+.modal .kofi{display:block;text-align:center;text-decoration:none;margin:4px 0 10px;background:#13c3ff;border-color:#13c3ff;color:#06263a}
+.modal .small{font-size:12.5px}
+@media (max-width:720px){.supportbtn.top{padding:6px 11px;font-size:13px}}
+
+/* day picker and the paywall for earlier days */
+.boardbar h3{margin-right:auto}
+.daypick select{appearance:none;-webkit-appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:7px 34px 7px 14px;font-size:15px;font-weight:700;cursor:pointer;
+  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 18px) 55%,calc(100% - 13px) 55%;background-size:5px 5px;background-repeat:no-repeat}
+.paywall{padding:28px 22px;max-width:560px;margin:0 auto;text-align:center}
+.paywall h3{margin:8px 0 6px;font-size:20px}
+.paywall p{margin:0 0 12px;color:var(--muted)}
+.paywall ol{text-align:left;margin:0 auto 18px;max-width:420px;line-height:1.7;padding-left:22px}
+.paywall li.done{color:var(--ok);font-weight:600}
+.pw-icon{font-size:30px}
+.pw-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.paywall .kofi{background:#13c3ff;color:#06263a}
+.ghost{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;padding:9px 16px;font-weight:700;cursor:pointer}
+.bsec.unlocked{color:var(--accent)}

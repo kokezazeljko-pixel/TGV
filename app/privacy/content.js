@@ -36,6 +36,7 @@ export const PRIVACY = {
           "Vercel: hosting of the website. Vercel may process technical data, such as IP addresses, outside the EU under the European Commission's standard contractual clauses.",
           "Vercel Web Analytics: counts page visits so we know how many people use the site (pages viewed, country, device type, the site you came from). It uses no cookies, does not store your IP address and does not build a profile of you; we only see totals.",
           "GitHub: runs the scripts that fetch train data from SNCF, opentransportdata.swiss and SNCB. These scripts do not handle any visitor data.",
+          "Ko-fi: donations and payments for access to earlier days. Ko-fi (with PayPal or Stripe) handles the payment; we only receive the email address, the amount and a transaction number, and use them to unlock access for the account with that email.",
         ],
       },
       {
@@ -93,6 +94,7 @@ export const PRIVACY = {
           "Vercel: Hosting der Website. Vercel kann technische Daten wie IP-Adressen auf Grundlage der Standardvertragsklauseln der Europäischen Kommission außerhalb der EU verarbeiten.",
           "Vercel Web Analytics: zählt Seitenaufrufe, damit wir wissen, wie viele Menschen die Website nutzen (besuchte Seiten, Land, Gerätetyp, vorherige Website). Es verwendet keine Cookies, speichert Ihre IP-Adresse nicht und erstellt kein Profil von Ihnen; wir sehen nur Gesamtzahlen.",
           "GitHub: führt die Skripte aus, die Zugdaten von SNCF, opentransportdata.swiss und SNCB abrufen. Diese Skripte verarbeiten keine Besucherdaten.",
+          "Ko-fi: Spenden und Zahlungen für den Zugang zu früheren Tagen. Ko-fi (mit PayPal oder Stripe) wickelt die Zahlung ab; wir erhalten nur die E-Mail-Adresse, den Betrag und eine Transaktionsnummer und nutzen sie, um den Zugang für das Konto mit dieser E-Mail freizuschalten.",
         ],
       },
       { h: "Zugdaten", p: ["Fahrpläne und Echtzeit-Verspätungen stammen aus den Open Data der SNCF (transport.data.gouv.fr), für die Schweiz von opentransportdata.swiss und für Belgien aus den Open Data der SNCB (data.belgianmobility.io). Sie enthalten keine personenbezogenen Daten."] },
@@ -147,6 +149,7 @@ export const PRIVACY = {
           "Vercel : hébergement du site. Vercel peut traiter des données techniques, comme les adresses IP, hors de l’UE, sous couvert des clauses contractuelles types de la Commission européenne.",
           "Vercel Web Analytics : compte les visites pour savoir combien de personnes utilisent le site (pages vues, pays, type d’appareil, site de provenance). Sans cookies, sans enregistrer votre adresse IP et sans créer de profil ; nous ne voyons que des totaux.",
           "GitHub : exécute les scripts qui récupèrent les données SNCF, opentransportdata.swiss et SNCB. Ces scripts ne traitent aucune donnée des visiteurs.",
+          "Ko-fi : dons et paiements pour l’accès aux jours précédents. Ko-fi (avec PayPal ou Stripe) traite le paiement ; nous recevons uniquement l’adresse e-mail, le montant et un numéro de transaction, utilisés pour débloquer l’accès du compte ayant cet e-mail.",
         ],
       },
       { h: "Données ferroviaires", p: ["Les horaires et les retards en temps réel proviennent de l’open data SNCF (transport.data.gouv.fr), pour la Suisse d’opentransportdata.swiss et pour la Belgique de l’open data SNCB (data.belgianmobility.io). Ils ne contiennent aucune donnée personnelle."] },
@@ -201,6 +204,7 @@ export const PRIVACY = {
           "Vercel: hosting van de website. Vercel kan technische gegevens, zoals IP-adressen, buiten de EU verwerken op basis van de standaardcontractbepalingen van de Europese Commissie.",
           "Vercel Web Analytics: telt paginabezoeken zodat we weten hoeveel mensen de site gebruiken (bekeken pagina's, land, soort toestel, de site waar je vandaan kwam). Het gebruikt geen cookies, bewaart je IP-adres niet en maakt geen profiel van je; we zien alleen totalen.",
           "GitHub: voert de scripts uit die treingegevens ophalen bij SNCF, opentransportdata.swiss en NMBS. Die scripts verwerken geen gegevens van bezoekers.",
+          "Ko-fi: giften en betalingen voor toegang tot eerdere dagen. Ko-fi (met PayPal of Stripe) verwerkt de betaling; wij ontvangen alleen het e-mailadres, het bedrag en een transactienummer, en gebruiken die om de toegang te ontgrendelen voor het account met dat e-mailadres.",
         ],
       },
       {

@@ -175,7 +175,7 @@ async function main() {
       removed += part.length;
     }
   }
-  await db.del("trains", `country=eq.${COUNTRY}&service_date=lt.${addDays(TODAY, -2)}`);
+  await db.del("trains", `country=eq.${COUNTRY}&service_date=lt.${addDays(TODAY, -8)}`); // istorija: 7 prethodnih dana (plaćeni pregled)
   console.log(`Gotovo: red vožnje je upisan (obrisano zastarelih: ${removed}).`);
 }
 
