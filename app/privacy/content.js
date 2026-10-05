@@ -12,7 +12,7 @@ export const PRIVACY = {
       {
         h: "What we collect",
         list: [
-          "Your email address, only if you sign in. It is used to send you a sign-in link and to keep you signed in. It is never shown to other visitors.",
+          "Your email address, only if you sign in. It is used to sign you in (with a link, a password you choose, or Google) and to keep you signed in. It is never shown to other visitors. Passwords are stored only in encrypted (hashed) form by Supabase; we never see them. If you sign in with Google, Google tells us only your email address.",
           "The display name you choose. It is shown next to your comments unless you post anonymously.",
           "Your comments: the text, the reason or rating you pick, whether you marked yourself as on board, the train and the time of posting.",
           "Technical data needed to run the site, such as your IP address and browser type, which our hosting providers keep in their server logs for a short time.",
@@ -70,7 +70,7 @@ export const PRIVACY = {
       {
         h: "Welche Daten wir erheben",
         list: [
-          "Ihre E-Mail-Adresse, nur wenn Sie sich anmelden. Sie dient dazu, Ihnen einen Anmeldelink zu senden und Sie angemeldet zu halten. Sie wird anderen Besuchern nie angezeigt.",
+          "Ihre E-Mail-Adresse, nur wenn Sie sich anmelden. Sie dient der Anmeldung (per Link, mit einem selbst gewählten Passwort oder mit Google) und dazu, Sie angemeldet zu halten. Sie wird anderen Besuchern nie angezeigt. Passwörter speichert Supabase nur verschlüsselt (gehasht); wir sehen sie nie. Bei der Anmeldung mit Google erhalten wir von Google nur Ihre E-Mail-Adresse.",
           "Den Anzeigenamen, den Sie wählen. Er erscheint neben Ihren Kommentaren, außer Sie posten anonym.",
           "Ihre Kommentare: den Text, den gewählten Grund oder die Bewertung, ob Sie sich als „an Bord“ markiert haben, den Zug und den Zeitpunkt.",
           "Technische Daten, die für den Betrieb nötig sind, etwa IP-Adresse und Browsertyp, die unsere Hosting-Anbieter kurzzeitig in ihren Server-Logs speichern.",
@@ -125,7 +125,7 @@ export const PRIVACY = {
       {
         h: "Données collectées",
         list: [
-          "Votre adresse e-mail, uniquement si vous vous connectez. Elle sert à vous envoyer un lien de connexion et à garder votre session ouverte. Elle n’est jamais affichée aux autres visiteurs.",
+          "Votre adresse e-mail, uniquement si vous vous connectez. Elle sert à vous connecter (par lien, avec un mot de passe que vous choisissez ou avec Google) et à garder votre session ouverte. Elle n’est jamais affichée aux autres visiteurs. Les mots de passe sont conservés par Supabase uniquement sous forme chiffrée (hachée) ; nous ne les voyons jamais. Avec Google, Google nous transmet uniquement votre adresse e-mail.",
           "Le nom d’affichage que vous choisissez. Il apparaît à côté de vos commentaires, sauf si vous publiez anonymement.",
           "Vos commentaires : le texte, le motif ou la note choisis, l’indication « à bord », le train et l’heure de publication.",
           "Les données techniques nécessaires au fonctionnement du site, comme l’adresse IP et le type de navigateur, conservées brièvement par nos hébergeurs dans leurs journaux.",
@@ -180,7 +180,7 @@ export const PRIVACY = {
       {
         h: "Wat we verzamelen",
         list: [
-          "Je e-mailadres, alleen als je je aanmeldt. Het wordt gebruikt om je een aanmeldlink te sturen en je aangemeld te houden. Het wordt nooit aan andere bezoekers getoond.",
+          "Je e-mailadres, alleen als je je aanmeldt. Het wordt gebruikt om je aan te melden (met een link, een zelfgekozen wachtwoord of Google) en je aangemeld te houden. Het wordt nooit aan andere bezoekers getoond. Wachtwoorden bewaart Supabase alleen versleuteld (gehasht); wij zien ze nooit. Meld je je aan met Google, dan krijgen we van Google alleen je e-mailadres.",
           "De weergavenaam die je kiest. Die staat naast je reacties, tenzij je anoniem plaatst.",
           "Je reacties: de tekst, de reden of score die je kiest, of je aangaf aan boord te zijn, de trein en het tijdstip van plaatsen.",
           "Technische gegevens die nodig zijn om de site te laten werken, zoals je IP-adres en browsertype, die onze hostingproviders korte tijd in hun serverlogs bewaren.",

@@ -433,3 +433,11 @@ a.primary{display:inline-block;text-decoration:none}
 .ghost{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;padding:9px 16px;font-weight:700;cursor:pointer}
 .bsec.unlocked{color:var(--accent)}
 .paywall .kofi.monthly{background:var(--accent);color:var(--accent-fg)}
+
+/* sign-in: Google button, "or" line, tabs */
+.googlebtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;border:1px solid var(--line);background:#fff;color:#1f1f1f;border-radius:8px;padding:10px 14px;font-weight:700;font-size:15px;cursor:pointer}
+.googlebtn:hover{background:#f6f8fb}
+.orline{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px}
+.orline::before,.orline::after{content:"";flex:1;height:1px;background:var(--line)}
+.authtabs{justify-content:center}
+.authlinks{justify-content:space-between;flex-wrap:wrap}
