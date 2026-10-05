@@ -34,6 +34,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
   const [running, setRunning] = useState([]);
   const [country, setCountry] = useState(DEFAULT_COUNTRY);
   const [loading, setLoading] = useState(false);
+  const [listCountry, setListCountry] = useState("all"); // whose trains the list under the map shows (Europe view)
   const [alertIds, setAlertIds] = useState(() => new Set()); // trains with an official notice from the railway
   const usedInitial = useRef(false); // the trains sent with the page are used only once, for the default view
 
@@ -46,7 +47,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
   const chooseCountry = (c) => {
     if (c === country) return;
     try { localStorage.setItem("tp-country", c); } catch {}
-    setStation(null); setType("all"); setRunning([]); setCountry(c);
+    setStation(null); setType("all"); setRunning([]); setListCountry("all"); setCountry(c);
   };
 
   // Load the chosen country's trains, then every minute fetch only the trains whose delays changed
@@ -145,14 +146,18 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
   }, [list, station, country]);
 
   const runningIds = useMemo(() => new Set(running.map((r) => r.tr.id)), [running]);
-  const sorted = useMemo(() => [...shown].sort((a, b) => toMin(a.dep) - toMin(b.dep)), [shown]);
+  const sorted = useMemo(() => [...shown].filter((x) => listCountry === "all" || x.country === listCountry).sort((a, b) => toMin(a.dep) - toMin(b.dep)), [shown, listCountry]);
+  // Under the map: the trains running right now first, then every train of the day from the morning
+  const liveRows = useMemo(() => sorted.filter((x) => runningIds.has(x.id)), [sorted, runningIds]);
+  const dayRows = useMemo(() => sorted.filter((x) => !runningIds.has(x.id)), [sorted, runningIds]);
+  const rowFlag = country === "all" && listCountry === "all";
 
   return (
     <>
       <div className="countries" role="group" aria-label={t("countryGroup")}>
         {COUNTRIES.map((c) => (
           <button key={c} type="button" className="countrybtn" aria-pressed={country === c} onClick={() => chooseCountry(c)}>
-            {(c === "all" ? REAL : [c]).map((f) => <span key={f} className={`flag flag-${f}`} aria-hidden="true" />)}{t("country_" + c)}
+            {(c === "all" ? ["eu"] : [c]).map((f) => <span key={f} className={`flag flag-${f}`} aria-hidden="true" />)}{t("country_" + c)}
           </button>
         ))}
       </div>
@@ -211,17 +216,54 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
         </aside>
       </section>
 
-      <section className="board" aria-label={t("hDep")}>
+      <div className="boardbar">
+        <h3>{t("listTitle")}</h3>
+        <CountryPicker value={country === "all" ? listCountry : country} locked={country !== "all"} onChange={setListCountry} />
+      </div>
+      <section className="board" aria-label={t("hDep")} style={{ marginTop: 10 }}>
         <div className="bhead"><span>{t("hDep")}</span><span>{t("hTrain")}</span><span>{t("hRoute")}</span><span>{t("hStatus")}</span><span style={{ textAlign: "right" }}>{t("hReports")}</span></div>
         {!real.length ? (
           <div className="empty">{loading ? t("loading") : t("noTrainsToday")}</div>
         ) : !sorted.length ? (
           <div className="empty">{t("nomatch")}</div>
         ) : (
-          sorted.map((tr) => <Row key={tr.id} tr={tr} n={counts[tr.id] || 0} live={runningIds.has(tr.id)} flag={country === "all"} notice={alertIds.has(tr.id)} />)
+          <>
+            {liveRows.length > 0 && <div className="bsec live">● {t("secRunning")} <span className="n">({liveRows.length})</span></div>}
+            {liveRows.map((tr) => <Row key={tr.id} tr={tr} n={counts[tr.id] || 0} live flag={rowFlag} notice={alertIds.has(tr.id)} />)}
+            {dayRows.length > 0 && <div className="bsec">{t("secDay")} <span className="n">({dayRows.length})</span></div>}
+            {dayRows.map((tr) => <Row key={tr.id} tr={tr} n={counts[tr.id] || 0} flag={rowFlag} notice={alertIds.has(tr.id)} />)}
+          </>
         )}
       </section>
     </>
+  );
+}
+
+// Country picker above the list: flag + name. On a single-country map it just shows that country.
+function CountryPicker({ value, locked, onChange }) {
+  const { t } = useLang();
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e) => { if (e.type === "keydown" ? e.key === "Escape" : !ref.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", close); document.addEventListener("keydown", close);
+    return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", close); };
+  }, [open]);
+  const Label = ({ c }) => <><span className={`flag flag-${c === "all" ? "eu" : c}`} aria-hidden="true" />{t("country_" + c)}</>;
+  return (
+    <div className="cpick" ref={ref}>
+      <button type="button" disabled={locked} aria-haspopup="listbox" aria-expanded={open} aria-label={`${t("listCountry")}: ${t("country_" + value)}`} onClick={() => setOpen((o) => !o)}>
+        <Label c={value} />
+      </button>
+      {open && (
+        <ul role="listbox" aria-label={t("listCountry")}>
+          {["all", ...REAL].map((c) => (
+            <li key={c}><button type="button" role="option" aria-selected={c === value} onClick={() => { onChange(c); setOpen(false); }}><Label c={c} /></button></li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
