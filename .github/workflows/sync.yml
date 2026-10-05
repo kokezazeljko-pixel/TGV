@@ -60,6 +60,14 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }} 
+      - name: Luksemburg – red vožnje
+        if: github.event.schedule != '20 14 * * *'
+        continue-on-error: true
+        run: node ingest/sync-schedule.mjs
+        env:
+          COUNTRY: lu
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}  
 
 
   kasnjenja:
