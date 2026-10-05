@@ -85,6 +85,8 @@ header.top .wrap{padding-block:18px 20px;display:flex;flex-wrap:wrap;align-items
 #map .lbl.l2,#map .lbl.l5{display:none}
 #map.z2 .lbl.l2{display:block}
 #map.z5 .lbl.l5{display:block}
+#map .lbl.l3{display:none}
+#map.z3 .lbl.l3{display:block} /* stations in a crowded city area: named after the first zoom-in */
 #map.z5 .lbl.grp{display:none}
 #map.small .lbl.b,#map.small .geo:not(.sea){display:none}
 #map.small .lbl.major{font-size:calc(11.5px * var(--u,1))}
