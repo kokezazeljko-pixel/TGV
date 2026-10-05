@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase";
 import { useSession } from "@/components/useSession";
-import { TRAIN_FIELDS, statusOf, toMin, parisTime, parisNowMin, ago } from "@/lib/format";
+import { TRAIN_FIELDS, statusOf, toMin, parisTime, parisNowMin, ago, plannedPf } from "@/lib/format";
 import { REASON_KEYS } from "@/lib/i18n";
 import { useLang } from "@/components/LangProvider";
 import TrainMap from "@/components/TrainMap";
@@ -220,6 +220,7 @@ function Stops({ train }) {
             <li key={`${s.seq ?? i}`} className={cls}>
               <span className="dot" />
               <span>{s.name}</span>
+              <Platform s={s} />
               <span className="t num">
                 {s.time}
                 {s.skipped ? <em className="d-bad">{t("skipped")}</em> : s.delay ? <em className={dcls}>+{s.delay}</em> : null}
@@ -230,6 +231,15 @@ function Stops({ train }) {
       </ol>
     </section>
   );
+}
+
+// Platform of a stop: "Pl. 7", or a changed one in red with the planned one struck through
+export function Platform({ s }) {
+  const { t } = useLang();
+  const planned = plannedPf(s);
+  if (s.apf && planned && s.apf !== planned) return <span className="pf changed" title={t("pfChanged", planned)}>{t("pf", s.apf)}<s>{planned}</s></span>;
+  const pf = s.apf || planned;
+  return <span className="pf">{pf ? t("pf", pf) : ""}</span>;
 }
 
 function CommentForm({ train, routeKey, onPosted }) {

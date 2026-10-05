@@ -9,7 +9,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { listZip, openEntry } from "./lib/zip.mjs";
 import { eachRow } from "./lib/csv.mjs";
-import { parisDate, hhmm, detectType, detectSwissType, productFromStopId, env, supabaseRest, download, chunks, latestSwissGtfsUrl } from "./lib/util.mjs";
+import { parisDate, hhmm, detectType, detectSwissType, productFromStopId, env, supabaseRest, download, chunks, latestSwissGtfsUrl, platformOf } from "./lib/util.mjs";
 import { BE_STATIC_URL, detectBelgianType, isBelgianStop, localName } from "./lib/belgium.mjs";
 
 const COUNTRY = env("COUNTRY", "fr");
@@ -110,13 +110,15 @@ async function main() {
   // Belgija: nazivi su u feedu na francuskom, holandski je u translations.txt -> naziv na lokalnom jeziku
   const dutch = new Map();
   if (COUNTRY === "be") await read("translations.txt", (r) => { if (r.table_name === "stops" && r.field_name === "stop_name" && r.language === "nl") dutch.set(r.field_value, r.translation); });
-  const stopNames = new Map(), stopCoords = new Map();
+  const stopNames = new Map(), stopCoords = new Map(), stopPf = new Map();
   await read("stops.txt", (r) => {
     if (!needStops.has(r.stop_id)) return;
     const lat = parseFloat(r.stop_lat), lon = parseFloat(r.stop_lon);
     const ok = Number.isFinite(lat) && Number.isFinite(lon);
     stopNames.set(r.stop_id, COUNTRY === "be" ? localName(r.stop_name, dutch.get(r.stop_name), ok ? lat : null, ok ? lon : null) : r.stop_name);
     if (ok) stopCoords.set(r.stop_id, [Math.round(lat * 1e4) / 1e4, Math.round(lon * 1e4) / 1e4]);
+    const pf = platformOf(r.stop_id, r.platform_code); // peron (Švajcarska, Belgija; SNCF ga ne objavljuje)
+    if (pf) stopPf.set(r.stop_id, pf);
   });
 
   // 5) Redovi za bazu
@@ -124,7 +126,8 @@ async function main() {
   for (const t of keep) {
     const stops = t.stops.map((s) => {
       const c = stopCoords.get(s.id);
-      return { ...s, name: stopNames.get(s.id) || s.id, time: hhmm(s.dep || s.arr), delay: 0, ...(c ? { lat: c[0], lon: c[1] } : {}) };
+      const pf = stopPf.get(s.id);
+      return { ...s, name: stopNames.get(s.id) || s.id, time: hhmm(s.dep || s.arr), delay: 0, ...(c ? { lat: c[0], lon: c[1] } : {}), ...(pf ? { pf } : {}) };
     });
     const first = stops[0], last = stops[stops.length - 1];
     for (const d of t.runs) {

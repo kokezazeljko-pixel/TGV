@@ -1,5 +1,5 @@
 // Računanje kašnjenja jednog voza iz GTFS-RT "TripUpdate" poruke.
-import { gtfsToEpoch } from "./util.mjs";
+import { gtfsToEpoch, platformOf } from "./util.mjs";
 
 const SKIPPED = 1;
 const CANCELED = 3;
@@ -22,7 +22,11 @@ export function applyTripUpdate(row, tu, nowSec) {
   for (const s of stops) {
     const u = bySeq.get(s.seq) ?? byId.get(s.id);
     s.skipped = false;
+    delete s.apf;
     if (u) {
+      // platform change: the feed names a different track of the same station (Belgium: "8814001_12" instead of "_14")
+      const apf = u.stopId && u.stopId !== s.id ? platformOf(u.stopId) : null;
+      if (apf && apf !== s.pf) s.apf = apf;
       if (u.scheduleRelationship === SKIPPED) s.skipped = true;
       const ev = u.arrival ?? u.departure;
       let sec = null;

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase";
 import { fetchTrainsForDay, fetchTrainsUpdatedSince, fetchCommentCounts, fetchAlertTrainIds } from "@/lib/queries";
-import { statusOf, toMin, fromMin, trainHref, ago, filterTrains, isShuttle, parisNowMin } from "@/lib/format";
+import { statusOf, toMin, fromMin, trainHref, ago, filterTrains, isShuttle, parisNowMin, plannedPf } from "@/lib/format";
 import { getGeo } from "@/lib/geo";
 
 // Map views: all countries together first, then Switzerland, France and Belgium
@@ -363,7 +363,8 @@ function StationPanel({ station, trains, country, onBack }) {
       const s = tr.stops[idx], last = idx === tr.stops.length - 1;
       const sub = last ? `${t("arr")} · ${t("from")} ${tr.origin}` : `${t("depS")} · ${t("to")} ${tr.destination}${station === "Paris" ? " · " + s.name.replace(/^Paris /, "") : ""}`;
       const m = toMin(s.time) + (s.delay || 0);
-      out.push({ tr, s, sub, m, past: now != null && m < now - 2 });
+      const planned = plannedPf(s), pf = s.apf || planned;
+      out.push({ tr, s, sub: pf ? `${sub} · ${t("pf", pf)}${s.apf && planned && s.apf !== planned ? " (" + t("pfChanged", planned) + ")" : ""}` : sub, m, past: now != null && m < now - 2 });
     }
     return out.sort((a, b) => (a.past - b.past) || (a.past ? b.m - a.m : a.m - b.m)).slice(0, 80);
   }, [trains, station, now, t]);

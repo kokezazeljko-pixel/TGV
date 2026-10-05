@@ -165,6 +165,14 @@ function gtfsToEpoch(dateStr, hms) {
   off = tzOffsetMin(guess - off * 60000);
   return Math.round((guess - off * 60000) / 1000);
 }
+var PLATFORM = /^(\d{1,3}[A-Z]{0,2}|[A-Z]\d{0,2})$/;
+function platformOf(stopId = "", code = "") {
+  const c = String(code || "").trim().toUpperCase().replace(/\s+/g, "");
+  if (c && PLATFORM.test(c))
+    return c;
+  const m = String(stopId).match(/^gs:nmbssncb:\d{7}_(\w+)$/) || String(stopId).match(/^\d{7}:0:(\w+)$/);
+  return m && PLATFORM.test(m[1].toUpperCase()) ? m[1].toUpperCase() : null;
+}
 
 // ../../../ingest/lib/realtime.mjs
 var SKIPPED = 1;
@@ -184,7 +192,11 @@ function applyTripUpdate(row, tu, nowSec) {
   for (const s of stops) {
     const u = bySeq.get(s.seq) ?? byId.get(s.id);
     s.skipped = false;
+    delete s.apf;
     if (u) {
+      const apf = u.stopId && u.stopId !== s.id ? platformOf(u.stopId) : null;
+      if (apf && apf !== s.pf)
+        s.apf = apf;
       if (u.scheduleRelationship === SKIPPED)
         s.skipped = true;
       const ev = u.arrival ?? u.departure;
@@ -534,7 +546,7 @@ Deno.serve(async (req) => {
   try {
     const t0 = Date.now();
     const [rows, feedBuf] = await Promise.all([rpc("rt_candidates", { p_country: country }), fetchFeed(country, swissKey)]);
-    const trains = rows.map((r) => ({ ...r, stops: (r.stops || []).map(([seq, id, arr, dep, delay, skipped]) => ({ seq, id, arr, dep, delay, skipped })) }));
+    const trains = rows.map((r) => ({ ...r, stops: (r.stops || []).map(([seq, id, arr, dep, delay, skipped, pf]) => ({ seq, id, arr, dep, delay, skipped, pf })) }));
     const index = new Map;
     for (const r of trains.sort((a, b) => a.service_date.localeCompare(b.service_date))) {
       if (!index.has(r.trip_id))
@@ -552,7 +564,7 @@ Deno.serve(async (req) => {
       if (!row)
         continue;
       const res = applyTripUpdate(row, tu, now);
-      updates.push({ id: res.id, delay_min: res.delay_min, cancelled: res.cancelled, d: res.stops.map((s) => [s.delay, !!s.skipped]) });
+      updates.push({ id: res.id, delay_min: res.delay_min, cancelled: res.cancelled, d: res.stops.map((s) => s.apf ? [s.delay, !!s.skipped, s.apf] : [s.delay, !!s.skipped]) });
     }
     const inFeed = updates.length;
     if (FEEDS[country].onlyDeviations) {

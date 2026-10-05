@@ -141,3 +141,14 @@ export async function download(url, headers = {}) {
 }
 
 export const chunks = (arr, n) => Array.from({ length: Math.ceil(arr.length / n) }, (_, i) => arr.slice(i * n, i * n + n));
+
+// Platform ("peron") of a stop. From stops.txt platform_code (Switzerland, Belgium), or from the
+// stop_id itself: Belgium "gs:nmbssncb:8814001_14" -> "14", old Swiss style "8503000:0:7" -> "7".
+// Only short track labels count ("7", "13AB", "4A"); "BUS", "TE BEPAL" and the like are not platforms.
+const PLATFORM = /^(\d{1,3}[A-Z]{0,2}|[A-Z]\d{0,2})$/;
+export function platformOf(stopId = "", code = "") {
+  const c = String(code || "").trim().toUpperCase().replace(/\s+/g, "");
+  if (c && PLATFORM.test(c)) return c;
+  const m = String(stopId).match(/^gs:nmbssncb:\d{7}_(\w+)$/) || String(stopId).match(/^\d{7}:0:(\w+)$/);
+  return m && PLATFORM.test(m[1].toUpperCase()) ? m[1].toUpperCase() : null;
+}

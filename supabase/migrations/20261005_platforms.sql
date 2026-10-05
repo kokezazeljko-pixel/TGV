@@ -1,0 +1,6 @@
+-- Platforms ("peron"), applied in Supabase on 2026-10-05 (this file documents it).
+-- trains.stops[] get "pf" (planned platform, from the timetable: Switzerland, Belgium; SNCF publishes none)
+-- and "apf" (changed platform, from the live feed: Belgium).
+-- rt_candidates returns pf as the 7th value of each compact stop; apply_rt_delays accepts an optional
+-- 3rd value per stop ([delay, skipped, apf]) and clears apf when it is missing.
+-- (full bodies: see the live functions public.rt_candidates and public.apply_rt_delays in Supabase)

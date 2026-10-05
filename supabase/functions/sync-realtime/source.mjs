@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
     const t0 = Date.now();
     const [rows, feedBuf] = await Promise.all([rpc("rt_candidates", { p_country: country }), fetchFeed(country, swissKey)]);
     // compact stops [[seq, id, arr, dep, delay, skipped]] -> objects
-    const trains = rows.map((r) => ({ ...r, stops: (r.stops || []).map(([seq, id, arr, dep, delay, skipped]) => ({ seq, id, arr, dep, delay, skipped })) }));
+    const trains = rows.map((r) => ({ ...r, stops: (r.stops || []).map(([seq, id, arr, dep, delay, skipped, pf]) => ({ seq, id, arr, dep, delay, skipped, pf })) }));
     const index = new Map();
     for (const r of trains.sort((a, b) => a.service_date.localeCompare(b.service_date))) {
       if (!index.has(r.trip_id)) index.set(r.trip_id, []);
@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
       const row = matchRow(index, tu.trip);
       if (!row) continue;
       const res = applyTripUpdate(row, tu, now);
-      updates.push({ id: res.id, delay_min: res.delay_min, cancelled: res.cancelled, d: res.stops.map((s) => [s.delay, !!s.skipped]) });
+      updates.push({ id: res.id, delay_min: res.delay_min, cancelled: res.cancelled, d: res.stops.map((s) => (s.apf ? [s.delay, !!s.skipped, s.apf] : [s.delay, !!s.skipped])) });
     }
     const inFeed = updates.length;
     // Belgium: running trains missing from the feed are on time

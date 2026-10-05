@@ -77,11 +77,22 @@ assert.equal(b1.stops[1].name, "Bruxelles-Midi / Brussel-Zuid", "Brisel: oba jez
 assert.equal(b1.destination, "Namur", "Valonija: francuski naziv");
 assert.equal(be.find((t) => t.number === "1530").destination, "Leuven");
 assert.equal(be.find((t) => t.number === "9233").type, "EC");
+assert.deepEqual(b1.stops.map((s) => s.pf), ["3", "14", "2"], "peroni iz stop_id");
+{
+  const { platformOf } = await import("../lib/util.mjs");
+  assert.equal(platformOf("ch:1:sloid:3000:31:31", "31"), "31");
+  assert.equal(platformOf("ch:1:sloid:3000:7:13", "13AB"), "13AB");
+  assert.equal(platformOf("gs:nmbssncb:8881000_BUS", "BUS"), null, "autobus nije peron");
+  assert.equal(platformOf("8503000:0:7"), "7");
+  assert.equal(platformOf("StopPoint:OCETGV INOUI-87686006"), null, "SNCF bez perona");
+}
 run("sync-realtime.mjs", { COUNTRY: "be", RT_FILE: join(dir, "feed-be.json"), TRAINS_FILE: join(dir, "trains-be.json"), NOW: now, OUT_FILE: join(dir, "updates-be.json") });
 const upbe = JSON.parse(readFileSync(join(dir, "updates-be.json"), "utf8"));
 const ub1 = upbe.find((u) => u.id === b1.id);
 assert.deepEqual(ub1.stops.map((s) => s.delay), [0, 5, 5], "kašnjenje od Brisela (po rednom broju, i kad se peron promeni)");
 assert.equal(ub1.delay_min, 5);
+assert.equal(ub1.stops[1].apf, "12", "promena perona u Briselu (14 -> 12)");
+assert.equal(ub1.stops[0].apf, undefined, "bez promene na polaznoj stanici");
 const ub2 = upbe.find((u) => u.id.endsWith(":1330:20260101:1"));
 assert.ok(ub2 && ub2.delay_min === 0, "voz koji vozi a nema ga u feedu je tačan");
 assert.equal(upbe.length, 2, "voz koji još nije krenuo (16:00) i EC u 15:00 se ne diraju");
