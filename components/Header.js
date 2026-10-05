@@ -1,5 +1,6 @@
 "use client";
 
+import { Avatar, avatarOf, useProfile } from "@/components/Avatar";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { parisTime } from "@/lib/format";
@@ -39,6 +40,7 @@ const FLAGS = {
 export default function Header() {
   const [time, setTime] = useState("--:--");
   const { session, ready } = useSession();
+  const { profile } = useProfile(session);
   const { lang, setLang, t } = useLang();
 
   useEffect(() => {
@@ -60,7 +62,12 @@ export default function Header() {
         </Link>
         <div className="top-right">
           <SupportButton className="supportbtn top" />
-          {ready && <Link href="/prijava" className="userlink">{session ? t("myAccount") : t("signIn")}</Link>}
+          {ready && (
+            <Link href="/prijava" className={`userlink${session ? " withav" : ""}`}>
+              {session && <Avatar src={avatarOf(profile)} name={profile?.display_name || ""} size={26} />}
+              {session ? t("myAccount") : t("signIn")}
+            </Link>
+          )}
           <div className="lang" role="group" aria-label="Language / Sprache / Langue / Taal">
             {LANGS.map((l) => (
               <button key={l} type="button" aria-pressed={lang === l} onClick={() => setLang(l)} aria-label={LANG_NAMES[l]} title={LANG_NAMES[l]}>{FLAGS[l]}</button>

@@ -12,8 +12,9 @@ export const PRIVACY = {
       {
         h: "What we collect",
         list: [
-          "Your email address, only if you sign in. It is used to sign you in (with a link, a password you choose, or Google) and to keep you signed in. It is never shown to other visitors. Passwords are stored only in encrypted (hashed) form by Supabase; we never see them. If you sign in with Google, Google tells us only your email address.",
+          "Your email address, only if you sign in. It is used to sign you in (with a link, a password you choose, or Google) and to keep you signed in. It is never shown to other visitors. Passwords are stored only in encrypted (hashed) form by Supabase; we never see them. If you sign in with Google, Google also tells us your name and profile photo; they are shown only if you choose them in “My account”.",
           "The display name you choose. It is shown next to your comments unless you post anonymously.",
+          "Optional profile details you add in “My account”: a profile picture (resized to a small square in your browser, so no camera or location data is uploaded), first and last name, a short text about you, your favourite station, home country and favourite train. Other visitors see only the picture next to your comments, and your first and last name only if you turn on “show my name”; the rest is visible only to you. You can change or remove them at any time.",
           "Your comments: the text, the reason or rating you pick, whether you marked yourself as on board, the train and the time of posting.",
           "Technical data needed to run the site, such as your IP address and browser type, which our hosting providers keep in their server logs for a short time.",
           "Your language and country choice and, if you sign in, your session. These are stored in your own browser.",
@@ -70,8 +71,9 @@ export const PRIVACY = {
       {
         h: "Welche Daten wir erheben",
         list: [
-          "Ihre E-Mail-Adresse, nur wenn Sie sich anmelden. Sie dient der Anmeldung (per Link, mit einem selbst gewählten Passwort oder mit Google) und dazu, Sie angemeldet zu halten. Sie wird anderen Besuchern nie angezeigt. Passwörter speichert Supabase nur verschlüsselt (gehasht); wir sehen sie nie. Bei der Anmeldung mit Google erhalten wir von Google nur Ihre E-Mail-Adresse.",
+          "Ihre E-Mail-Adresse, nur wenn Sie sich anmelden. Sie dient der Anmeldung (per Link, mit einem selbst gewählten Passwort oder mit Google) und dazu, Sie angemeldet zu halten. Sie wird anderen Besuchern nie angezeigt. Passwörter speichert Supabase nur verschlüsselt (gehasht); wir sehen sie nie. Bei der Anmeldung mit Google erhalten wir von Google auch Ihren Namen und Ihr Profilfoto; diese werden nur angezeigt, wenn Sie sie unter „Mein Konto“ wählen.",
           "Den Anzeigenamen, den Sie wählen. Er erscheint neben Ihren Kommentaren, außer Sie posten anonym.",
+          "Freiwillige Profilangaben unter „Mein Konto“: ein Profilbild (im Browser auf ein kleines Quadrat verkleinert, ohne Kamera- oder Standortdaten), Vor- und Nachname, ein kurzer Text über Sie, Lieblingsbahnhof, Heimatland und Lieblingszug. Andere Besucher sehen bei Ihren Kommentaren nur das Bild und Vor- und Nachnamen nur, wenn Sie „Namen zeigen“ einschalten; der Rest ist nur für Sie sichtbar. Sie können alles jederzeit ändern oder löschen.",
           "Ihre Kommentare: den Text, den gewählten Grund oder die Bewertung, ob Sie sich als „an Bord“ markiert haben, den Zug und den Zeitpunkt.",
           "Technische Daten, die für den Betrieb nötig sind, etwa IP-Adresse und Browsertyp, die unsere Hosting-Anbieter kurzzeitig in ihren Server-Logs speichern.",
           "Ihre Sprachwahl, Ihre Länderwahl und, wenn Sie angemeldet sind, Ihre Sitzung. Diese werden in Ihrem eigenen Browser gespeichert.",
@@ -125,8 +127,9 @@ export const PRIVACY = {
       {
         h: "Données collectées",
         list: [
-          "Votre adresse e-mail, uniquement si vous vous connectez. Elle sert à vous connecter (par lien, avec un mot de passe que vous choisissez ou avec Google) et à garder votre session ouverte. Elle n’est jamais affichée aux autres visiteurs. Les mots de passe sont conservés par Supabase uniquement sous forme chiffrée (hachée) ; nous ne les voyons jamais. Avec Google, Google nous transmet uniquement votre adresse e-mail.",
+          "Votre adresse e-mail, uniquement si vous vous connectez. Elle sert à vous connecter (par lien, avec un mot de passe que vous choisissez ou avec Google) et à garder votre session ouverte. Elle n’est jamais affichée aux autres visiteurs. Les mots de passe sont conservés par Supabase uniquement sous forme chiffrée (hachée) ; nous ne les voyons jamais. Avec Google, Google nous transmet aussi votre nom et votre photo de profil ; ils ne sont affichés que si vous les choisissez dans « Mon compte ».",
           "Le nom d’affichage que vous choisissez. Il apparaît à côté de vos commentaires, sauf si vous publiez anonymement.",
+          "Les informations facultatives ajoutées dans « Mon compte » : une photo de profil (réduite en petit carré dans votre navigateur, sans données d’appareil photo ni de localisation), prénom et nom, un court texte, votre gare préférée, votre pays et votre train préféré. Les autres visiteurs ne voient que la photo à côté de vos commentaires, et vos prénom et nom seulement si vous activez « afficher mon nom » ; le reste n’est visible que par vous. Vous pouvez les modifier ou les supprimer à tout moment.",
           "Vos commentaires : le texte, le motif ou la note choisis, l’indication « à bord », le train et l’heure de publication.",
           "Les données techniques nécessaires au fonctionnement du site, comme l’adresse IP et le type de navigateur, conservées brièvement par nos hébergeurs dans leurs journaux.",
           "Votre choix de langue et de pays et, si vous êtes connecté, votre session. Ils sont enregistrés dans votre propre navigateur.",
@@ -180,8 +183,9 @@ export const PRIVACY = {
       {
         h: "Wat we verzamelen",
         list: [
-          "Je e-mailadres, alleen als je je aanmeldt. Het wordt gebruikt om je aan te melden (met een link, een zelfgekozen wachtwoord of Google) en je aangemeld te houden. Het wordt nooit aan andere bezoekers getoond. Wachtwoorden bewaart Supabase alleen versleuteld (gehasht); wij zien ze nooit. Meld je je aan met Google, dan krijgen we van Google alleen je e-mailadres.",
+          "Je e-mailadres, alleen als je je aanmeldt. Het wordt gebruikt om je aan te melden (met een link, een zelfgekozen wachtwoord of Google) en je aangemeld te houden. Het wordt nooit aan andere bezoekers getoond. Wachtwoorden bewaart Supabase alleen versleuteld (gehasht); wij zien ze nooit. Meld je je aan met Google, dan krijgen we van Google ook je naam en profielfoto; die worden alleen getoond als je ze kiest in „Mijn account”.",
           "De weergavenaam die je kiest. Die staat naast je reacties, tenzij je anoniem plaatst.",
+          "Optionele profielgegevens in „Mijn account”: een profielfoto (in je browser verkleind tot een klein vierkant, zonder camera- of locatiegegevens), voor- en achternaam, een korte tekst over jezelf, je favoriete station, thuisland en favoriete trein. Andere bezoekers zien naast je reacties alleen de foto, en je voor- en achternaam alleen als je „mijn naam tonen” aanzet; de rest zie alleen jij. Je kunt alles op elk moment wijzigen of verwijderen.",
           "Je reacties: de tekst, de reden of score die je kiest, of je aangaf aan boord te zijn, de trein en het tijdstip van plaatsen.",
           "Technische gegevens die nodig zijn om de site te laten werken, zoals je IP-adres en browsertype, die onze hostingproviders korte tijd in hun serverlogs bewaren.",
           "Je keuze van taal en land en, als je aangemeld bent, je sessie. Die worden in je eigen browser opgeslagen.",

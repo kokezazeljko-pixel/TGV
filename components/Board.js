@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase";
 import { useSession } from "@/components/useSession";
+import { useProfile } from "@/components/Avatar";
 import { KOFI_URL } from "@/lib/site";
 import { fetchTrainsForDay, fetchTrainsUpdatedSince, fetchCommentCounts, fetchAlertTrainIds } from "@/lib/queries";
 import { statusOf, toMin, fromMin, trainHref, ago, filterTrains, isShuttle, parisNowMin, plannedPf } from "@/lib/format";
@@ -31,6 +32,7 @@ const shiftDay = (iso, n) => new Date(Date.parse(iso + "T12:00:00Z") + n * 86400
 export default function Board({ initialTrains, initialCounts, today, loadError }) {
   const { t, lang } = useLang();
   const { session } = useSession();
+  const { profile } = useProfile(session);
   const [day, setDay] = useState(today); // which day the board shows
   const isPast = day < today;
   const [access, setAccess] = useState(null); // until when this account may see earlier days
@@ -60,11 +62,26 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
   const usedInitial = useRef(false); // the trains sent with the page are used only once, for the default view
 
   // Remember the chosen country in this browser
+  // A link like /?c=ch&station=Lausanne (from "My account") opens that country and station
   useEffect(() => {
+    const qs = new URLSearchParams(window.location.search);
+    const qc = qs.get("c"), qst = qs.get("station");
+    if (qst) setStation(qst.slice(0, 80));
+    if (qc && COUNTRIES.includes(qc)) { if (qc !== DEFAULT_COUNTRY) setCountry(qc); return; }
     let saved = null;
     try { saved = localStorage.getItem("tp-country"); } catch {}
     if (saved && saved !== DEFAULT_COUNTRY && COUNTRIES.includes(saved)) setCountry(saved);
   }, []);
+  // Signed in with a home country and nothing chosen yet in this browser: open on the home country
+  const usedHome = useRef(false);
+  useEffect(() => {
+    if (!profile || usedHome.current) return;
+    usedHome.current = true;
+    let saved = null;
+    try { saved = localStorage.getItem("tp-country"); } catch {}
+    const qs = new URLSearchParams(window.location.search);
+    if (!saved && !qs.get("c") && !qs.get("station") && COUNTRIES.includes(profile.home_country)) setCountry(profile.home_country);
+  }, [profile]);
   const chooseCountry = (c) => {
     if (c === country) return;
     try { localStorage.setItem("tp-country", c); } catch {}
@@ -158,6 +175,14 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
     setStation(name || null);
     if (name) requestAnimationFrame(() => document.querySelector(".mapbox")?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
   };
+  // the ★ button: the favourite station from "My account" (switching to its country if another one is open)
+  const home = profile?.home_station || null;
+  const goHome = () => {
+    if (station === home) return setStation(null);
+    const c = profile.home_country;
+    if (c && country !== "all" && c !== country) chooseCountry(c);
+    pickStation(home);
+  };
 
   // With a station selected, the map and the board show only the trains that stop there
   const shown = useMemo(() => {
@@ -204,6 +229,9 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
             <button key={k} type="button" className="chipbtn" aria-pressed={status === k} onClick={() => setStatus(k)}>{t(l)}</button>
           ))}
         </div>
+        {home && (
+          <button type="button" className="chipbtn starbtn" aria-pressed={station === home} onClick={goHome} title={t("myStation")}>★ {home}</button>
+        )}
         <label className="stationpick">
           <span className="sr">{t("stationPick")}</span>
           <select value={station && stationNames.has(station) ? station : ""} onChange={(e) => pickStation(e.target.value)} aria-label={t("stationPick")}>

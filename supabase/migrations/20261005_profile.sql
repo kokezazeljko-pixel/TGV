@@ -1,0 +1,6 @@
+-- Already applied in Supabase (migration "profile_details_avatars"); kept here as documentation.
+-- profiles: first_name, last_name, show_real_name, avatar_url (own bucket or Google photo only), avatar_preset,
+-- bio, home_station, home_country, fav_train, updated_at (with length checks).
+-- Users may update only those columns of their own row. comments_feed gains author_avatar and shows the real
+-- name only when show_real_name is on. station_list() lists today's stations. Storage bucket "avatars"
+-- (public, 512 KB, webp/jpeg/png); each user may write only in the folder named after their user id.

@@ -1,5 +1,6 @@
 "use client";
 
+import { Avatar } from "@/components/Avatar";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase";
@@ -85,7 +86,7 @@ function OfficialNotices({ alerts: all }) {
   );
 }
 
-const COMMENT_FIELDS = "id,kind,reason,rating,body,onboard,created_at,author_name,is_mine,likes,liked";
+const COMMENT_FIELDS = "id,kind,reason,rating,body,onboard,created_at,author_name,author_avatar,is_mine,likes,liked";
 
 export default function TrainDetail({ initialTrain }) {
   const { t, lang } = useLang();
@@ -374,6 +375,7 @@ function Comment({ c, onDeleted, onLiked, reasonLabel }) {
   return (
     <li className="cm plain">
       <div className="who">
+        <Avatar src={c.author_avatar} name={c.author_name || "?"} size={28} />
         {c.author_name || t("anonName")}
         <span className="when">{ago(c.created_at, t, lang)}</span>
         {c.is_mine && !confirm && <button className="linkbtn" type="button" onClick={() => setConfirm(true)}>{t("del")}</button>}

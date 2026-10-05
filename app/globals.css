@@ -441,3 +441,41 @@ a.primary{display:inline-block;text-decoration:none}
 .orline::before,.orline::after{content:"";flex:1;height:1px;background:var(--line)}
 .authtabs{justify-content:center}
 .authlinks{justify-content:space-between;flex-wrap:wrap}
+
+/* ---- avatars and "My account" */
+.avatar{display:inline-grid;place-items:center;border-radius:50%;flex:none;object-fit:cover;color:#fff;font-weight:700;line-height:1;overflow:hidden;background:var(--surface-2);user-select:none}
+.userlink.withav{display:inline-flex;align-items:center;gap:8px;padding:3px 14px 3px 3px}
+.cm .who{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.starbtn{white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.acct{max-width:980px;margin:28px auto 0;display:grid;gap:16px}
+.acct-hero{display:flex;gap:18px;align-items:center;flex-wrap:wrap;padding:20px}
+.acct-hero .avatar{box-shadow:0 0 0 3px var(--surface),0 0 0 5px var(--line)}
+.acct-id{flex:1 1 260px;min-width:0;display:grid;gap:6px}
+.acct-id h2{margin:0;font-family:var(--f-display);font-size:32px;line-height:1.05;overflow-wrap:anywhere}
+.acct-bio{margin:0;overflow-wrap:anywhere}
+.acct-badges{display:flex;flex-wrap:wrap;gap:6px}
+.lvl{background:var(--accent);color:var(--accent-fg);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;letter-spacing:.03em}
+.chip-s{border:1px solid var(--line);background:var(--surface-2);border-radius:999px;padding:2px 10px;font-size:13px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acct-back{align-self:flex-start;font-weight:600}
+.acct-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:820px){.acct-grid{grid-template-columns:minmax(0,1fr)}}
+.acct .card h3{margin:0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:480px){.two{grid-template-columns:1fr}}
+.fld{display:grid;gap:6px;min-width:0}
+.fld>span{font-size:14px;font-weight:600;color:var(--muted)}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:14px;cursor:pointer}
+.check input{margin-top:3px;width:18px;height:18px;accent-color:var(--accent);flex:none}
+textarea.input{resize:vertical;font:inherit}
+.presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:8px}
+.preset{border:2px solid transparent;background:none;border-radius:50%;padding:2px;cursor:pointer;display:grid;place-items:center;aspect-ratio:1}
+.preset:hover{border-color:var(--line)}
+.preset[aria-pressed="true"]{border-color:var(--accent)}
+.minstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.minstats div{background:var(--surface-2);border-radius:8px;padding:10px 4px;display:grid;gap:2px}
+.minstats b{font-family:var(--f-display);font-size:28px;line-height:1}
+.minstats span{font-size:12px;color:var(--muted)}
+.lvlbar{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden;border:1px solid var(--line)}
+.lvlbar i{display:block;height:100%;background:var(--accent);border-radius:99px}
+.okline{margin:0;font-weight:600;color:var(--good,#15803d)}
+.fld .chipbtn{display:inline-flex;align-items:center;gap:6px}

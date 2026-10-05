@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { getBrowserClient, isConfigured } from "@/lib/supabase";
 import { useSession } from "@/components/useSession";
 import { useLang } from "@/components/LangProvider";
+import Account from "@/components/Account";
 
 // Sign-in: Google, email + own password, or a sign-in link by email. Passwords are kept by Supabase Auth
 // (hashed); the site never sees or stores them.
@@ -28,7 +29,7 @@ export default function LoginPage() {
   if (!isConfigured) return <div className="notice narrow">{t("notConfigured")}</div>;
   if (!ready) return <div className="narrow muted">{t("loading")}</div>;
   if (session && recovery) return <NewPassword onDone={() => setRecovery(false)} />;
-  return session ? <Account session={session} next={next} /> : <SignIn next={next} />;
+  return session ? <Account session={session} next={next} SetPassword={SetPassword} /> : <SignIn next={next} />;
 }
 
 const back = (next, extra = "") => `${window.location.origin}/prijava?next=${encodeURIComponent(next)}${extra}`;
@@ -146,45 +147,6 @@ function NewPassword({ onDone }) {
         <button className="primary" type="submit">{t("savePw")}</button>
         {msg && <div className={`note${msg.err ? " err" : ""}`}>{msg.text}</div>}
       </form>
-    </section>
-  );
-}
-
-function Account({ session, next }) {
-  const { t } = useLang();
-  const sb = getBrowserClient();
-  const [name, setName] = useState("");
-  const [msg, setMsg] = useState(null);
-
-  useEffect(() => {
-    sb.from("profiles").select("display_name").eq("id", session.user.id).maybeSingle().then(({ data }) => {
-      if (data) setName(data.display_name);
-    });
-  }, [sb, session.user.id]);
-
-  async function save(e) {
-    e.preventDefault();
-    const clean = name.trim();
-    if (clean.length < 2 || clean.length > 40) return setMsg({ err: true, text: t("nameLen") });
-    const { error } = await sb.from("profiles").update({ display_name: clean }).eq("id", session.user.id);
-    setMsg(error ? { err: true, text: error.message } : { err: false, text: t("saved") });
-  }
-
-  return (
-    <section className="narrow card stack">
-      <h2>{t("myAccount")}</h2>
-      <p className="muted">{t("signedInAs", session.user.email)}</p>
-      <form className="stack" onSubmit={save}>
-        <label htmlFor="name" className="muted">{t("nameLabel")}</label>
-        <input id="name" className="input" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} />
-        <div className="frow">
-          <button className="primary" type="submit">{t("saveName")}</button>
-          <Link href={next}>{next === "/" ? t("backBoard") : t("backTrain")}</Link>
-        </div>
-        {msg && <div className={`note${msg.err ? " err" : ""}`}>{msg.text}</div>}
-      </form>
-      <SetPassword />
-      <button className="ghost" type="button" onClick={() => sb.auth.signOut()}>{t("signOut")}</button>
     </section>
   );
 }
