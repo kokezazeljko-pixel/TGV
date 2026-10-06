@@ -8,7 +8,7 @@ import { useSession } from "@/components/useSession";
 import { useProfile } from "@/components/Avatar";
 import { KOFI_URL } from "@/lib/site";
 import { fetchTrainsForDay, fetchTrainsUpdatedSince, fetchCommentCounts, fetchAlertTrainIds } from "@/lib/queries";
-import { statusOf, toMin, fromMin, trainHref, ago, filterTrains, isShuttle, parisNowMin, plannedPf } from "@/lib/format";
+import { statusOf, toMin, fromMin, trainHref, ago, filterTrains, isShuttle, parisNowMin, plannedPf, isScheduleOnly, SCHEDULE_ONLY } from "@/lib/format";
 import { getGeo } from "@/lib/geo";
 
 // Map views: all countries together first, then Switzerland, France, Belgium and the Netherlands
@@ -130,7 +130,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
   // Punctuality and average delay are measured on the trains running right now (the ones on the map).
   // Counting the whole day would mix in trains that have not left yet, which always show 0 min.
   const stats = useMemo(() => {
-    const now = running.map((r) => r.tr).filter((x) => !x.cancelled);
+    const now = running.map((r) => r.tr).filter((x) => !x.cancelled && !isScheduleOnly(x)); // timetable-only trains say nothing about punctuality
     const onTime = now.filter((x) => (x.delay_min || 0) < 5).length;
     const sum = now.reduce((a, x) => a + (x.delay_min || 0), 0);
     const avg = now.length ? sum / now.length : 0;
@@ -217,6 +217,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
 
       {stats.lastRt && <p className="muted" style={{ margin: "8px 0 0" }}>{t("updatedSrc", ago(stats.lastRt, t, lang), t("source_" + country))}</p>}
       {loadError && <div className="notice"><b>{t("loadError")}</b> {loadError}</div>}
+      {SCHEDULE_ONLY.has(country) ? <SchedNotice /> : <AskBubble />}
 
       <div className="filters">
         <div className="seg" role="group" aria-label={t("typeGroup")}>
@@ -329,6 +330,33 @@ function HistoryPaywall({ signedIn, onCheck }) {
         {signedIn && <button type="button" className="ghost" onClick={check} disabled={busy}>{busy ? t("loading") : t("histCheck")}</button>}
       </div>
       {msg && <p className="note err">{msg}</p>}
+    </div>
+  );
+}
+
+// Luxembourg (no live data yet): say so, and ask passengers on board to tell the others how it is going
+function SchedNotice() {
+  const { t } = useLang();
+  return (
+    <div className="infobox sched" role="note">
+      <span className="ib-ico" aria-hidden="true">🕒</span>
+      <div><b>{t("schedTitle")}</b><p>{t("schedText")}</p><p className="ib-ask">💬 {t("schedAsk")}</p></div>
+    </div>
+  );
+}
+
+// Speech bubble inviting passengers on a train to post an update (can be closed; remembered in this browser)
+function AskBubble() {
+  const { t } = useLang();
+  const [hidden, setHidden] = useState(true);
+  useEffect(() => { try { setHidden(localStorage.getItem("tp-ask-hidden") === "1"); } catch { setHidden(false); } }, []);
+  if (hidden) return null;
+  const close = () => { setHidden(true); try { localStorage.setItem("tp-ask-hidden", "1"); } catch {} };
+  return (
+    <div className="askbubble" role="note">
+      <span className="ib-ico" aria-hidden="true">💬</span>
+      <div><b>{t("askTitle")}</b><p>{t("askText")}</p></div>
+      <button type="button" className="ib-close" onClick={close} aria-label={t("close")} title={t("close")}>×</button>
     </div>
   );
 }

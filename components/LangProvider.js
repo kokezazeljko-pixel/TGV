@@ -5,7 +5,7 @@ import { DICT, translate } from "@/lib/i18n";
 
 const LangContext = createContext({ lang: "en", setLang: () => {}, t: (k, ...a) => translate("en", k, ...a) });
 
-// Remembers the chosen language in the browser; German and French browsers start in their language
+// Remembers the chosen language in the browser; a browser set to one of the site languages starts in it
 export function LangProvider({ children }) {
   const [lang, setLangState] = useState("en");
 

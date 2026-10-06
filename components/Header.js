@@ -11,7 +11,7 @@ import Logo from "@/components/Logo";
 import SupportButton from "@/components/Support";
 
 // Language buttons show the flag of the language's country (English → United Kingdom)
-const LANG_NAMES = { en: "English", de: "Deutsch", fr: "Français", nl: "Nederlands" };
+const LANG_NAMES = { en: "English", de: "Deutsch", fr: "Français", nl: "Nederlands", es: "Español" };
 const FLAGS = {
   en: (
     <svg viewBox="0 0 60 30" aria-hidden="true">
@@ -34,6 +34,8 @@ const FLAGS = {
   ),
   nl: (
     <svg viewBox="0 0 9 6" aria-hidden="true"><path d="M0 0h9v6H0z" fill="#21468B" /><path d="M0 0h9v4H0z" fill="#fff" /><path d="M0 0h9v2H0z" fill="#AE1C28" /></svg>
+  ),  es: (
+    <svg viewBox="0 0 3 2" aria-hidden="true"><path d="M0 0h3v2H0z" fill="#AA151B" /><path d="M0 .5h3v1H0z" fill="#F1BF00" /></svg>
   ),
 };
 

@@ -389,6 +389,7 @@ a.primary{display:inline-block;text-decoration:none}
 .cpick li button{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;color:var(--fg);padding:8px 10px;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;text-align:left}
 .cpick li button:hover,.cpick li button[aria-selected="true"]{background:var(--surface-2)}
 .cpick .flag + .flag{margin-left:-4px}
+@media (max-width:640px){.cpick ul{left:0;right:auto;max-width:calc(100vw - 32px)}}
 .bsec{padding:9px 16px;background:var(--surface-2);border-bottom:1px solid var(--line);font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
 .bsec.live{color:var(--ok)}
 .bsec .n{font-weight:600;letter-spacing:0;text-transform:none}
@@ -484,3 +485,17 @@ textarea.input{resize:vertical;font:inherit}
 .lvlbar i{display:block;height:100%;background:var(--accent);border-radius:99px}
 .okline{margin:0;font-weight:600;color:var(--good,#15803d)}
 .fld .chipbtn{display:inline-flex;align-items:center;gap:6px}
+
+/* Notes above the board: timetable-only country (Luxembourg) and the invitation to post an update */
+.infobox,.askbubble{display:flex;gap:12px;align-items:flex-start;margin:14px 0 0;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--surface);line-height:1.45}
+.infobox p,.askbubble p{margin:3px 0 0}
+.infobox.sched{background:var(--warn-bg);border-color:transparent;color:var(--fg)}
+.infobox .ib-ask{font-weight:600}
+.infobox.small{margin:12px 0 0;padding:9px 12px;font-size:14px;display:block}
+.ib-ico{font-size:22px;line-height:1.1}
+.askbubble{position:relative;padding-right:40px;background:var(--surface-2)}
+.askbubble::after{content:"";position:absolute;left:26px;bottom:-8px;width:14px;height:14px;background:var(--surface-2);border-right:1px solid var(--line);border-bottom:1px solid var(--line);transform:rotate(45deg)}
+.ib-close{position:absolute;top:6px;right:8px;border:0;background:none;color:var(--muted);font-size:22px;line-height:1;cursor:pointer;padding:4px 6px;border-radius:8px}
+.ib-close:hover{background:var(--line)}
+.s-sched{color:var(--muted);background:var(--surface-2)}
+#map .trn.s-sched .arrow{fill:var(--muted)}

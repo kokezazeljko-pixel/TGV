@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase";
 import { useSession } from "@/components/useSession";
-import { TRAIN_FIELDS, statusOf, toMin, parisTime, parisNowMin, ago, plannedPf } from "@/lib/format";
+import { TRAIN_FIELDS, statusOf, toMin, parisTime, parisNowMin, ago, plannedPf, isScheduleOnly } from "@/lib/format";
 import { REASON_KEYS } from "@/lib/i18n";
 import { useLang } from "@/components/LangProvider";
 import TrainMap from "@/components/TrainMap";
@@ -19,8 +19,8 @@ const routeMapFor = (train) => (getGeo(train.country || "fr").fitsTrain(train) ?
 const paragraphs = (html) => (html || "").replace(/<br\s*\/?>/gi, "\n").split(/<\/p>|\n/i)
   .map((p) => p.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#39;|&rsquo;/g, "’").replace(/&quot;/g, "\"").trim()).filter(Boolean);
 
-const SITE_LANGS = ["en", "de", "fr", "nl"];
-const LANG_NAMES = { en: "English", de: "Deutsch", fr: "Français", it: "Italiano", nl: "Nederlands" };
+const SITE_LANGS = ["en", "de", "fr", "nl", "es"];
+const LANG_NAMES = { en: "English", de: "Deutsch", fr: "Français", it: "Italiano", nl: "Nederlands", es: "Español" };
 // Official languages of each country: a notice the railway published in the reader's language counts as original there
 const OFFICIAL = { fr: ["fr"], ch: ["de", "fr", "it"], be: ["nl", "fr", "de"], nl: ["nl"], lu: ["fr", "de"], es: ["es"] };
 const SOURCE = { fr: "SNCF", ch: "opentransportdata.swiss", be: "SNCB / NMBS", nl: "NS / NDOV", lu: "CFL / mobiliteit.lu", es: "Renfe" };
@@ -146,12 +146,13 @@ export default function TrainDetail({ initialTrain }) {
         <div className="col">
           <section className="card">
             <div className="bigdelay">
-              <div className="n num">{train.cancelled ? t("cancelled") : train.delay_min ? `+${train.delay_min} min` : t("onTimeLbl")}</div>
+              <div className="n num">{train.cancelled ? t("cancelled") : isScheduleOnly(train) ? t("schedLbl") : train.delay_min ? `+${train.delay_min} min` : t("onTimeLbl")}</div>
               <div className="muted">
                 <span className={`pill ${st.cls}`}>{st.label}</span>
-                <div>{train.rt_updated_at ? t("updated", ago(train.rt_updated_at, t, lang)) : departed === false ? t("notStarted") : t("noReport")}</div>
+                <div>{train.rt_updated_at ? t("updated", ago(train.rt_updated_at, t, lang)) : isScheduleOnly(train) ? t("schedShort") : departed === false ? t("notStarted") : t("noReport")}</div>
               </div>
             </div>
+            {isScheduleOnly(train) && <p className="infobox sched small" role="note"><span aria-hidden="true">💬</span> {t("schedTrainAsk")}</p>}
           </section>
 
           <Stops train={train} />

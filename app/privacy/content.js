@@ -1,4 +1,4 @@
-// Privacy policy text in English, German, French and Dutch.
+// Privacy policy text in English, German, French, Dutch and Spanish.
 // Each section: h (heading), p (paragraphs before the list), list, after (paragraphs after the list).
 // Placeholders: {site} = site name, {email} = contact email.
 
@@ -231,6 +231,65 @@ export const PRIVACY = {
       },
       { h: "Kinderen", p: ["De site is niet bedoeld voor kinderen jonger dan 15 jaar. Maak geen account aan als je jonger bent dan 15."] },
       { h: "Wijzigingen", p: ["Als we veranderen hoe we met gegevens omgaan, passen we deze pagina en de datum bovenaan aan."] },
+    ],
+  },
+  es: {
+    title: "Política de privacidad",
+    updated: "Última actualización",
+    intro: "{site} muestra cuánto se retrasan los trenes en Francia, Suiza, Bélgica, los Países Bajos, Luxemburgo y España y permite a los viajeros contar lo que pasa a bordo. Esta página explica qué datos personales trata la web, por qué y qué derechos tienes según el Reglamento General de Protección de Datos de la UE (RGPD) y la Ley Federal suiza de Protección de Datos (LPD).",
+    sections: [
+      { h: "Quién es responsable", p: ["La web la gestiona el operador de {site}, que es el responsable del tratamiento. Puedes escribir al operador a {email} para cualquier pregunta sobre tus datos."] },
+      {
+        h: "Qué datos recogemos",
+        list: [
+          "Tu dirección de correo, solo si inicias sesión. Se usa para iniciar sesión (con un enlace, una contraseña que elijas o Google) y para mantener la sesión abierta. Nunca se muestra a otros visitantes. Supabase guarda las contraseñas solo cifradas (hash); nosotros nunca las vemos. Si inicias sesión con Google, Google también nos comunica tu nombre y tu foto de perfil; solo se muestran si los eliges en «Mi cuenta».",
+          "El nombre que elijas. Se muestra junto a tus comentarios, salvo que publiques de forma anónima.",
+          "Datos de perfil opcionales que añadas en «Mi cuenta»: una foto de perfil (reducida a un pequeño cuadrado en tu navegador, así que no se suben datos de la cámara ni de ubicación), nombre y apellido, un texto breve sobre ti, tu estación favorita, tu país y tu tren favorito. Los demás visitantes solo ven la foto junto a tus comentarios, y tu nombre y apellido solo si activas «mostrar mi nombre»; el resto solo lo ves tú. Puedes cambiarlos o borrarlos cuando quieras.",
+          "Tus comentarios: el texto, el motivo o la valoración que elijas, si indicaste que ibas a bordo, el tren y la hora de publicación.",
+          "Datos técnicos necesarios para que la web funcione, como tu dirección IP y el tipo de navegador, que nuestros proveedores de alojamiento guardan poco tiempo en sus registros.",
+          "El idioma y el país que eliges y, si inicias sesión, tu sesión. Se guardan en tu propio navegador.",
+        ],
+        after: ["Puedes consultar los retrasos sin iniciar sesión. En ese caso no recogemos datos personales, aparte de los registros técnicos del servidor."],
+      },
+      { h: "Qué no hacemos", list: ["No vendemos ni alquilamos tus datos.", "No mostramos anuncios.", "No usamos cookies de seguimiento ni de publicidad, ni herramientas de analítica que te sigan de una web a otra."] },
+      {
+        h: "Por qué usamos tus datos (base legal)",
+        list: [
+          "Para darte una cuenta y publicar tus comentarios: es necesario para prestar el servicio que has pedido (artículo 6(1)(b) del RGPD).",
+          "Para mantener la web segura y evitar spam y abusos, con los registros del servidor y límites de publicación: nuestro interés legítimo (artículo 6(1)(f)).",
+        ],
+      },
+      {
+        h: "Quién trata los datos por nosotros",
+        p: ["Trabajamos con proveedores de confianza que tratan datos por cuenta nuestra:"],
+        list: [
+          "Supabase: base de datos e inicio de sesión. Los datos se guardan en la Unión Europea (Fráncfort, Alemania). Supabase también descarga los horarios y retrasos de los trenes españoles.",
+          "Vercel: alojamiento de la web. Vercel puede tratar datos técnicos, como direcciones IP, fuera de la UE según las cláusulas contractuales tipo de la Comisión Europea.",
+          "Vercel Web Analytics: cuenta las visitas para saber cuántas personas usan la web (páginas vistas, país, tipo de dispositivo, la web de la que vienes). No usa cookies, no guarda tu dirección IP y no crea un perfil tuyo; solo vemos totales.",
+          "GitHub: ejecuta los scripts que descargan los datos de trenes de SNCF, opentransportdata.swiss, SNCB, OVapi (Países Bajos) y data.public.lu (Luxemburgo). Estos scripts no tratan datos de los visitantes.",
+          "Ko-fi: donaciones y pagos por el acceso a días anteriores. Ko-fi (con PayPal o Stripe) gestiona el pago; nosotros solo recibimos la dirección de correo, el importe y un número de transacción, y los usamos para desbloquear el acceso de la cuenta con ese correo.",
+        ],
+      },
+      {
+        h: "Datos de los trenes",
+        p: ["Los horarios y los retrasos en tiempo real proceden del open data de SNCF (transport.data.gouv.fr), para Suiza de opentransportdata.swiss, para Bélgica del open data de SNCB (data.belgianmobility.io), para los Países Bajos del open data de NS / NDOV a través de OVapi (gtfs.ovapi.nl), para Luxemburgo del open data de la Administration des transports publics (data.public.lu, mobiliteit.lu) y para España del open data de Renfe (data.renfe.com). No contienen datos personales."],
+      },
+      {
+        h: "Cuánto tiempo guardamos los datos",
+        list: [
+          "Tu cuenta y tu nombre: hasta que nos pidas borrarlos.",
+          "Tus comentarios: hasta que los borres tú (con «Eliminar» junto a tu comentario) o borres tu cuenta.",
+          "Registros del servidor: los guardan nuestros proveedores de alojamiento durante un tiempo limitado, normalmente de unos días a unas semanas.",
+        ],
+      },
+      {
+        h: "Tus derechos",
+        p: ["Según el RGPD puedes pedir acceder a tus datos, corregirlos, borrarlos, recibir una copia u oponerte a cómo los usamos. Escribe a {email} y te responderemos en un plazo de un mes. También puedes borrar tú mismo cualquiera de tus comentarios cuando quieras."],
+        list2h: "Si no estás satisfecho",
+        list2: "Puedes presentar una reclamación ante una autoridad de protección de datos, por ejemplo la Agencia Española de Protección de Datos (www.aepd.es), el Comisionado Federal de Protección de Datos e Información de Suiza (www.edoeb.admin.ch), la CNIL en Francia (www.cnil.fr) o la autoridad de tu propio país.",
+      },
+      { h: "Menores", p: ["La web no está pensada para menores de 15 años. No crees una cuenta si tienes menos de 15 años."] },
+      { h: "Cambios en esta política", p: ["Si cambiamos cómo tratamos los datos, actualizaremos esta página y la fecha de arriba."] },
     ],
   },
 };
