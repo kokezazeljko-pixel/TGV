@@ -129,7 +129,17 @@ function rows(text) {
   return out;
 }
 var WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-function buildGermanSchedule(zip, dates, inflateRaw) {
+function inRing(ring, lon, lat) {
+  let c = false;
+  for (let i = 0, j = ring.length - 1;i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if (yi > lat !== yj > lat && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi)
+      c = !c;
+  }
+  return c;
+}
+var touchesGermany = (stops, ring) => !ring || new Set(stops.filter((s) => s.lat != null && inRing(ring, s.lon, s.lat)).map((s) => s.name)).size >= 2;
+function buildGermanSchedule(zip, dates, inflateRaw, ring = null) {
   const read = unzip(zip, inflateRaw);
   const ymd = (iso) => iso.replaceAll("-", "");
   const active = new Map(dates.map((d) => [d, new Set]));
@@ -189,6 +199,8 @@ function buildGermanSchedule(zip, dates, inflateRaw) {
         .../^[0-9]{1,3}[a-z]?$/i.test(pf) ? { pf: pf.toUpperCase() } : {}
       };
     });
+    if (!touchesGermany(st, ring))
+      continue;
     for (const d of t.runs)
       out.push({
         id: `${d}_de_${t.id}`,
@@ -239,12 +251,19 @@ function germanUpdates(trains, plan, nowSec) {
     const cat = deCategory(p.cat);
     if (!cat)
       continue;
-    for (const hub of p.hubs || [p.hub]) {
-      if (p.dp_pt)
-        byKey.set(key(hub, cat, p.dp_pt) + "|d", p);
-      if (p.ar_pt)
-        byKey.set(key(hub, cat, p.ar_pt) + "|a", p);
-    }
+    for (const hub of p.hubs || [p.hub])
+      for (const c of [cat, "*"]) {
+        if (p.dp_pt) {
+          const k = key(hub, c, p.dp_pt) + "|d";
+          if (c === cat || !byKey.has(k))
+            byKey.set(k, p);
+        }
+        if (p.ar_pt) {
+          const k = key(hub, c, p.ar_pt) + "|a";
+          if (c === cat || !byKey.has(k))
+            byKey.set(k, p);
+        }
+      }
   }
   const updates = [];
   for (const tr of trains) {
@@ -254,7 +273,7 @@ function germanUpdates(trains, plan, nowSec) {
       const hub = deNorm(s.name);
       const depMin = s.dep ? Math.round(fastEpoch(tr.service_date, s.dep) / 60) : null;
       const arrMin = s.arr ? Math.round(fastEpoch(tr.service_date, s.arr) / 60) : null;
-      const p = depMin && byKey.get(`${hub}|${tr.type}|${depMin}|d`) || arrMin && byKey.get(`${hub}|${tr.type}|${arrMin}|a`);
+      const p = depMin && byKey.get(`${hub}|${tr.type}|${depMin}|d`) || arrMin && byKey.get(`${hub}|${tr.type}|${arrMin}|a`) || depMin && byKey.get(`${hub}|*|${depMin}|d`) || arrMin && byKey.get(`${hub}|*|${arrMin}|a`);
       let skipped = false, apf;
       if (p) {
         any = true;
@@ -290,6 +309,8 @@ function germanUpdates(trains, plan, nowSec) {
   }
   return updates;
 }
+// ../../../lib/network-de.json (only the outline of Germany is used)
+var network_de_default = { land: [[[7.2,53.25],[7.05,53.6],[7.7,53.7],[8.1,53.55],[8.5,53.55],[8.7,53.87],[8.95,53.9],[8.85,54.13],[8.95,54.5],[8.6,54.9],[9.43,54.83],[9.95,54.75],[10.15,54.4],[10.8,54.3],[11.1,54.45],[10.85,53.95],[11.45,53.9],[12.1,54.18],[12.5,54.47],[13.15,54.4],[13.4,54.65],[13.75,54.25],[14.25,53.9],[14.4,53.3],[14.15,52.85],[14.6,52.6],[14.7,52.1],[14.95,51.45],[15.04,51.0],[14.8,50.85],[14.3,50.88],[13.85,50.73],[13.0,50.45],[12.25,50.25],[12.2,50.1],[12.5,49.7],[12.9,49.35],[13.4,48.95],[13.8,48.75],[13.45,48.57],[13.0,48.25],[12.75,48.13],[12.95,47.95],[13.0,47.75],[13.0,47.45],[12.75,47.68],[12.2,47.6],[11.6,47.58],[11.1,47.4],[10.45,47.55],[10.2,47.3],[9.75,47.55],[9.2,47.65],[8.87,47.66],[8.78,47.73],[8.65,47.8],[8.47,47.76],[8.55,47.62],[8.2,47.6],[7.6,47.58],[7.55,48.1],[7.8,48.6],[8.2,48.98],[7.6,49.08],[7.0,49.12],[7.03,49.19],[6.95,49.225],[6.86,49.22],[6.7,49.2],[6.37,49.46],[6.42,49.55],[6.5,49.71],[6.52,49.81],[6.42,49.81],[6.32,49.84],[6.24,49.9],[6.18,49.95],[6.13,50.05],[6.13,50.13],[6.13,50.18],[6.4,50.32],[6.18,50.55],[6.02,50.75],[6.08,50.92],[5.87,51.05],[6.08,51.17],[6.22,51.36],[6.22,51.51],[6.05,51.66],[5.95,51.81],[6.17,51.9],[6.4,51.83],[6.83,51.97],[6.7,52.03],[7.03,52.23],[7.07,52.39],[6.98,52.46],[6.7,52.49],[6.73,52.65],[7.07,52.84],[7.2,52.98],[7.21,53.18]]] };
 
 // source.mjs
 var URL_ = Deno.env.get("SUPABASE_URL");
@@ -326,7 +347,7 @@ async function schedule() {
   if (!res.ok)
     throw new Error(`gtfs.de -> ${res.status}`);
   const zip = new Uint8Array(await res.arrayBuffer());
-  const rows = buildGermanSchedule(zip, dates, (d) => inflateRawSync(d));
+  const rows = buildGermanSchedule(zip, dates, (d) => inflateRawSync(d), network_de_default.land[0]);
   for (let i = 0;i < rows.length; i += 400)
     await upsert("trains", rows.slice(i, i + 400).map(({ number, ...r }) => r), "id");
   const fresh = new Set(rows.map((r) => r.id));
@@ -365,7 +386,7 @@ async function pollHub(h, now) {
     const xml = await tt(`plan/${eva}/${g("year")}${g("month")}${g("day")}/${g("hour")}`);
     calls++;
     const { station, stops } = parseTimetable(xml);
-    const rows = stops.filter((s) => s.tl && s.tl.f === "F" && deCategory(s.tl.c)).map((s) => ({
+    const rows = stops.filter((s) => s.tl && deCategory(s.tl.c)).map((s) => ({
       eva,
       sid: s.sid,
       day: parisDate(0, new Date(ttTime(s.dp?.pt || s.ar?.pt) || hr)),
@@ -432,7 +453,7 @@ async function realtime() {
       if (st.length < 2)
         continue;
       const a = fastEpoch(r.service_date, st[0].dep || st[0].arr), b = fastEpoch(r.service_date, st[st.length - 1].arr || st[st.length - 1].dep);
-      if (now >= a - 3600 && now <= b + 7200 + (r.delay_min || 0) * 60)
+      if (now >= a - 3 * 3600 && now <= b + 7200 + (r.delay_min || 0) * 60)
         trains.push(r);
     }
     if (page.length < 1000)

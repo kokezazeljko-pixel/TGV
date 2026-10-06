@@ -6,6 +6,7 @@
 import { inflateRawSync } from "node:zlib";
 import { DE_GTFS_URL, DE_TT_BASE, buildGermanSchedule, parseTimetable, ttTime, deNorm, deCategory, germanUpdates, fastEpoch } from "../../../ingest/lib/germany.mjs";
 import { parisDate, gtfsToEpoch } from "../../../ingest/lib/util.mjs";
+import DE_NET from "../../../lib/network-de.json" with { type: "json" };
 
 const URL_ = Deno.env.get("SUPABASE_URL");
 const KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -38,7 +39,7 @@ async function schedule() {
   const res = await fetch(DE_GTFS_URL, { headers: UA });
   if (!res.ok) throw new Error(`gtfs.de -> ${res.status}`);
   const zip = new Uint8Array(await res.arrayBuffer());
-  const rows = buildGermanSchedule(zip, dates, (d) => inflateRawSync(d));
+  const rows = buildGermanSchedule(zip, dates, (d) => inflateRawSync(d), DE_NET.land[0]);
   // keep numbers and live data already found for these trains (the timetable is reloaded every day)
   for (let i = 0; i < rows.length; i += 400) await upsert("trains", rows.slice(i, i + 400).map(({ number, ...r }) => r), "id");
   // a new timetable can rename trips: old rows of the same days are removed
@@ -76,7 +77,8 @@ async function pollHub(h, now) {
     const g = (t) => p.find((x) => x.type === t).value;
     const xml = await tt(`plan/${eva}/${g("year")}${g("month")}${g("day")}/${g("hour")}`); calls++;
     const { station, stops } = parseTimetable(xml);
-    const rows = stops.filter((s) => s.tl && s.tl.f === "F" && deCategory(s.tl.c)).map((s) => ({
+    // every operator counts: EC/RJ/NJ run by ÖBB, SBB, PKP or DSB are not flagged "F" (long distance) by DB
+    const rows = stops.filter((s) => s.tl && deCategory(s.tl.c)).map((s) => ({
       eva, sid: s.sid, day: parisDate(0, new Date(ttTime(s.dp?.pt || s.ar?.pt) || hr)), cat: s.tl.c, num: s.tl.n,
       ar_pt: ttTime(s.ar?.pt), dp_pt: ttTime(s.dp?.pt), pp: s.dp?.pp || s.ar?.pp || null,
     }));
@@ -122,7 +124,7 @@ async function realtime() {
     for (const r of page) {
       const st = r.stops || []; if (st.length < 2) continue;
       const a = fastEpoch(r.service_date, st[0].dep || st[0].arr), b = fastEpoch(r.service_date, st[st.length - 1].arr || st[st.length - 1].dep);
-      if (now >= a - 3600 && now <= b + 7200 + (r.delay_min || 0) * 60) trains.push(r);
+      if (now >= a - 3 * 3600 && now <= b + 7200 + (r.delay_min || 0) * 60) trains.push(r);
     }
     if (page.length < 1000) break;
   }

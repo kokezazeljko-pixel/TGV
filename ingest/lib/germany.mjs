@@ -80,7 +80,19 @@ function rows(text) {
 
 const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 // zip (Uint8Array) -> rows for the trains table (country "de") for the given days (YYYY-MM-DD)
-export function buildGermanSchedule(zip, dates, inflateRaw) {
+// gtfs.de also lists trains that run only abroad (Poland, Denmark, Austria, Switzerland...): only trains with at least
+// two stations inside Germany are kept (ring = outline of Germany, [lon, lat] points, from lib/network-de.json)
+function inRing(ring, lon, lat) {
+  let c = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if (yi > lat !== yj > lat && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) c = !c;
+  }
+  return c;
+}
+export const touchesGermany = (stops, ring) => !ring || new Set(stops.filter((s) => s.lat != null && inRing(ring, s.lon, s.lat)).map((s) => s.name)).size >= 2;
+
+export function buildGermanSchedule(zip, dates, inflateRaw, ring = null) {
   const read = unzip(zip, inflateRaw);
   const ymd = (iso) => iso.replaceAll("-", "");
   const active = new Map(dates.map((d) => [d, new Set()]));
@@ -122,6 +134,7 @@ export function buildGermanSchedule(zip, dates, inflateRaw) {
         ...(Number.isFinite(lat) ? { lat: Math.round(lat * 1e4) / 1e4, lon: Math.round(lon * 1e4) / 1e4 } : {}),
         ...(/^[0-9]{1,3}[a-z]?$/i.test(pf) ? { pf: pf.toUpperCase() } : {}) };
     });
+    if (!touchesGermany(st, ring)) continue;
     for (const d of t.runs) out.push({
       id: `${d}_de_${t.id}`, trip_id: t.id, service_date: d, country: "de",
       number: "", type: t.type, origin: st[0].name, destination: st[st.length - 1].name,
@@ -154,12 +167,13 @@ export function ttTime(s) { // "2610052051" -> ISO timestamp (Europe/Berlin = Eu
 // plan rows: { hubs: [normalized station names], cat, num, ar_pt, dp_pt, ar_ct, dp_ct, pp, cp, cs }
 export function germanUpdates(trains, plan, nowSec) {
   const key = (hub, cat, iso) => `${hub}|${cat}|${iso ? Math.round(Date.parse(iso) / 60000) : ""}`;
+  // gtfs.de and DB can name the category differently (EC / IC / RJ): the same station and minute without the category is the fallback
   const byKey = new Map();
   for (const p of plan) {
     const cat = deCategory(p.cat); if (!cat) continue;
-    for (const hub of p.hubs || [p.hub]) {
-      if (p.dp_pt) byKey.set(key(hub, cat, p.dp_pt) + "|d", p);
-      if (p.ar_pt) byKey.set(key(hub, cat, p.ar_pt) + "|a", p);
+    for (const hub of p.hubs || [p.hub]) for (const c of [cat, "*"]) {
+      if (p.dp_pt) { const k = key(hub, c, p.dp_pt) + "|d"; if (c === cat || !byKey.has(k)) byKey.set(k, p); }
+      if (p.ar_pt) { const k = key(hub, c, p.ar_pt) + "|a"; if (c === cat || !byKey.has(k)) byKey.set(k, p); }
     }
   }
   const updates = [];
@@ -170,7 +184,8 @@ export function germanUpdates(trains, plan, nowSec) {
       const hub = deNorm(s.name);
       const depMin = s.dep ? Math.round(fastEpoch(tr.service_date, s.dep) / 60) : null;
       const arrMin = s.arr ? Math.round(fastEpoch(tr.service_date, s.arr) / 60) : null;
-      const p = (depMin && byKey.get(`${hub}|${tr.type}|${depMin}|d`)) || (arrMin && byKey.get(`${hub}|${tr.type}|${arrMin}|a`));
+      const p = (depMin && byKey.get(`${hub}|${tr.type}|${depMin}|d`)) || (arrMin && byKey.get(`${hub}|${tr.type}|${arrMin}|a`))
+        || (depMin && byKey.get(`${hub}|*|${depMin}|d`)) || (arrMin && byKey.get(`${hub}|*|${arrMin}|a`));
       let skipped = false, apf;
       if (p) {
         any = true;
