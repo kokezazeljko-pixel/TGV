@@ -29,6 +29,29 @@ const OFFICIAL = { fr: ["fr"], ch: ["de", "fr", "it"], be: ["nl", "fr", "de"], n
 const SOURCE = { fr: "SNCF", ch: "opentransportdata.swiss", be: "SNCB / NMBS", nl: "NS / NDOV", lu: "CFL / mobiliteit.lu", es: "Renfe", pt: "CP" };
 const gtranslate = (text, to) => `https://translate.google.com/?sl=auto&tl=${to}&text=${encodeURIComponent(text.slice(0, 4500))}&op=translate`;
 
+// The train's route on a large map, over the whole page (opened from the small route map; Esc or × closes it)
+function BigRouteMap({ train, onClose }) {
+  const { t } = useLang();
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden"; // the page behind does not scroll
+    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = overflow; };
+  }, [onClose]);
+  return (
+    <div className="mapmodal" role="dialog" aria-modal="true" aria-label={`${t("routeMap")}: ${train.type} ${train.number}`} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="mapmodal-box">
+        <div className="mapmodal-head">
+          <h3>{train.type} {train.number} <span className="muted">· {train.origin} → {train.destination}</span></h3>
+          <button type="button" className="mapmodal-close" onClick={onClose} aria-label={t("close")} title={t("close")}>×</button>
+        </div>
+        <TrainMap country={routeMapFor(train)} trains={[train]} highlight={train} compact big />
+      </div>
+    </div>
+  );
+}
+
 // Shown in the railway's original language first; the reader can switch to the other site languages.
 // Uses the railway's own translation when the feed has one, otherwise offers a Google Translate link.
 function OfficialNotices({ alerts: all }) {
@@ -127,6 +150,7 @@ export default function TrainDetail({ initialTrain }) {
   const st = statusOf(train, t);
   // Has the train left its first station yet? (computed in the browser, Paris time)
   const [departed, setDeparted] = useState(null);
+  const [bigMap, setBigMap] = useState(false);
   useEffect(() => { setDeparted(localNowMin(train.country) >= toMin(train.dep) + (train.stops?.[0]?.delay || 0)); }, [train]);
   const tally = useMemo(() => {
     const m = {};
@@ -164,8 +188,9 @@ export default function TrainDetail({ initialTrain }) {
 
           <section className="card">
             <h3>{t("routeMap")}</h3>
-            <TrainMap country={routeMapFor(train)} trains={[train]} highlight={train} compact />
+            <TrainMap country={routeMapFor(train)} trains={[train]} highlight={train} compact onExpand={() => setBigMap(true)} />
           </section>
+          {bigMap && <BigRouteMap train={train} onClose={() => setBigMap(false)} />}
 
           <section className="card">
             <h3>{t("whyTitle")}</h3>

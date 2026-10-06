@@ -17,7 +17,8 @@ const TIER_A = new Set(["Lille", "Strasbourg", "Lyon", "Marseille", "Bordeaux", 
  */
 export const MAP_STYLES = ["classic", "dark"];
 
-export default function TrainMap({ country = "fr", trains, onTrainClick, onStationClick, selectedStation, highlight, onRunning, compact }) {
+// onExpand (route view on the train page): a click on the small map, or the ⛶ button, opens it large; big = shown in that large window
+export default function TrainMap({ country = "fr", trains, onTrainClick, onStationClick, selectedStation, highlight, onRunning, compact, onExpand, big }) {
   const { t } = useLang();
   // Map look chosen by the visitor (Classic / Dark), remembered in this browser
   const [mapStyle, setMapStyle] = useState("classic");
@@ -181,10 +182,11 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
   }, [selectedStation]);
 
   return (
-    <div className={"mapbox style-" + mapStyle + (compact && highlight ? " routeview" : "")} style={{ aspectRatio: compact && highlight ? "16 / 10" : `${W} / ${H}` }}>
+    <div className={"mapbox style-" + mapStyle + (compact && highlight ? " routeview" : "") + (big ? " big" : "") + (onExpand ? " expandable" : "")} style={big ? undefined : { aspectRatio: compact && highlight ? "16 / 10" : `${W} / ${H}` }}>
       <svg
         ref={svgRef} id="map" role="img" aria-label={t(country === "fr" ? "mapLabel" : "mapLabel_" + country)} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet"
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
+        onClick={onExpand ? () => { if (!d.moved) onExpand(); } : undefined}
       >
         <BaseMap geo={geo} />
         <GeoLabels geo={geo} />
@@ -216,6 +218,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
         <button type="button" title={t("zin")} aria-label={t("zin")} onClick={() => zoomAt(...center(), 1.6)}>+</button>
         <button type="button" title={t("zout")} aria-label={t("zout")} onClick={() => zoomAt(...center(), 1 / 1.6)}>−</button>
         <button type="button" className="small" title={t("zreset")} aria-label={t("zreset")} onClick={() => { view.current = { x: 0, y: 0, w: W, h: H }; applyView(); }}>⤢</button>
+        {onExpand && <button type="button" className="small expand" title={t("mapFull")} aria-label={t("mapFull")} onClick={onExpand}>⛶</button>}
       </div>
       {!compact && <div className="maphint">{t("hint")}</div>}
       {(!compact || highlight) && (
