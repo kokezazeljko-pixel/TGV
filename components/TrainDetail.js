@@ -25,8 +25,8 @@ const paragraphs = (html) => (html || "").replace(/<br\s*\/?>/gi, "\n").split(/<
 const SITE_LANGS = ["en", "de", "fr", "nl", "es"];
 const LANG_NAMES = { en: "English", de: "Deutsch", fr: "Français", it: "Italiano", nl: "Nederlands", es: "Español" };
 // Official languages of each country: a notice the railway published in the reader's language counts as original there
-const OFFICIAL = { fr: ["fr"], ch: ["de", "fr", "it"], be: ["nl", "fr", "de"], nl: ["nl"], lu: ["fr", "de"], es: ["es"], pt: ["pt"] };
-const SOURCE = { fr: "SNCF", ch: "opentransportdata.swiss", be: "SNCB / NMBS", nl: "NS / NDOV", lu: "CFL / mobiliteit.lu", es: "Renfe", pt: "CP" };
+const OFFICIAL = { fr: ["fr"], ch: ["de", "fr", "it"], be: ["nl", "fr", "de"], nl: ["nl"], lu: ["fr", "de"], es: ["es"], pt: ["pt"], de: ["de"] };
+const SOURCE = { fr: "SNCF", ch: "opentransportdata.swiss", be: "SNCB / NMBS", nl: "NS / NDOV", lu: "CFL / mobiliteit.lu", es: "Renfe", pt: "CP", de: "Deutsche Bahn" };
 const gtranslate = (text, to) => `https://translate.google.com/?sl=auto&tl=${to}&text=${encodeURIComponent(text.slice(0, 4500))}&op=translate`;
 
 // The train's route on a large map, over the whole page (opened from the small route map; Esc or × closes it)

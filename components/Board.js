@@ -12,7 +12,7 @@ import { statusOf, toMin, fromMin, trainHref, ago, filterTrains, isShuttle, pari
 import { getGeo } from "@/lib/geo";
 
 // Map views: all countries together first, then Switzerland, France, Belgium and the Netherlands
-const COUNTRIES = ["all", "ch", "fr", "es", "pt", "be", "nl", "lu"];
+const COUNTRIES = ["all", "ch", "fr", "de", "es", "pt", "be", "nl", "lu"];
 const REAL = COUNTRIES.slice(1);
 const DEFAULT_COUNTRY = "all"; // the server sends this view's trains with the page
 import { useLang } from "@/components/LangProvider";
@@ -406,7 +406,7 @@ function Row({ tr, n, live, flag, notice }) {
   return (
     <Link href={trainHref(tr.id)} className="row" aria-label={`${tr.type} ${tr.number}, ${tr.origin} – ${tr.destination}, ${st.label}`}>
       <div className="time num c-time">{late ? <>{fromMin(toMin(tr.dep) + tr.delay_min)}<s>{tr.dep}</s></> : tr.dep}</div>
-      <div className="c-train"><div className="tnum num">{flag && <span className={`flag mini flag-${tr.country}`} aria-hidden="true" />}{tr.number}</div><span className="ttype">{tr.type}</span></div>
+      <div className="c-train"><div className="tnum num">{flag && <span className={`flag mini flag-${tr.country}`} aria-hidden="true" />}{tr.number || "–"}</div><span className="ttype">{tr.type}</span></div>
       <div className="route">
         <b>{tr.origin} → {tr.destination}{live && <span className="livetag">● {t("live")}</span>}{notice && <span className="noticetag" title={t("hasNotice")}>⚠ {t("hasNotice")}</span>}</b>
         {via.length > 0 && <span className="via">{t("via")} {via.join(", ")}</span>}

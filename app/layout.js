@@ -12,10 +12,10 @@ const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["500", "700"], variab
 
 export const metadata = {
   metadataBase: new URL(SITE_URL),
-  title: { default: "Train Punctuality – train delays in France, Switzerland, Belgium, the Netherlands, Luxembourg, Spain and Portugal", template: "%s · Train Punctuality" },
-  description: "How late is your train in France (TGV), Switzerland (IC, IR, EC), Belgium (IC, EC) the Netherlands (NS Intercity, ICE, Eurostar) Luxembourg (CFL), Spain (AVE, Alvia) and Portugal (Alfa Pendular, Intercidades), and what passengers on board are saying. Zugverspätungen und Berichte von Reisenden. Retards des trains et avis des voyageurs. Treinvertragingen en meldingen van reizigers.",
+  title: { default: "Train Punctuality – train delays in France, Switzerland, Belgium, the Netherlands, Luxembourg, Germany, Spain and Portugal", template: "%s · Train Punctuality" },
+  description: "How late is your train in France (TGV), Switzerland (IC, IR, EC), Belgium (IC, EC) the Netherlands (NS Intercity, ICE, Eurostar) Luxembourg (CFL), Germany (ICE, IC), Spain (AVE, Alvia) and Portugal (Alfa Pendular, Intercidades), and what passengers on board are saying. Zugverspätungen und Berichte von Reisenden. Retards des trains et avis des voyageurs. Treinvertragingen en meldingen van reizigers.",
   alternates: { canonical: "/" },
-  openGraph: { title: "Train Punctuality – train delays in France, Switzerland, Belgium, the Netherlands, Luxembourg, Spain and Portugal", description: "Live train delays in France, Switzerland, Belgium, the Netherlands, Luxembourg, Spain and Portugal and reports from passengers on board.", url: "/", siteName: "Train Punctuality", type: "website" },
+  openGraph: { title: "Train Punctuality – train delays in France, Switzerland, Belgium, the Netherlands, Luxembourg, Germany, Spain and Portugal", description: "Live train delays in France, Switzerland, Belgium, the Netherlands, Luxembourg, Germany, Spain and Portugal and reports from passengers on board.", url: "/", siteName: "Train Punctuality", type: "website" },
 };
 
 export const viewport = { themeColor: "#16233f" };
