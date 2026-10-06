@@ -178,18 +178,21 @@ export function germanUpdates(trains, plan, nowSec) {
   }
   const updates = [];
   for (const tr of trains) {
-    let carry = null, any = false, number = null, cancelledAll = true;
+    let carry = null, any = false, cancelledAll = true;
+    const votes = new Map(); // train number seen at each matched station: the most common one wins
     const d = [];
-    for (const s of tr.stops) {
+    for (const [i, s] of tr.stops.entries()) {
       const hub = deNorm(s.name);
-      const depMin = s.dep ? Math.round(fastEpoch(tr.service_date, s.dep) / 60) : null;
-      const arrMin = s.arr ? Math.round(fastEpoch(tr.service_date, s.arr) / 60) : null;
+      // gtfs.de gives the first and last stop both times: the train only departs from the first and only arrives at the last
+      // (otherwise a train leaving the terminus at that minute, e.g. IC 285 Stuttgart–Zürich, would be taken for this one)
+      const depMin = s.dep && i < tr.stops.length - 1 ? Math.round(fastEpoch(tr.service_date, s.dep) / 60) : null;
+      const arrMin = s.arr && i > 0 ? Math.round(fastEpoch(tr.service_date, s.arr) / 60) : null;
       const p = (depMin && byKey.get(`${hub}|${tr.type}|${depMin}|d`)) || (arrMin && byKey.get(`${hub}|${tr.type}|${arrMin}|a`))
         || (depMin && byKey.get(`${hub}|*|${depMin}|d`)) || (arrMin && byKey.get(`${hub}|*|${arrMin}|a`));
       let skipped = false, apf;
       if (p) {
         any = true;
-        if (p.num) number = p.num;
+        if (p.num) votes.set(p.num, (votes.get(p.num) || 0) + 1);
         const sec = p.dp_ct && p.dp_pt ? (Date.parse(p.dp_ct) - Date.parse(p.dp_pt)) / 1000 : p.ar_ct && p.ar_pt ? (Date.parse(p.ar_ct) - Date.parse(p.ar_pt)) / 1000 : (p.dp_pt || p.ar_pt) ? 0 : null;
         if (sec != null) carry = sec;
         if (p.cs === "c") skipped = true;
@@ -200,6 +203,7 @@ export function germanUpdates(trains, plan, nowSec) {
       d.push(apf ? [delay, skipped, apf] : [delay, skipped]);
     }
     if (!any) continue;
+    const number = [...votes].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
     // current delay = at the next stop not reached yet
     let delay_min = d.length ? d[d.length - 1][0] : 0;
     for (let i = 0; i < tr.stops.length; i++) {
