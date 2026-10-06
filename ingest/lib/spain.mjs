@@ -24,7 +24,7 @@ const ES_HONOURS = /-(Clara Campoamor|Almudena Grandes|Julio Anguita|Fernando ZÃ
 export const esStopName = (raw = "") => { const name = raw.trim(); return ES_NAMES[name] || name.replace(ES_HONOURS, ""); };
 
 // ---- minimal ZIP reading (Node and Deno; inflateRaw is passed in)
-function unzip(buf, inflateRaw) {
+export function unzip(buf, inflateRaw) {
   const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   let e = -1;
   for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { e = i; break; }
@@ -44,8 +44,8 @@ function unzip(buf, inflateRaw) {
     return td.decode(f.method === 8 ? inflateRaw(data) : data);
   };
 }
-// Renfe pads every line with spaces to a fixed width; no field is quoted. keep(firstField) skips unwanted lines cheaply.
-function eachLine(text, onRow, keep = null) {
+// Renfe pads every line with spaces to a fixed width; no field is quoted (also used for the Portuguese CP feed). keep(firstField) skips unwanted lines cheaply.
+export function eachLine(text, onRow, keep = null) {
   let start = 0, head = null;
   while (start < text.length) {
     let end = text.indexOf("\n", start); if (end < 0) end = text.length;

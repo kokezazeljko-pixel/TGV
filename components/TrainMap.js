@@ -172,7 +172,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
     const pts = [pt, ...trains.map((tr) => trainPos(tr, nowMin)).filter(Boolean).map((p) => p.xy)];
     let x0 = Math.min(...pts.map((p) => p[0])), x1 = Math.max(...pts.map((p) => p[0]));
     let y0 = Math.min(...pts.map((p) => p[1])), y1 = Math.max(...pts.map((p) => p[1]));
-    const minW = W / (country === "ch" || country === "be" || country === "nl" || country === "lu" ? 2.6 : country === "es" ? 3.2 : country === "all" ? 6 : 4.5);
+    const minW = W / (country === "ch" || country === "be" || country === "nl" || country === "lu" || country === "pt" ? 2.6 : country === "es" ? 3.2 : country === "all" ? 6 : 4.5);
     let w = Math.max(minW, (x1 - x0) * 1.25, ((y1 - y0) * 1.25 * W) / H);
     w = Math.min(W, w);
     const h = (w * H) / W, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;

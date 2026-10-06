@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase";
 import { useSession } from "@/components/useSession";
-import { TRAIN_FIELDS, statusOf, toMin, parisTime, parisNowMin, ago, plannedPf, isScheduleOnly } from "@/lib/format";
+import { TRAIN_FIELDS, statusOf, toMin, parisTime, parisNowMin, ago, plannedPf, isScheduleOnly, localNowMin } from "@/lib/format";
 import { REASON_KEYS } from "@/lib/i18n";
 import { useLang } from "@/components/LangProvider";
 import TrainMap from "@/components/TrainMap";
@@ -22,8 +22,8 @@ const paragraphs = (html) => (html || "").replace(/<br\s*\/?>/gi, "\n").split(/<
 const SITE_LANGS = ["en", "de", "fr", "nl", "es"];
 const LANG_NAMES = { en: "English", de: "Deutsch", fr: "Français", it: "Italiano", nl: "Nederlands", es: "Español" };
 // Official languages of each country: a notice the railway published in the reader's language counts as original there
-const OFFICIAL = { fr: ["fr"], ch: ["de", "fr", "it"], be: ["nl", "fr", "de"], nl: ["nl"], lu: ["fr", "de"], es: ["es"] };
-const SOURCE = { fr: "SNCF", ch: "opentransportdata.swiss", be: "SNCB / NMBS", nl: "NS / NDOV", lu: "CFL / mobiliteit.lu", es: "Renfe" };
+const OFFICIAL = { fr: ["fr"], ch: ["de", "fr", "it"], be: ["nl", "fr", "de"], nl: ["nl"], lu: ["fr", "de"], es: ["es"], pt: ["pt"] };
+const SOURCE = { fr: "SNCF", ch: "opentransportdata.swiss", be: "SNCB / NMBS", nl: "NS / NDOV", lu: "CFL / mobiliteit.lu", es: "Renfe", pt: "CP" };
 const gtranslate = (text, to) => `https://translate.google.com/?sl=auto&tl=${to}&text=${encodeURIComponent(text.slice(0, 4500))}&op=translate`;
 
 // Shown in the railway's original language first; the reader can switch to the other site languages.
@@ -124,7 +124,7 @@ export default function TrainDetail({ initialTrain }) {
   const st = statusOf(train, t);
   // Has the train left its first station yet? (computed in the browser, Paris time)
   const [departed, setDeparted] = useState(null);
-  useEffect(() => { setDeparted(parisNowMin() >= toMin(train.dep) + (train.stops?.[0]?.delay || 0)); }, [train]);
+  useEffect(() => { setDeparted(localNowMin(train.country) >= toMin(train.dep) + (train.stops?.[0]?.delay || 0)); }, [train]);
   const tally = useMemo(() => {
     const m = {};
     for (const c of comments) if (c.reason) m[c.reason] = (m[c.reason] || 0) + 1;
@@ -152,7 +152,7 @@ export default function TrainDetail({ initialTrain }) {
                 <div>{train.rt_updated_at ? t("updated", ago(train.rt_updated_at, t, lang)) : isScheduleOnly(train) ? t("schedShort") : departed === false ? t("notStarted") : t("noReport")}</div>
               </div>
             </div>
-            {isScheduleOnly(train) && <p className="infobox sched small" role="note"><span aria-hidden="true">💬</span> {t("schedTrainAsk")}</p>}
+            {isScheduleOnly(train) && <p className="infobox sched small" role="note"><span aria-hidden="true">💬</span> {t("schedTrainAsk", t("country_" + train.country))}</p>}
           </section>
 
           <Stops train={train} />

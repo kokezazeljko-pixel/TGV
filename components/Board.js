@@ -12,7 +12,7 @@ import { statusOf, toMin, fromMin, trainHref, ago, filterTrains, isShuttle, pari
 import { getGeo } from "@/lib/geo";
 
 // Map views: all countries together first, then Switzerland, France, Belgium and the Netherlands
-const COUNTRIES = ["all", "ch", "fr", "es", "be", "nl", "lu"];
+const COUNTRIES = ["all", "ch", "fr", "es", "pt", "be", "nl", "lu"];
 const REAL = COUNTRIES.slice(1);
 const DEFAULT_COUNTRY = "all"; // the server sends this view's trains with the page
 import { useLang } from "@/components/LangProvider";
@@ -217,7 +217,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
 
       {stats.lastRt && <p className="muted" style={{ margin: "8px 0 0" }}>{t("updatedSrc", ago(stats.lastRt, t, lang), t("source_" + country))}</p>}
       {loadError && <div className="notice"><b>{t("loadError")}</b> {loadError}</div>}
-      {SCHEDULE_ONLY.has(country) ? <SchedNotice /> : <AskBubble />}
+      {SCHEDULE_ONLY.has(country) ? <SchedNotice country={country} /> : <AskBubble />}
 
       <div className="filters">
         <div className="seg" role="group" aria-label={t("typeGroup")}>
@@ -334,13 +334,13 @@ function HistoryPaywall({ signedIn, onCheck }) {
   );
 }
 
-// Luxembourg (no live data yet): say so, and ask passengers on board to tell the others how it is going
-function SchedNotice() {
+// Luxembourg and Portugal (no live data yet): say so, and ask passengers on board to tell the others how it is going
+function SchedNotice({ country }) {
   const { t } = useLang();
   return (
     <div className="infobox sched" role="note">
       <span className="ib-ico" aria-hidden="true">🕒</span>
-      <div><b>{t("schedTitle")}</b><p>{t("schedText")}</p><p className="ib-ask">💬 {t("schedAsk")}</p></div>
+      <div><b>{t("schedTitle", t("country_" + country))}</b><p>{t("schedText", t("country_" + country))}</p><p className="ib-ask">💬 {t("schedAsk", t("country_" + country))}</p></div>
     </div>
   );
 }
