@@ -34,8 +34,10 @@ const FLAGS = {
   ),
   nl: (
     <svg viewBox="0 0 9 6" aria-hidden="true"><path d="M0 0h9v6H0z" fill="#21468B" /><path d="M0 0h9v4H0z" fill="#fff" /><path d="M0 0h9v2H0z" fill="#AE1C28" /></svg>
-  ),  es: (
-    <svg viewBox="0 0 3 2" aria-hidden="true"><path d="M0 0h3v2H0z" fill="#AA151B" /><path d="M0 .5h3v1H0z" fill="#F1BF00" /></svg>
+  ),
+  // Spain: the official flag with the coat of arms, simplified so it stays readable at this size
+  es: (
+    <svg viewBox="0 0 750 500" aria-hidden="true"><rect width="750" height="500" fill="#AA151B" /><rect y="125" width="750" height="250" fill="#F1BF00" /><g transform="translate(250 250)"><rect x="-98" y="-58" width="22" height="120" fill="#CCCCCC" stroke="#AA151B" strokeWidth="5" /><rect x="76" y="-58" width="22" height="120" fill="#CCCCCC" stroke="#AA151B" strokeWidth="5" /><rect x="-106" y="-72" width="38" height="16" fill="#F1BF00" stroke="#AA151B" strokeWidth="4" /><rect x="68" y="-72" width="38" height="16" fill="#F1BF00" stroke="#AA151B" strokeWidth="4" /><path d="M-58-62h116v66c0 34-26 58-58 58s-58-24-58-58z" fill="#AA151B" stroke="#7A5A00" strokeWidth="5" /><path d="M0-62h58v62H0z" fill="#EEEEEE" /><path d="M-58 0H0v62c-32 0-58-24-58-58z" fill="#F1BF00" /><path d="M-50 0v36M-38 0v48M-26 0v55M-14 0v60" stroke="#AA151B" strokeWidth="7" /><path d="M0 0h58v4c0 34-26 58-58 58z" fill="#AA151B" /><rect x="-40" y="-50" width="22" height="26" fill="#F1BF00" /><circle cx="29" cy="-31" r="13" fill="#AA151B" /><ellipse cx="0" cy="-4" rx="16" ry="20" fill="#2A3E9A" stroke="#AA151B" strokeWidth="4" /><path d="M-52-74l10-30 20 16 22-26 22 26 20-16 10 30z" fill="#C8102E" stroke="#8A6A00" strokeWidth="6" /><path d="M-52-74h104v10h-104z" fill="#D9A400" /></g></svg>
   ),
 };
 

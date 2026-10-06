@@ -16,8 +16,11 @@ import { fetchAlertsForTrain } from "@/lib/queries";
 const routeMapFor = (train) => (getGeo(train.country || "fr").fitsTrain(train) ? train.country || "fr" : "all");
 
 // Notices come as simple HTML from the railway: keep only the text, one paragraph per block (never inject their HTML)
-const paragraphs = (html) => (html || "").replace(/<br\s*\/?>/gi, "\n").split(/<\/p>|\n/i)
-  .map((p) => p.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#39;|&rsquo;/g, "’").replace(/&quot;/g, "\"").trim()).filter(Boolean);
+// A removed tag becomes a space, then spaces are tidied up. SNCF's English text also glues words to its template
+// ("Maintenance workat Paris Est", "click on:Train breakdown"): those get their space back
+const paragraphs = (html) => (html || "").replace(/<br\s*\/?>/gi, "\n").split(/<\/p>|<\/div>|<\/li>|\n/i)
+  .map((p) => p.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#39;|&rsquo;/g, "’").replace(/&quot;/g, "\"")
+    .replace(/([a-zà-ÿ])([.:;!?])(?=[A-ZÀ-Ý])/g, "$1$2 ").replace(/([a-z]{3,})at (?=[A-ZÀ-Ý])/g, "$1 at ").replace(/\s+([.,:;!?])(?=\s|$)/g, "$1").replace(/\s+/g, " ").trim()).filter(Boolean);
 
 const SITE_LANGS = ["en", "de", "fr", "nl", "es"];
 const LANG_NAMES = { en: "English", de: "Deutsch", fr: "Français", it: "Italiano", nl: "Nederlands", es: "Español" };
