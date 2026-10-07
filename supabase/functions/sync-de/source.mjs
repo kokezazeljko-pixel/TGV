@@ -1,11 +1,13 @@
 // Supabase Edge funkcija za Nemačku (Deutsche Bahn), piše u tabelu trains (country "de").
 //   ?kind=schedule  red vožnje iz gtfs.de za danas i sutra (jednom dnevno)
+//   ?kind=flix      red vožnje FlixTraina (Flix GTFS) za danas i sutra
 //   ?kind=rt        DB Timetables: nekoliko glavnih stanica po pozivu (red se rotira), pa kašnjenja u trains
 // Tajne: DB_CLIENT_ID, DB_API_KEY (Edge Functions → Secrets). Zaštita: x-cron-token kao kod sync-realtime.
 // Izvorni kod je ovde; za objavljivanje se spaja sa ingest/lib u index.ts (bun build).
 import { inflateRawSync } from "node:zlib";
-import { DE_GTFS_URL, DE_TT_BASE, buildGermanSchedule, parseTimetable, ttTime, deNorm, deCategory, germanUpdates, fastEpoch } from "../../../ingest/lib/germany.mjs";
+import { DE_GTFS_URL, DE_TT_BASE, FLIX_GTFS_URL, buildFlixSchedule, buildGermanSchedule, parseTimetable, ttTime, deNorm, deCategory, germanUpdates, fastEpoch } from "../../../ingest/lib/germany.mjs";
 import { parisDate, gtfsToEpoch } from "../../../ingest/lib/util.mjs";
+import { parseLine } from "../../../ingest/lib/csv.mjs";
 import DE_NET from "../../../lib/network-de.json" with { type: "json" };
 
 const URL_ = Deno.env.get("SUPABASE_URL");
@@ -46,7 +48,7 @@ async function schedule() {
   const fresh = new Set(rows.map((r) => r.id));
   for (const d of dates) {
     const old = await rest("GET", `trains?select=id&country=eq.de&service_date=eq.${d}&limit=5000`);
-    const stale = old.map((r) => r.id).filter((id) => !fresh.has(id));
+    const stale = old.map((r) => r.id).filter((id) => !fresh.has(id) && !id.includes("_de_FLX")); // FlixTrain rows come from kind=flix
     for (let i = 0; i < stale.length; i += 80) await rest("DELETE", `trains?id=in.(${encodeURIComponent(stale.slice(i, i + 80).map((id) => `"${id}"`).join(","))})`, null, { Prefer: "return=minimal" });
   }
   await rest("DELETE", `trains?country=eq.de&service_date=lt.${parisDate(-8)}`, null, { Prefer: "return=minimal" });
@@ -99,6 +101,59 @@ async function pollHub(h, now) {
   return calls;
 }
 
+// FlixTrain timetable (Flix GTFS, ~30 MB): the big files are read as a stream and only the FlixTrain lines are kept
+async function zipEntries(buf) {
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  let e = -1; for (let i = buf.length - 22; i >= 0; i--) if (dv.getUint32(i, true) === 0x06054b50) { e = i; break; }
+  const count = dv.getUint16(e + 10, true); let p = dv.getUint32(e + 16, true);
+  const files = {};
+  for (let n = 0; n < count; n++) {
+    const method = dv.getUint16(p + 10, true), comp = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+    files[new TextDecoder().decode(buf.subarray(p + 46, p + 46 + nl)).split("/").pop()] = { method, comp, off }; p += 46 + nl + xl + cl;
+  }
+  return async (name, keep = null) => {
+    const f = files[name]; if (!f) return [];
+    const start = f.off + 30 + dv.getUint16(f.off + 26, true) + dv.getUint16(f.off + 28, true);
+    const data = buf.subarray(start, start + f.comp);
+    let o = 0;
+    const src = new ReadableStream({ pull(c) { if (o >= data.length) return c.close(); c.enqueue(data.subarray(o, o + 65536)); o += 65536; } }, { highWaterMark: 1 });
+    const reader = (f.method === 8 ? src.pipeThrough(new DecompressionStream("deflate-raw")) : src).getReader();
+    const td = new TextDecoder(); let rest = "", head = null; const out = [];
+    const line = (l) => {
+      if (l.endsWith("\r")) l = l.slice(0, -1); if (!l) return;
+      if (!head) { head = parseLine(l.replace(/^\uFEFF/, "")).map((h) => h.trim()); return; }
+      if (keep && !keep(l)) return;
+      const v = parseLine(l); const r = {}; head.forEach((h, i) => (r[h] = v[i] ?? "")); out.push(r);
+    };
+    for (;;) { const { value, done } = await reader.read(); if (done) break; const parts = (rest + td.decode(value, { stream: true })).split("\n"); rest = parts.pop(); for (const l of parts) line(l); }
+    line(rest);
+    return out;
+  };
+}
+async function flix() {
+  const dates = [parisDate(0), parisDate(1)];
+  const res = await fetch(FLIX_GTFS_URL, { headers: UA });
+  if (!res.ok) throw new Error(`flix gtfs -> ${res.status}`);
+  const read = await zipEntries(new Uint8Array(await res.arrayBuffer()));
+  const isFlx = (l) => l.startsWith("FLX") || l.startsWith('"FLX');
+  const files = { trips: await read("trips.txt", isFlx), stop_times: await read("stop_times.txt", isFlx), calendar: await read("calendar.txt", isFlx),
+    calendar_dates: await read("calendar_dates.txt", isFlx), stops: [] };
+  const need = new Set(files.stop_times.map((r) => r.stop_id));
+  files.stops = await read("stops.txt", (l) => need.has(l.slice(0, l.indexOf(","))));
+  const rows = buildFlixSchedule(files, dates);
+  if (!rows.length) return { kind: "flix", trains: 0, note: "no FlixTrain found – nothing changed" };
+  // the train number from Flix is kept (DB confirms it later); live data already written stays
+  for (let i = 0; i < rows.length; i += 200) await upsert("trains", rows.slice(i, i + 200), "id");
+  const fresh = new Set(rows.map((r) => r.id));
+  let removed = 0;
+  for (const d of dates) {
+    const old = await rest("GET", `trains?select=id&country=eq.de&service_date=eq.${d}&id=like.*_de_FLX*&limit=1000`);
+    const stale = old.map((r) => r.id).filter((id) => !fresh.has(id));
+    for (let i = 0; i < stale.length; i += 80) { await rest("DELETE", `trains?id=in.(${encodeURIComponent(stale.slice(i, i + 80).map((id) => `"${id}"`).join(","))})`, null, { Prefer: "return=minimal" }); removed += Math.min(80, stale.length - i); }
+  }
+  return { kind: "flix", trains: rows.length, removed };
+}
+
 async function realtime() {
   const t0 = Date.now();
   const hubs = await rest("GET", `de_hubs?select=name,eva,station,last_fchg&order=last_fchg.asc.nullsfirst&limit=${PER_RUN}`);
@@ -122,7 +177,7 @@ async function realtime() {
   const now = Math.floor(Date.now() / 1000);
   const trains = [];
   for (let off = 0; ; off += 1000) {
-    const page = await rest("GET", `trains?country=eq.de&service_date=in.(${days.join(",")})&select=id,service_date,type,stops,delay_min&order=id&limit=1000&offset=${off}`);
+    const page = await rest("GET", `trains?country=eq.de&service_date=in.(${days.join(",")})&select=id,service_date,type,number,stops,delay_min&order=id&limit=1000&offset=${off}`);
     for (const r of page) {
       const st = r.stops || []; if (st.length < 2) continue;
       const a = fastEpoch(r.service_date, st[0].dep || st[0].arr), b = fastEpoch(r.service_date, st[st.length - 1].arr || st[st.length - 1].dep);
@@ -143,7 +198,7 @@ Deno.serve(async (req) => {
   if (!DB_ID || !DB_KEY) return json({ error: "DB_CLIENT_ID / DB_API_KEY not set" }, 500);
   try {
     const kind = new URL(req.url).searchParams.get("kind") || "rt";
-    const out = kind === "schedule" ? await schedule() : await realtime();
+    const out = kind === "schedule" ? await schedule() : kind === "flix" ? await flix() : await realtime();
     console.log(JSON.stringify(out));
     return json(out);
   } catch (e) {

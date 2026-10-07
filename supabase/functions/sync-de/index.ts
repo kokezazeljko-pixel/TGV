@@ -69,7 +69,7 @@ function fastEpoch(dateStr, hms) {
 }
 var DE_GTFS_URL = "https://download.gtfs.de/germany/fv_free/latest.zip";
 var DE_TT_BASE = "https://apis.deutschebahn.com/db-api-marketplace/apis/timetables/v1/";
-var DE_CATS = { ICE: "ICE", IC: "IC", EC: "EC", ECE: "EC", EN: "Night train", NJ: "Night train", RJ: "Railjet", RJX: "Railjet", TGV: "TGV" };
+var DE_CATS = { ICE: "ICE", IC: "IC", EC: "EC", ECE: "EC", EN: "Night train", NJ: "Night train", RJ: "Railjet", RJX: "Railjet", TGV: "TGV", FLX: "FLX" };
 var deCategory = (s = "") => DE_CATS[(String(s).trim().match(/^[A-Za-z]+/) || [""])[0].toUpperCase()] || null;
 var DE_SKIP_AGENCIES = new Set(["1"]);
 var deNorm = (s = "") => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/hauptbahnhof/g, "hbf").replace(/\bbahnhof\b|\bbf\b/g, "").replace(/[^a-z0-9]+/g, "");
@@ -270,8 +270,12 @@ function germanUpdates(trains, plan, nowSec) {
     if (!h || min == null)
       return [];
     const out = [];
+    const flix = tr.type === "FLX";
     for (let dt = -FUZZY;dt <= FUZZY; dt++)
       for (const p of h.get(min + dt) || []) {
+        const isFlx = deCategory(p.cat) === "FLX";
+        if (flix ? !(isFlx && tr.number && p.num === tr.number) : isFlx)
+          continue;
         const same = deCategory(p.cat) === tr.type;
         if (dt === 0)
           out.push([p, same ? 3 : 1.5, true]);
@@ -341,8 +345,8 @@ function germanUpdates(trains, plan, nowSec) {
       const delay = Math.max(0, Math.round((carry ?? 0) / 60));
       d.push(apf ? [delay, skipped, apf] : [delay, skipped]);
     }
-    const tie = ranked[1] && Math.abs(ranked[1][1] - best[1]) < 1e-9;
-    const number = tie ? "" : key.startsWith("?") ? null : key;
+    const tie = ranked[1] && Math.abs(ranked[1][1] - best[1]) < 0.000000001;
+    const number = tr.type === "FLX" ? null : tie ? "" : key.startsWith("?") ? null : key;
     let delay_min = d.length ? d[d.length - 1][0] : 0;
     for (let i = 0;i < tr.stops.length; i++) {
       const s = tr.stops[i];
@@ -357,6 +361,100 @@ function germanUpdates(trains, plan, nowSec) {
     updates.push({ id: tr.id, delay_min: cancelled ? 0 : delay_min, cancelled, d, number });
   }
   return updates;
+}
+var FLIX_GTFS_URL = "http://gtfs.gis.flix.tech/gtfs_generic_eu.zip";
+var FLIX_CITY = { Cologne: "Köln", Hanover: "Hannover", Munich: "München", Nuremberg: "Nürnberg", Brunswick: "Braunschweig" };
+function flixStopName(raw = "") {
+  let s = raw.replace(/\s*\(FlixTrain\)\s*$/i, "").trim().replace(/\s+Central Station$/i, " Hbf");
+  for (const [en, de] of Object.entries(FLIX_CITY))
+    s = s.replace(new RegExp("^" + en + "\\b"), de);
+  return s;
+}
+var flixNumber = (tripId = "") => (String(tripId).split("-")[1] || "").replace(/^0+(?=\d)/, "");
+var two = (n) => String(n).padStart(2, "0");
+var berlinParts = (ms) => Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms)).map((p) => [p.type, p.value]));
+function buildFlixSchedule(files, dates) {
+  const ymd = (iso) => iso.replaceAll("-", "");
+  const active = new Map(dates.map((d) => [d, new Set]));
+  for (const r of files.calendar)
+    for (const d of dates) {
+      const wd = WEEKDAYS[new Date(d + "T12:00:00Z").getUTCDay()];
+      if (r.start_date <= ymd(d) && ymd(d) <= r.end_date && r[wd] === "1")
+        active.get(d).add(r.service_id);
+    }
+  for (const r of files.calendar_dates)
+    for (const d of dates) {
+      if (r.date !== ymd(d))
+        continue;
+      if (r.exception_type === "1")
+        active.get(d).add(r.service_id);
+      if (r.exception_type === "2")
+        active.get(d).delete(r.service_id);
+    }
+  const trips = new Map;
+  for (const r of files.trips) {
+    if (!/^FLX\d/.test(r.route_id || ""))
+      continue;
+    const runs = dates.filter((d) => active.get(d).has(r.service_id));
+    if (runs.length)
+      trips.set(r.trip_id, { id: r.trip_id, runs, stops: [] });
+  }
+  for (const r of files.stop_times) {
+    const t = trips.get(r.trip_id);
+    if (t)
+      t.stops.push({ seq: Number(r.stop_sequence), id: r.stop_id, arr: r.arrival_time || null, dep: r.departure_time || null });
+  }
+  const stops = new Map(files.stops.map((r) => [r.stop_id, r]));
+  const out = [];
+  for (const t of trips.values()) {
+    if (t.stops.length < 2)
+      continue;
+    t.stops.sort((a, b) => a.seq - b.seq);
+    for (const d of t.runs) {
+      const utc = (hms) => {
+        const [h, m, s = 0] = hms.split(":").map(Number);
+        return Date.UTC(...d.split("-").map((v, i) => i === 1 ? v - 1 : +v), h, m, s);
+      };
+      const first = berlinParts(utc(t.stops[0].dep || t.stops[0].arr));
+      const day = `${first.year}-${first.month}-${first.day}`;
+      const local = (hms) => {
+        if (!hms)
+          return null;
+        const ms = utc(hms), p = berlinParts(ms);
+        const dayDiff = Math.round((Date.UTC(+p.year, p.month - 1, +p.day) - Date.UTC(+first.year, first.month - 1, +first.day)) / 86400000);
+        return `${two(+p.hour + 24 * dayDiff)}:${p.minute}:${p.second}`;
+      };
+      const st = t.stops.map((s) => {
+        const r = stops.get(s.id) || {};
+        const lat = parseFloat(r.stop_lat), lon = parseFloat(r.stop_lon);
+        const arr = local(s.arr), dep = local(s.dep);
+        return {
+          seq: s.seq,
+          id: s.id,
+          arr,
+          dep,
+          name: flixStopName(r.stop_name || s.id),
+          time: hhmm(dep || arr),
+          delay: 0,
+          ...Number.isFinite(lat) ? { lat: Math.round(lat * 1e4) / 1e4, lon: Math.round(lon * 1e4) / 1e4 } : {}
+        };
+      });
+      out.push({
+        id: `${day}_de_${t.id}`,
+        trip_id: t.id,
+        service_date: day,
+        country: "de",
+        number: flixNumber(t.id),
+        type: "FLX",
+        origin: st[0].name,
+        destination: st[st.length - 1].name,
+        dep: hhmm(st[0].dep || st[0].arr),
+        arr: hhmm(st[st.length - 1].arr || st[st.length - 1].dep),
+        stops: st
+      });
+    }
+  }
+  return out;
 }
 // ../../../lib/network-de.json (only the outline of Germany is used)
 var network_de_default = { land: [[[7.2,53.25],[7.05,53.6],[7.7,53.7],[8.1,53.55],[8.5,53.55],[8.7,53.87],[8.95,53.9],[8.85,54.13],[8.95,54.5],[8.6,54.9],[9.45,54.805],[9.95,54.75],[10.15,54.4],[10.8,54.3],[11.1,54.45],[10.85,53.95],[11.45,53.9],[12.1,54.18],[12.5,54.47],[13.15,54.4],[13.4,54.65],[13.75,54.25],[14.25,53.9],[14.4,53.3],[14.15,52.85],[14.6,52.6],[14.7,52.1],[14.95,51.45],[15.04,51.0],[14.8,50.85],[14.3,50.88],[13.85,50.73],[13.0,50.45],[12.25,50.25],[12.2,50.1],[12.5,49.7],[12.9,49.35],[13.4,48.95],[13.8,48.75],[13.45,48.57],[13.0,48.25],[12.75,48.13],[12.95,47.95],[13.0,47.75],[13.0,47.45],[12.75,47.68],[12.2,47.6],[11.6,47.58],[11.1,47.4],[10.45,47.55],[10.2,47.3],[9.75,47.55],[9.2,47.65],[8.87,47.66],[8.78,47.73],[8.65,47.8],[8.47,47.76],[8.55,47.62],[8.2,47.6],[7.6,47.58],[7.55,48.1],[7.8,48.6],[8.2,48.98],[7.6,49.08],[7.0,49.12],[7.03,49.19],[6.95,49.225],[6.86,49.22],[6.7,49.2],[6.37,49.46],[6.42,49.55],[6.5,49.71],[6.52,49.81],[6.42,49.81],[6.32,49.84],[6.24,49.9],[6.18,49.95],[6.13,50.05],[6.13,50.13],[6.13,50.18],[6.4,50.32],[6.18,50.55],[6.02,50.75],[6.08,50.92],[5.87,51.05],[6.08,51.17],[6.22,51.36],[6.22,51.51],[6.05,51.66],[5.95,51.81],[6.17,51.9],[6.4,51.83],[6.83,51.97],[6.7,52.03],[7.03,52.23],[7.07,52.39],[6.98,52.46],[6.7,52.49],[6.73,52.65],[7.07,52.84],[7.2,52.98],[7.21,53.18]]] };
@@ -402,7 +500,7 @@ async function schedule() {
   const fresh = new Set(rows.map((r) => r.id));
   for (const d of dates) {
     const old = await rest("GET", `trains?select=id&country=eq.de&service_date=eq.${d}&limit=5000`);
-    const stale = old.map((r) => r.id).filter((id) => !fresh.has(id));
+    const stale = old.map((r) => r.id).filter((id) => !fresh.has(id) && !id.includes("_de_FLX"));
     for (let i = 0;i < stale.length; i += 80)
       await rest("DELETE", `trains?id=in.(${encodeURIComponent(stale.slice(i, i + 80).map((id) => `"${id}"`).join(","))})`, null, { Prefer: "return=minimal" });
   }
@@ -470,6 +568,102 @@ async function pollHub(h, now) {
   await rest("PATCH", `de_hubs?name=eq.${encodeURIComponent(h.name)}`, { last_fchg: new Date().toISOString(), last_error: null }, { Prefer: "return=minimal" });
   return calls;
 }
+async function zipEntries(buf) {
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  let e = -1;
+  for (let i = buf.length - 22;i >= 0; i--)
+    if (dv.getUint32(i, true) === 101010256) {
+      e = i;
+      break;
+    }
+  const count = dv.getUint16(e + 10, true);
+  let p = dv.getUint32(e + 16, true);
+  const files = {};
+  for (let n = 0;n < count; n++) {
+    const method = dv.getUint16(p + 10, true), comp = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+    files[new TextDecoder().decode(buf.subarray(p + 46, p + 46 + nl)).split("/").pop()] = { method, comp, off };
+    p += 46 + nl + xl + cl;
+  }
+  return async (name, keep = null) => {
+    const f = files[name];
+    if (!f)
+      return [];
+    const start = f.off + 30 + dv.getUint16(f.off + 26, true) + dv.getUint16(f.off + 28, true);
+    const data = buf.subarray(start, start + f.comp);
+    let o = 0;
+    const src = new ReadableStream({ pull(c) {
+      if (o >= data.length)
+        return c.close();
+      c.enqueue(data.subarray(o, o + 65536));
+      o += 65536;
+    } }, { highWaterMark: 1 });
+    const reader = (f.method === 8 ? src.pipeThrough(new DecompressionStream("deflate-raw")) : src).getReader();
+    const td = new TextDecoder;
+    let rest = "", head = null;
+    const out = [];
+    const line = (l) => {
+      if (l.endsWith("\r"))
+        l = l.slice(0, -1);
+      if (!l)
+        return;
+      if (!head) {
+        head = parseLine(l.replace(/^\uFEFF/, "")).map((h) => h.trim());
+        return;
+      }
+      if (keep && !keep(l))
+        return;
+      const v = parseLine(l);
+      const r = {};
+      head.forEach((h, i) => r[h] = v[i] ?? "");
+      out.push(r);
+    };
+    for (;; ) {
+      const { value, done } = await reader.read();
+      if (done)
+        break;
+      const parts = (rest + td.decode(value, { stream: true })).split(`
+`);
+      rest = parts.pop();
+      for (const l of parts)
+        line(l);
+    }
+    line(rest);
+    return out;
+  };
+}
+async function flix() {
+  const dates = [parisDate(0), parisDate(1)];
+  const res = await fetch(FLIX_GTFS_URL, { headers: UA });
+  if (!res.ok)
+    throw new Error(`flix gtfs -> ${res.status}`);
+  const read = await zipEntries(new Uint8Array(await res.arrayBuffer()));
+  const isFlx = (l) => l.startsWith("FLX") || l.startsWith('"FLX');
+  const files = {
+    trips: await read("trips.txt", isFlx),
+    stop_times: await read("stop_times.txt", isFlx),
+    calendar: await read("calendar.txt", isFlx),
+    calendar_dates: await read("calendar_dates.txt", isFlx),
+    stops: []
+  };
+  const need = new Set(files.stop_times.map((r) => r.stop_id));
+  files.stops = await read("stops.txt", (l) => need.has(l.slice(0, l.indexOf(","))));
+  const rows = buildFlixSchedule(files, dates);
+  if (!rows.length)
+    return { kind: "flix", trains: 0, note: "no FlixTrain found – nothing changed" };
+  for (let i = 0;i < rows.length; i += 200)
+    await upsert("trains", rows.slice(i, i + 200), "id");
+  const fresh = new Set(rows.map((r) => r.id));
+  let removed = 0;
+  for (const d of dates) {
+    const old = await rest("GET", `trains?select=id&country=eq.de&service_date=eq.${d}&id=like.*_de_FLX*&limit=1000`);
+    const stale = old.map((r) => r.id).filter((id) => !fresh.has(id));
+    for (let i = 0;i < stale.length; i += 80) {
+      await rest("DELETE", `trains?id=in.(${encodeURIComponent(stale.slice(i, i + 80).map((id) => `"${id}"`).join(","))})`, null, { Prefer: "return=minimal" });
+      removed += Math.min(80, stale.length - i);
+    }
+  }
+  return { kind: "flix", trains: rows.length, removed };
+}
 async function realtime() {
   const t0 = Date.now();
   const hubs = await rest("GET", `de_hubs?select=name,eva,station,last_fchg&order=last_fchg.asc.nullsfirst&limit=${PER_RUN}`);
@@ -497,7 +691,7 @@ async function realtime() {
   const now = Math.floor(Date.now() / 1000);
   const trains = [];
   for (let off = 0;; off += 1000) {
-    const page = await rest("GET", `trains?country=eq.de&service_date=in.(${days.join(",")})&select=id,service_date,type,stops,delay_min&order=id&limit=1000&offset=${off}`);
+    const page = await rest("GET", `trains?country=eq.de&service_date=in.(${days.join(",")})&select=id,service_date,type,number,stops,delay_min&order=id&limit=1000&offset=${off}`);
     for (const r of page) {
       const st = r.stops || [];
       if (st.length < 2)
@@ -524,7 +718,7 @@ Deno.serve(async (req) => {
     return json({ error: "DB_CLIENT_ID / DB_API_KEY not set" }, 500);
   try {
     const kind = new URL(req.url).searchParams.get("kind") || "rt";
-    const out = kind === "schedule" ? await schedule() : await realtime();
+    const out = kind === "schedule" ? await schedule() : kind === "flix" ? await flix() : await realtime();
     console.log(JSON.stringify(out));
     return json(out);
   } catch (e) {

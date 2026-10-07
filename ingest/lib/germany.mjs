@@ -20,7 +20,7 @@ export const DE_GTFS_URL = "https://download.gtfs.de/germany/fv_free/latest.zip"
 export const DE_TT_BASE = "https://apis.deutschebahn.com/db-api-marketplace/apis/timetables/v1/";
 
 // route_short_name ("ICE 23", "IC 55", "EC", "ECE 85", "EN", "RJ", "NJ") -> type shown on the site
-const DE_CATS = { ICE: "ICE", IC: "IC", EC: "EC", ECE: "EC", EN: "Night train", NJ: "Night train", RJ: "Railjet", RJX: "Railjet", TGV: "TGV" };
+const DE_CATS = { ICE: "ICE", IC: "IC", EC: "EC", ECE: "EC", EN: "Night train", NJ: "Night train", RJ: "Railjet", RJX: "Railjet", TGV: "TGV", FLX: "FLX" };
 export const deCategory = (s = "") => DE_CATS[(String(s).trim().match(/^[A-Za-z]+/) || [""])[0].toUpperCase()] || null;
 export const DE_SKIP_AGENCIES = new Set(["1"]); // BahnTouristikExpress (special tourist trains)
 
@@ -184,7 +184,12 @@ export function germanUpdates(trains, plan, nowSec) {
   function candidates(tr, hub, kind, min) {
     const h = idx.get(`${hub}|${kind}`); if (!h || min == null) return [];
     const out = [];
+    // FlixTrain: its number comes from the Flix timetable and is the same at DB, so only FLX rows with that number count;
+    // other trains never take a FLX row
+    const flix = tr.type === "FLX";
     for (let dt = -FUZZY; dt <= FUZZY; dt++) for (const p of h.get(min + dt) || []) {
+      const isFlx = deCategory(p.cat) === "FLX";
+      if (flix ? !(isFlx && tr.number && p.num === tr.number) : isFlx) continue;
       const same = deCategory(p.cat) === tr.type;
       if (dt === 0) out.push([p, same ? 3 : 1.5, true]);
       else if (same) out.push([p, 1 / (Math.abs(dt) + 1), false]);
@@ -245,7 +250,7 @@ export function germanUpdates(trains, plan, nowSec) {
     }
     // two trains with the same score (an ICE pair that splits later on, before the stations after the split are known): no number yet
     const tie = ranked[1] && Math.abs(ranked[1][1] - best[1]) < 1e-9;
-    const number = tie ? "" : key.startsWith("?") ? null : key;
+    const number = tr.type === "FLX" ? null : tie ? "" : key.startsWith("?") ? null : key;
     // current delay = at the next stop not reached yet
     let delay_min = d.length ? d[d.length - 1][0] : 0;
     for (let i = 0; i < tr.stops.length; i++) {
@@ -256,4 +261,70 @@ export function germanUpdates(trains, plan, nowSec) {
     updates.push({ id: tr.id, delay_min: cancelled ? 0 : delay_min, cancelled, d, number });
   }
   return updates;
+}
+
+// ---- FlixTrain: Flix publishes its own timetable (gtfs.gis.flix.tech, buses and trains of all of Europe).
+// Only the train lines (route ids FLX10, FLX20…) are kept. Times in that feed are UTC (agency_timezone UTC) and
+// station names English ("Cologne Central Station (FlixTrain)"): both are turned into what the German data uses.
+export const FLIX_GTFS_URL = "http://gtfs.gis.flix.tech/gtfs_generic_eu.zip";
+const FLIX_CITY = { Cologne: "Köln", Hanover: "Hannover", Munich: "München", Nuremberg: "Nürnberg", Brunswick: "Braunschweig" };
+export function flixStopName(raw = "") {
+  let s = raw.replace(/\s*\(FlixTrain\)\s*$/i, "").trim().replace(/\s+Central Station$/i, " Hbf");
+  for (const [en, de] of Object.entries(FLIX_CITY)) s = s.replace(new RegExp("^" + en + "\\b"), de);
+  return s;
+}
+// "FLX10-1239-0739102026-AH#TS-00" -> train 1239
+export const flixNumber = (tripId = "") => (String(tripId).split("-")[1] || "").replace(/^0+(?=\d)/, "");
+const two = (n) => String(n).padStart(2, "0");
+const berlinParts = (ms) => Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms)).map((p) => [p.type, p.value]));
+// files: { trips, stop_times, calendar, calendar_dates, stops } as arrays of row objects (only FLX rows needed)
+// dates: Berlin days (YYYY-MM-DD) to build
+export function buildFlixSchedule(files, dates) {
+  const ymd = (iso) => iso.replaceAll("-", "");
+  // GTFS service days are UTC days; a Berlin day's trains all start on the same UTC day (none leave before 02:00)
+  const active = new Map(dates.map((d) => [d, new Set()]));
+  for (const r of files.calendar) for (const d of dates) {
+    const wd = WEEKDAYS[new Date(d + "T12:00:00Z").getUTCDay()];
+    if (r.start_date <= ymd(d) && ymd(d) <= r.end_date && r[wd] === "1") active.get(d).add(r.service_id);
+  }
+  for (const r of files.calendar_dates) for (const d of dates) {
+    if (r.date !== ymd(d)) continue;
+    if (r.exception_type === "1") active.get(d).add(r.service_id);
+    if (r.exception_type === "2") active.get(d).delete(r.service_id);
+  }
+  const trips = new Map();
+  for (const r of files.trips) {
+    if (!/^FLX\d/.test(r.route_id || "")) continue;
+    const runs = dates.filter((d) => active.get(d).has(r.service_id));
+    if (runs.length) trips.set(r.trip_id, { id: r.trip_id, runs, stops: [] });
+  }
+  for (const r of files.stop_times) { const t = trips.get(r.trip_id); if (t) t.stops.push({ seq: Number(r.stop_sequence), id: r.stop_id, arr: r.arrival_time || null, dep: r.departure_time || null }); }
+  const stops = new Map(files.stops.map((r) => [r.stop_id, r]));
+  const out = [];
+  for (const t of trips.values()) {
+    if (t.stops.length < 2) continue;
+    t.stops.sort((a, b) => a.seq - b.seq);
+    for (const d of t.runs) {
+      // UTC time of the day d -> Berlin local time, counted from the Berlin midnight of the train's first departure
+      const utc = (hms) => { const [h, m, s = 0] = hms.split(":").map(Number); return Date.UTC(...d.split("-").map((v, i) => (i === 1 ? v - 1 : +v)), h, m, s); };
+      const first = berlinParts(utc(t.stops[0].dep || t.stops[0].arr));
+      const day = `${first.year}-${first.month}-${first.day}`;
+      const local = (hms) => {
+        if (!hms) return null;
+        const ms = utc(hms), p = berlinParts(ms);
+        const dayDiff = Math.round((Date.UTC(+p.year, p.month - 1, +p.day) - Date.UTC(+first.year, first.month - 1, +first.day)) / 86400000);
+        return `${two(+p.hour + 24 * dayDiff)}:${p.minute}:${p.second}`;
+      };
+      const st = t.stops.map((s) => {
+        const r = stops.get(s.id) || {};
+        const lat = parseFloat(r.stop_lat), lon = parseFloat(r.stop_lon);
+        const arr = local(s.arr), dep = local(s.dep);
+        return { seq: s.seq, id: s.id, arr, dep, name: flixStopName(r.stop_name || s.id), time: hhmm(dep || arr), delay: 0,
+          ...(Number.isFinite(lat) ? { lat: Math.round(lat * 1e4) / 1e4, lon: Math.round(lon * 1e4) / 1e4 } : {}) };
+      });
+      out.push({ id: `${day}_de_${t.id}`, trip_id: t.id, service_date: day, country: "de", number: flixNumber(t.id), type: "FLX",
+        origin: st[0].name, destination: st[st.length - 1].name, dep: hhmm(st[0].dep || st[0].arr), arr: hhmm(st[st.length - 1].arr || st[st.length - 1].dep), stops: st });
+    }
+  }
+  return out;
 }
