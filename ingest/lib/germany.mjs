@@ -35,6 +35,7 @@ const DE_NAMES = { "Gesundbrunnen Bahnhof Badstr., Berlin": "Berlin Gesundbrunne
 export function deStopName(raw = "") {
   if (DE_NAMES[raw]) return DE_NAMES[raw];
   let s = raw.trim()
+    .replace(/\s+Gl\.\s*[\d\-–]+[a-z]?$/i, "") // "München Hbf Gl.5-10" (platform group) -> "München Hbf"
     .replace(/\((Gr|S|CH|PL|F|fr|SLO|A|CZ|NL|B|DK)\)/g, "")
     .replace(/^Bahnhof,\s*/, "")
     .replace(/,\s*Hauptbahnhof$/, " Hbf");
@@ -166,33 +167,73 @@ export function ttTime(s) { // "2610052051" -> ISO timestamp (Europe/Berlin = Eu
 // ---- matching: trains (stops with name + arr/dep) + plan rows of the main stations -> live updates
 // plan rows: { hubs: [normalized station names], cat, num, ar_pt, dp_pt, ar_ct, dp_ct, pp, cp, cs }
 export function germanUpdates(trains, plan, nowSec) {
-  const key = (hub, cat, iso) => `${hub}|${cat}|${iso ? Math.round(Date.parse(iso) / 60000) : ""}`;
-  // gtfs.de and DB can name the category differently (EC / IC / RJ): the same station and minute without the category is the fallback
-  const byKey = new Map();
+  // plan rows by main station and planned minute (departures and arrivals apart)
+  const idx = new Map();
+  const put = (hub, kind, iso, p) => {
+    const m = Math.round(Date.parse(iso) / 60000), k = `${hub}|${kind}`;
+    let h = idx.get(k); if (!h) idx.set(k, (h = new Map()));
+    (h.get(m) || h.set(m, []).get(m)).push(p);
+  };
   for (const p of plan) {
-    const cat = deCategory(p.cat); if (!cat) continue;
-    for (const hub of p.hubs || [p.hub]) for (const c of [cat, "*"]) {
-      if (p.dp_pt) { const k = key(hub, c, p.dp_pt) + "|d"; if (c === cat || !byKey.has(k)) byKey.set(k, p); }
-      if (p.ar_pt) { const k = key(hub, c, p.ar_pt) + "|a"; if (c === cat || !byKey.has(k)) byKey.set(k, p); }
+    if (!deCategory(p.cat)) continue;
+    for (const hub of p.hubs || [p.hub]) { if (p.dp_pt) put(hub, "d", p.dp_pt, p); if (p.ar_pt) put(hub, "a", p.ar_pt, p); }
+  }
+  const numOf = (p) => p.num || `?${p.eva}|${p.dp_pt || p.ar_pt}`;
+  const FUZZY = 5; // minutes: the DB timetable of the day can differ a little from gtfs.de (building works)
+  // candidates at one stop: [plan row, weight, exact?]
+  function candidates(tr, hub, kind, min) {
+    const h = idx.get(`${hub}|${kind}`); if (!h || min == null) return [];
+    const out = [];
+    for (let dt = -FUZZY; dt <= FUZZY; dt++) for (const p of h.get(min + dt) || []) {
+      const same = deCategory(p.cat) === tr.type;
+      if (dt === 0) out.push([p, same ? 3 : 1.5, true]);
+      else if (same) out.push([p, 1 / (Math.abs(dt) + 1), false]);
     }
+    return out;
   }
   const updates = [];
   for (const tr of trains) {
-    let carry = null, any = false, cancelledAll = true;
-    const votes = new Map(); // train number seen at each matched station: the most common one wins
-    const d = [];
-    for (const [i, s] of tr.stops.entries()) {
+    // 1) which DB train is this? every main station gives one vote, shared among the trains planned there at that time.
+    //    Two trains leaving at the same minute (ICE pairs that split at Hamm, opposite directions) are told apart by the other stations.
+    const per = tr.stops.map((s, i) => {
       const hub = deNorm(s.name);
       // gtfs.de gives the first and last stop both times: the train only departs from the first and only arrives at the last
-      // (otherwise a train leaving the terminus at that minute, e.g. IC 285 Stuttgart–Zürich, would be taken for this one)
       const depMin = s.dep && i < tr.stops.length - 1 ? Math.round(fastEpoch(tr.service_date, s.dep) / 60) : null;
       const arrMin = s.arr && i > 0 ? Math.round(fastEpoch(tr.service_date, s.arr) / 60) : null;
-      const p = (depMin && byKey.get(`${hub}|${tr.type}|${depMin}|d`)) || (arrMin && byKey.get(`${hub}|${tr.type}|${arrMin}|a`))
-        || (depMin && byKey.get(`${hub}|*|${depMin}|d`)) || (arrMin && byKey.get(`${hub}|*|${arrMin}|a`));
+      const c = [...candidates(tr, hub, "d", depMin), ...candidates(tr, hub, "a", arrMin)];
+      // one entry per DB train at this stop: arrival and departure weights add up (an ICE pair arrives together but leaves apart),
+      // the row with the best single match is kept for the live data
+      const seen = new Map();
+      for (const x of c) {
+        const k = numOf(x[0]), cur = seen.get(k);
+        if (!cur) seen.set(k, [x[0], x[1], x[2], x[1]]);
+        else { cur[1] += x[1]; cur[2] = cur[2] || x[2]; if (x[1] > cur[3]) { cur[0] = x[0]; cur[3] = x[1]; } }
+      }
+      return [...seen.values()];
+    });
+    const score = new Map(), exact = new Map(), stopsHit = new Map();
+    for (const c of per) {
+      const sum = c.reduce((a, x) => a + x[1], 0); if (!sum) continue;
+      for (const [p, w, ex] of c) {
+        const k = numOf(p);
+        score.set(k, (score.get(k) || 0) + w / sum);
+        stopsHit.set(k, (stopsHit.get(k) || 0) + 1);
+        if (ex) exact.set(k, (exact.get(k) || 0) + 1);
+      }
+    }
+    const ranked = [...score].sort((a, b) => b[1] - a[1] || (exact.get(b[0]) || 0) - (exact.get(a[0]) || 0));
+    const best = ranked[0];
+    // accepted with an exact match somewhere, or a near-time match at two or more stations
+    if (!best || !((exact.get(best[0]) || 0) >= 1 || (stopsHit.get(best[0]) || 0) >= 2)) continue;
+    const key = best[0];
+    // 2) live data only from that train's own rows
+    let carry = null, cancelledAll = true;
+    const d = [];
+    for (const [i, s] of tr.stops.entries()) {
+      const mine = per[i].filter((x) => numOf(x[0]) === key).sort((a, b) => b[1] - a[1])[0];
+      const p = mine && mine[0];
       let skipped = false, apf;
       if (p) {
-        any = true;
-        if (p.num) votes.set(p.num, (votes.get(p.num) || 0) + 1);
         const sec = p.dp_ct && p.dp_pt ? (Date.parse(p.dp_ct) - Date.parse(p.dp_pt)) / 1000 : p.ar_ct && p.ar_pt ? (Date.parse(p.ar_ct) - Date.parse(p.ar_pt)) / 1000 : (p.dp_pt || p.ar_pt) ? 0 : null;
         if (sec != null) carry = sec;
         if (p.cs === "c") skipped = true;
@@ -202,8 +243,9 @@ export function germanUpdates(trains, plan, nowSec) {
       const delay = Math.max(0, Math.round((carry ?? 0) / 60));
       d.push(apf ? [delay, skipped, apf] : [delay, skipped]);
     }
-    if (!any) continue;
-    const number = [...votes].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+    // two trains with the same score (an ICE pair that splits later on, before the stations after the split are known): no number yet
+    const tie = ranked[1] && Math.abs(ranked[1][1] - best[1]) < 1e-9;
+    const number = tie ? "" : key.startsWith("?") ? null : key;
     // current delay = at the next stop not reached yet
     let delay_min = d.length ? d[d.length - 1][0] : 0;
     for (let i = 0; i < tr.stops.length; i++) {

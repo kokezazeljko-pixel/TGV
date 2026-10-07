@@ -13,7 +13,7 @@ const KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const DB_ID = Deno.env.get("DB_CLIENT_ID") || "";
 const DB_KEY = Deno.env.get("DB_API_KEY") || "";
 const UA = { "User-Agent": "TrainPunctuality/1.0 (+https://www.trainpunctuality.com)" };
-const PER_RUN = 4; // stations per call; with a call every minute ≈ 6 + plan calls per minute (limit 60)
+const PER_RUN = 10; // stations per call (about 140 stations, each one every ~14 min); ≈ 12–20 DB calls per minute (limit 60)
 
 async function rest(method, path, body, extra = {}) {
   const res = await fetch(`${URL_}/rest/v1/${path}`, {
@@ -112,8 +112,10 @@ async function realtime() {
   // a station can be written differently in gtfs.de and DB ("Frankfurt (Main) Hbf" / "Frankfurt(Main)Hbf"): both names count
   const evaName = new Map((await rest("GET", "de_hubs?select=name,eva,station&eva=not.is.null")).map((h) => [h.eva, [...new Set([deNorm(h.name), deNorm(h.station || "")].filter(Boolean))]]));
   const plan = [];
+  const since = new Date(Date.now() - 12 * 3600e3).toISOString();
   for (let off = 0; ; off += 1000) {
-    const page = await rest("GET", `de_plan?day=in.(${days.join(",")})&select=eva,cat,num,ar_pt,dp_pt,ar_ct,dp_ct,pp,cp,cs&order=eva,sid&limit=1000&offset=${off}`);
+    // only stops from 12 hours ago on (night trains) are needed for the trains running now
+    const page = await rest("GET", `de_plan?day=in.(${days.join(",")})&or=(dp_pt.gte.%22${since}%22,ar_pt.gte.%22${since}%22)&select=eva,cat,num,ar_pt,dp_pt,ar_ct,dp_ct,pp,cp,cs&order=eva,sid&limit=1000&offset=${off}`);
     for (const p of page) plan.push({ ...p, hubs: evaName.get(p.eva) || [] });
     if (page.length < 1000) break;
   }

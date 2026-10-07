@@ -404,7 +404,7 @@ function Row({ tr, n, live, flag, notice }) {
   const late = !tr.cancelled && (tr.delay_min || 0) >= 5;
   const via = (tr.stops || []).slice(1, -1).map((s) => s.name);
   return (
-    <Link href={trainHref(tr.id)} className="row" aria-label={`${tr.type} ${tr.number}, ${tr.origin} – ${tr.destination}, ${st.label}`}>
+    <Link href={trainHref(tr.id)} prefetch={false} className="row" aria-label={`${tr.type} ${tr.number}, ${tr.origin} – ${tr.destination}, ${st.label}`}>
       <div className="time num c-time">{late ? <>{fromMin(toMin(tr.dep) + tr.delay_min)}<s>{tr.dep}</s></> : tr.dep}</div>
       <div className="c-train"><div className="tnum num">{flag && <span className={`flag mini flag-${tr.country}`} aria-hidden="true" />}{tr.number || "–"}</div><span className="ttype">{tr.type}</span></div>
       <div className="route">
@@ -422,7 +422,7 @@ function MiniRow({ tr, time, delay, sub, past }) {
   const st = statusOf(tr, t);
   return (
     <li className={past ? "past" : ""}>
-      <Link href={trainHref(tr.id)} className="minirow">
+      <Link href={trainHref(tr.id)} prefetch={false} className="minirow">
         <div className="t num">{delay >= 5 && !tr.cancelled ? <>{fromMin(toMin(time) + delay)}<s>{time}</s></> : time}</div>
         <div className="d"><b>{tr.type} {tr.number}</b><span>{sub}</span></div>
         <span className={`pill ${st.cls}`}>{st.label}</span>

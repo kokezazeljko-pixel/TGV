@@ -77,7 +77,7 @@ var DE_NAMES = { "Gesundbrunnen Bahnhof Badstr., Berlin": "Berlin Gesundbrunnen"
 function deStopName(raw = "") {
   if (DE_NAMES[raw])
     return DE_NAMES[raw];
-  let s = raw.trim().replace(/\((Gr|S|CH|PL|F|fr|SLO|A|CZ|NL|B|DK)\)/g, "").replace(/^Bahnhof,\s*/, "").replace(/,\s*Hauptbahnhof$/, " Hbf");
+  let s = raw.trim().replace(/\s+Gl\.\s*[\d\-–]+[a-z]?$/i, "").replace(/\((Gr|S|CH|PL|F|fr|SLO|A|CZ|NL|B|DK)\)/g, "").replace(/^Bahnhof,\s*/, "").replace(/,\s*Hauptbahnhof$/, " Hbf");
   const m = /^(.+?) (?:S\+U |S |U )?(?:Bahnhof|Bhf)?\s*(?:\(S\))?, ([^,]+)$/.exec(s);
   if (m && !/Hbf$/.test(m[1]))
     s = `${m[2]} ${m[1]}`;
@@ -245,41 +245,89 @@ function ttTime(s) {
   return new Date(fastEpoch(d, `${s.slice(6, 8)}:${s.slice(8, 10)}:00`) * 1000).toISOString();
 }
 function germanUpdates(trains, plan, nowSec) {
-  const key = (hub, cat, iso) => `${hub}|${cat}|${iso ? Math.round(Date.parse(iso) / 60000) : ""}`;
-  const byKey = new Map;
+  const idx = new Map;
+  const put = (hub, kind, iso, p) => {
+    const m = Math.round(Date.parse(iso) / 60000), k = `${hub}|${kind}`;
+    let h = idx.get(k);
+    if (!h)
+      idx.set(k, h = new Map);
+    (h.get(m) || h.set(m, []).get(m)).push(p);
+  };
   for (const p of plan) {
-    const cat = deCategory(p.cat);
-    if (!cat)
+    if (!deCategory(p.cat))
       continue;
-    for (const hub of p.hubs || [p.hub])
-      for (const c of [cat, "*"]) {
-        if (p.dp_pt) {
-          const k = key(hub, c, p.dp_pt) + "|d";
-          if (c === cat || !byKey.has(k))
-            byKey.set(k, p);
-        }
-        if (p.ar_pt) {
-          const k = key(hub, c, p.ar_pt) + "|a";
-          if (c === cat || !byKey.has(k))
-            byKey.set(k, p);
-        }
+    for (const hub of p.hubs || [p.hub]) {
+      if (p.dp_pt)
+        put(hub, "d", p.dp_pt, p);
+      if (p.ar_pt)
+        put(hub, "a", p.ar_pt, p);
+    }
+  }
+  const numOf = (p) => p.num || `?${p.eva}|${p.dp_pt || p.ar_pt}`;
+  const FUZZY = 5;
+  function candidates(tr, hub, kind, min) {
+    const h = idx.get(`${hub}|${kind}`);
+    if (!h || min == null)
+      return [];
+    const out = [];
+    for (let dt = -FUZZY;dt <= FUZZY; dt++)
+      for (const p of h.get(min + dt) || []) {
+        const same = deCategory(p.cat) === tr.type;
+        if (dt === 0)
+          out.push([p, same ? 3 : 1.5, true]);
+        else if (same)
+          out.push([p, 1 / (Math.abs(dt) + 1), false]);
       }
+    return out;
   }
   const updates = [];
   for (const tr of trains) {
-    let carry = null, any = false, cancelledAll = true;
-    const votes = new Map;
-    const d = [];
-    for (const [i, s] of tr.stops.entries()) {
+    const per = tr.stops.map((s, i) => {
       const hub = deNorm(s.name);
       const depMin = s.dep && i < tr.stops.length - 1 ? Math.round(fastEpoch(tr.service_date, s.dep) / 60) : null;
       const arrMin = s.arr && i > 0 ? Math.round(fastEpoch(tr.service_date, s.arr) / 60) : null;
-      const p = depMin && byKey.get(`${hub}|${tr.type}|${depMin}|d`) || arrMin && byKey.get(`${hub}|${tr.type}|${arrMin}|a`) || depMin && byKey.get(`${hub}|*|${depMin}|d`) || arrMin && byKey.get(`${hub}|*|${arrMin}|a`);
+      const c = [...candidates(tr, hub, "d", depMin), ...candidates(tr, hub, "a", arrMin)];
+      const seen = new Map;
+      for (const x of c) {
+        const k = numOf(x[0]), cur = seen.get(k);
+        if (!cur)
+          seen.set(k, [x[0], x[1], x[2], x[1]]);
+        else {
+          cur[1] += x[1];
+          cur[2] = cur[2] || x[2];
+          if (x[1] > cur[3]) {
+            cur[0] = x[0];
+            cur[3] = x[1];
+          }
+        }
+      }
+      return [...seen.values()];
+    });
+    const score = new Map, exact = new Map, stopsHit = new Map;
+    for (const c of per) {
+      const sum = c.reduce((a, x) => a + x[1], 0);
+      if (!sum)
+        continue;
+      for (const [p, w, ex] of c) {
+        const k = numOf(p);
+        score.set(k, (score.get(k) || 0) + w / sum);
+        stopsHit.set(k, (stopsHit.get(k) || 0) + 1);
+        if (ex)
+          exact.set(k, (exact.get(k) || 0) + 1);
+      }
+    }
+    const ranked = [...score].sort((a, b) => b[1] - a[1] || (exact.get(b[0]) || 0) - (exact.get(a[0]) || 0));
+    const best = ranked[0];
+    if (!best || !((exact.get(best[0]) || 0) >= 1 || (stopsHit.get(best[0]) || 0) >= 2))
+      continue;
+    const key = best[0];
+    let carry = null, cancelledAll = true;
+    const d = [];
+    for (const [i, s] of tr.stops.entries()) {
+      const mine = per[i].filter((x) => numOf(x[0]) === key).sort((a, b) => b[1] - a[1])[0];
+      const p = mine && mine[0];
       let skipped = false, apf;
       if (p) {
-        any = true;
-        if (p.num)
-          votes.set(p.num, (votes.get(p.num) || 0) + 1);
         const sec = p.dp_ct && p.dp_pt ? (Date.parse(p.dp_ct) - Date.parse(p.dp_pt)) / 1000 : p.ar_ct && p.ar_pt ? (Date.parse(p.ar_ct) - Date.parse(p.ar_pt)) / 1000 : p.dp_pt || p.ar_pt ? 0 : null;
         if (sec != null)
           carry = sec;
@@ -293,9 +341,8 @@ function germanUpdates(trains, plan, nowSec) {
       const delay = Math.max(0, Math.round((carry ?? 0) / 60));
       d.push(apf ? [delay, skipped, apf] : [delay, skipped]);
     }
-    if (!any)
-      continue;
-    const number = [...votes].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+    const tie = ranked[1] && Math.abs(ranked[1][1] - best[1]) < 1e-9;
+    const number = tie ? "" : key.startsWith("?") ? null : key;
     let delay_min = d.length ? d[d.length - 1][0] : 0;
     for (let i = 0;i < tr.stops.length; i++) {
       const s = tr.stops[i];
@@ -320,7 +367,7 @@ var KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 var DB_ID = Deno.env.get("DB_CLIENT_ID") || "";
 var DB_KEY = Deno.env.get("DB_API_KEY") || "";
 var UA = { "User-Agent": "TrainPunctuality/1.0 (+https://www.trainpunctuality.com)" };
-var PER_RUN = 4;
+var PER_RUN = 10;
 async function rest(method, path, body, extra = {}) {
   const res = await fetch(`${URL_}/rest/v1/${path}`, {
     method,
@@ -439,8 +486,9 @@ async function realtime() {
   const days = [parisDate(-1), parisDate(0)];
   const evaName = new Map((await rest("GET", "de_hubs?select=name,eva,station&eva=not.is.null")).map((h) => [h.eva, [...new Set([deNorm(h.name), deNorm(h.station || "")].filter(Boolean))]]));
   const plan = [];
+  const since = new Date(Date.now() - 12 * 3600000).toISOString();
   for (let off = 0;; off += 1000) {
-    const page = await rest("GET", `de_plan?day=in.(${days.join(",")})&select=eva,cat,num,ar_pt,dp_pt,ar_ct,dp_ct,pp,cp,cs&order=eva,sid&limit=1000&offset=${off}`);
+    const page = await rest("GET", `de_plan?day=in.(${days.join(",")})&or=(dp_pt.gte.%22${since}%22,ar_pt.gte.%22${since}%22)&select=eva,cat,num,ar_pt,dp_pt,ar_ct,dp_ct,pp,cp,cs&order=eva,sid&limit=1000&offset=${off}`);
     for (const p of page)
       plan.push({ ...p, hubs: evaName.get(p.eva) || [] });
     if (page.length < 1000)

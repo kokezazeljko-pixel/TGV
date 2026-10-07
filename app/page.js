@@ -3,7 +3,7 @@ import { getServerClient, isConfigured } from "@/lib/supabase";
 import { parisDate } from "@/lib/format";
 import { fetchTrainsForDay, fetchCommentCounts } from "@/lib/queries";
 
-export const revalidate = 300; // the server rebuilds this page at most every 5 minutes; the browser fetches newer delays itself
+export const revalidate = 3600; // the server rebuilds this page at most once an hour (each rebuild is a Vercel "ISR write"); the browser fetches newer delays itself every minute
 
 export default async function Home() {
   if (!isConfigured) return <SetupNotice />;
