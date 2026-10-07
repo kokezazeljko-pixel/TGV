@@ -3,7 +3,8 @@ import TrainDetail from "@/components/TrainDetail";
 import { getServerClient, isConfigured } from "@/lib/supabase";
 import { TRAIN_FIELDS } from "@/lib/format";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
+
 
 function decodeId(raw) {
   try { return decodeURIComponent(raw); } catch { return raw; }
