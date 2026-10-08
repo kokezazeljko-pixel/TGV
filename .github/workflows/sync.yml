@@ -14,6 +14,12 @@ on:
         type: choice
         options: [oba, red-voznje, kasnjenja]
         default: oba
+  - name: Provera mapa i podataka
+        if: github.event.schedule != '20 14 * * *'
+        run: node ingest/check-maps.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}      
 
 concurrency:
   group: sync-${{ github.event.schedule || github.event.inputs.job }}
