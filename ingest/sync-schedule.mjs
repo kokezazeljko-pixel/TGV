@@ -45,7 +45,9 @@ const servesCountry = (t) => COUNTRY === "ch" ? t.stops.some((s) => /^(ch:|85\d{
   : COUNTRY === "lu" ? t.stops.some((s) => isLuxStop(s.id)) : true;
 
 // Šatl vozovi (npr. Avignon Centre ↔ Avignon TGV) imaju 6-cifrene brojeve i samo dve stanice
-const isShuttle = (t) => (COUNTRY === "fr" && /^\d{6,}$/.test(t.trip_short_name || t.trip_headsign || "")) || t.stops.length < 2;
+// SNCF: šatlovi imaju broj od 6+ cifara, a autobusi uz TGV (Meuse TGV – Verdun, TGV Haute-Picardie – Amiens…) imaju
+// "R" (routier = drumski) u trip_id umesto "F" (ferré) ili route_type 3 – nijedno nije voz
+const isShuttle = (t, route = {}) => (COUNTRY === "fr" && (/^\d{6,}$/.test(t.trip_short_name || t.trip_headsign || "") || String(route.route_type).trim() === "3" || /^OCESN\d+R/.test(t.trip_id || ""))) || t.stops.length < 2;
 
 async function main() {
   console.log(`Zemlja: ${COUNTRY} · red vožnje za: ${dates.join(", ")} · vrste: ${TYPES.join(", ")}`);
@@ -110,7 +112,7 @@ async function main() {
     const route = routes.get(t.route_id) || {};
     t.type = routeType ? route.type : detectType(productFromStopId(t.stops[0].id), route.route_short_name, route.route_long_name, route.route_desc);
     typeCount[t.type] = (typeCount[t.type] || 0) + 1;
-    if (TYPES.includes(t.type) && !isShuttle(t) && servesCountry(t)) keep.push(t);
+    if (TYPES.includes(t.type) && !isShuttle(t, route) && servesCountry(t)) keep.push(t);
   }
   console.log("Prepoznate vrste vozova:", typeCount);
 
@@ -122,7 +124,7 @@ async function main() {
   await read("stops.txt", (r) => {
     if (!needStops.has(r.stop_id)) return;
     const lat = parseFloat(r.stop_lat), lon = parseFloat(r.stop_lon);
-    const ok = Number.isFinite(lat) && Number.isFinite(lon);
+    const ok = Number.isFinite(lat) && Number.isFinite(lon) && !(lat === 0 && lon === 0); // 0,0 = coordinates missing in the feed (NL: Berlin Südkreuz)
     stopNames.set(r.stop_id, COUNTRY === "be" ? localName(r.stop_name, dutch.get(r.stop_name), ok ? lat : null, ok ? lon : null) : COUNTRY === "lu" ? luxStopName(r.stop_name) : r.stop_name);
     if (ok) stopCoords.set(r.stop_id, [Math.round(lat * 1e4) / 1e4, Math.round(lon * 1e4) / 1e4]);
     const pf = platformOf(r.stop_id, r.platform_code); // peron (Švajcarska, Belgija; SNCF ga ne objavljuje)
