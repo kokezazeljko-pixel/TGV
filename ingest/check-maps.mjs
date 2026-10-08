@@ -1,7 +1,8 @@
 // Dnevna provera podataka i mapa (pokreće se posle reda vožnje): node ingest/check-maps.mjs
 // Za svaki današnji voz proverava:
 //  1) da nije autobus (SNCF autobusi uz TGV, šatlovi sa 6-cifrenim brojem),
-//  2) da svaka stanica ima koordinate (ne 0,0),
+//  2) da nijedna stanica nema lažne koordinate 0,0 (to bi je stavilo u Afriku); stanica bez koordinata u feedu
+//     (npr. nemačke stanice u holandskom feedu) samo se ne crta na mapi i nije greška,
 //  3) da svaka stanica ima svoju tačku na liniji mape te zemlje (ne samo "negde blizu linije"),
 //  4) da mapa ima liniju između dve uzastopne stanice, bez velikog zaobilaska.
 // Ako nešto nije u redu, ispisuje tačno šta (zemlja, voz, stanice) i završava sa greškom,
@@ -102,8 +103,8 @@ async function main() {
   const problems = [];
   for (const t of trains) {
     if (t.country === "fr" && (/_OCESN\d+R/.test(t.id) || /^\d{6,}$/.test(t.number || ""))) problems.push(`fr: autobus ili šatl među vozovima: ${t.type} ${t.number} (${t.id})`);
-    const zero = (t.stops || []).filter((s) => !Number.isFinite(s.lat) || !Number.isFinite(s.lon) || (s.lat === 0 && s.lon === 0));
-    if (zero.length) problems.push(`${t.country}: stanica bez koordinata: ${zero.map((s) => s.name).join(", ")} (${t.type} ${t.number})`);
+    const zero = (t.stops || []).filter((s) => s.lat === 0 && s.lon === 0);
+    if (zero.length) problems.push(`${t.country}: stanica sa koordinatama 0,0: ${zero.map((s) => s.name).join(", ")} (${t.type} ${t.number})`);
   }
   for (const c of COUNTRIES) {
     const mine = trains.filter((t) => t.country === c);
@@ -118,7 +119,7 @@ async function main() {
     for (const p of problems.slice(0, 200)) console.log(" - " + p);
     process.exit(1);
   }
-  console.log("\n✔ Sve stanice su na mapama, nema autobusa ni stanica bez koordinata.");
+  console.log("\n✔ Sve stanice su na mapama, nema autobusa ni stanica sa koordinatama 0,0.");
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
