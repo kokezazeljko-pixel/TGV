@@ -2,6 +2,7 @@
 //   ?kind=schedule  red vožnje iz gtfs.de za danas i sutra (jednom dnevno)
 //   ?kind=flix      red vožnje FlixTraina (Flix GTFS) za danas i sutra
 //   ?kind=rt        DB Timetables: nekoliko glavnih stanica po pozivu (red se rotira), pa kašnjenja u trains
+//   ?kind=plan      DB plan unapred (DB ga objavljuje ~18 sati ranije): broj voza se upisuje čim ga DB objavi
 // Tajne: DB_CLIENT_ID, DB_API_KEY (Edge Functions → Secrets). Zaštita: x-cron-token kao kod sync-realtime.
 // Izvorni kod je ovde; za objavljivanje se spaja sa ingest/lib u index.ts (bun build).
 import { inflateRawSync } from "node:zlib";
@@ -16,6 +17,8 @@ const DB_ID = Deno.env.get("DB_CLIENT_ID") || "";
 const DB_KEY = Deno.env.get("DB_API_KEY") || "";
 const UA = { "User-Agent": "TrainPunctuality/1.0 (+https://www.trainpunctuality.com)" };
 const PER_RUN = 10; // stations per call (about 140 stations, each one every ~14 min); ≈ 12–20 DB calls per minute (limit 60)
+const PLAN_AHEAD = 18; // hours: DB publishes its plan about 14–20 hours ahead (later hours answer 404 until published)
+const PLAN_CALLS = 20; // plan hours fetched per kind=plan call (every minute); kind=rt makes about 20 calls a minute: together about 40 of the 60 allowed
 
 async function rest(method, path, body, extra = {}) {
   const res = await fetch(`${URL_}/rest/v1/${path}`, {
@@ -27,9 +30,9 @@ async function rest(method, path, body, extra = {}) {
   return t ? JSON.parse(t) : null;
 }
 const upsert = (table, rows, onConflict) => rows.length ? rest("POST", `${table}?on_conflict=${onConflict}`, rows, { Prefer: "resolution=merge-duplicates,return=minimal" }) : null;
-async function tt(path) {
+async function tt(path, missing = "") {
   const res = await fetch(DE_TT_BASE + path, { headers: { ...UA, "DB-Client-Id": DB_ID, "DB-Api-Key": DB_KEY, Accept: "application/xml" } });
-  if (res.status === 404) return "";
+  if (res.status === 404) return missing;
   if (!res.ok) throw new Error(`timetables ${path.split("/")[0]} -> ${res.status}`);
   return res.text();
 }
@@ -53,6 +56,7 @@ async function schedule() {
   }
   await rest("DELETE", `trains?country=eq.de&service_date=lt.${parisDate(-8)}`, null, { Prefer: "return=minimal" });
   await rest("DELETE", `de_plan?day=lt.${parisDate(-1)}`, null, { Prefer: "return=minimal" });
+  await rest("DELETE", `de_plan_hours?hour=lt.${new Date(Date.now() - 2 * 86400e3).toISOString()}`, null, { Prefer: "return=minimal" });
   return { kind: "schedule", trains: rows.length, bytes: zip.length };
 }
 
@@ -66,27 +70,36 @@ async function hubEva(h) {
   return eva;
 }
 
+// one hour of DB's plan at one station; false = DB has not published that hour yet (404), nothing is marked as done
+async function planHour(h, eva, hr) {
+  const p = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", year: "2-digit", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" }).formatToParts(hr);
+  const g = (t) => p.find((x) => x.type === t).value;
+  const xml = await tt(`plan/${eva}/${g("year")}${g("month")}${g("day")}/${g("hour")}`, null);
+  if (xml === null) return false;
+  const { station, stops } = parseTimetable(xml);
+  // every operator counts: EC/RJ/NJ run by ÖBB, SBB, PKP or DSB are not flagged "F" (long distance) by DB
+  const rows = stops.filter((s) => s.tl && deCategory(s.tl.c)).map((s) => ({
+    eva, sid: s.sid, day: parisDate(0, new Date(ttTime(s.dp?.pt || s.ar?.pt) || hr)), cat: s.tl.c, num: s.tl.n,
+    ar_pt: ttTime(s.ar?.pt), dp_pt: ttTime(s.dp?.pt), pp: s.dp?.pp || s.ar?.pp || null,
+  }));
+  await upsert("de_plan", rows, "eva,sid");
+  await upsert("de_plan_hours", [{ eva, hour: hr.toISOString() }], "eva,hour");
+  if (station && station !== h.station) { h.station = station; await rest("PATCH", `de_hubs?name=eq.${encodeURIComponent(h.name)}`, { station }, { Prefer: "return=minimal" }); }
+  return true;
+}
+
 async function pollHub(h, now) {
   const eva = await hubEva(h);
   if (!eva) return 0;
-  // planned stops for this hour and the next two (each hour is fetched once)
+  // planned stops for this hour and the next two, if kind=plan has not fetched them yet;
+  // the next hour is fetched again (it was fetched up to 18 hours ago: an extra train added since then is picked up)
   const hours = [0, 1, 2].map((k) => new Date(Math.floor(now / 3600000) * 3600000 + k * 3600000));
   const have = new Set((await rest("GET", `de_plan_hours?eva=eq.${eva}&hour=gte.${hours[0].toISOString()}&select=hour`)).map((r) => Date.parse(r.hour)));
   let calls = 0;
   for (const hr of hours) {
-    if (have.has(hr.getTime())) continue;
-    const p = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", year: "2-digit", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" }).formatToParts(hr);
-    const g = (t) => p.find((x) => x.type === t).value;
-    const xml = await tt(`plan/${eva}/${g("year")}${g("month")}${g("day")}/${g("hour")}`); calls++;
-    const { station, stops } = parseTimetable(xml);
-    // every operator counts: EC/RJ/NJ run by ÖBB, SBB, PKP or DSB are not flagged "F" (long distance) by DB
-    const rows = stops.filter((s) => s.tl && deCategory(s.tl.c)).map((s) => ({
-      eva, sid: s.sid, day: parisDate(0, new Date(ttTime(s.dp?.pt || s.ar?.pt) || hr)), cat: s.tl.c, num: s.tl.n,
-      ar_pt: ttTime(s.ar?.pt), dp_pt: ttTime(s.dp?.pt), pp: s.dp?.pp || s.ar?.pp || null,
-    }));
-    await upsert("de_plan", rows, "eva,sid");
-    await upsert("de_plan_hours", [{ eva, hour: hr.toISOString() }], "eva,hour");
-    if (station && station !== h.station) { h.station = station; await rest("PATCH", `de_hubs?name=eq.${encodeURIComponent(h.name)}`, { station }, { Prefer: "return=minimal" }); }
+    if (have.has(hr.getTime()) && hr !== hours[1]) continue;
+    calls++;
+    if (!(await planHour(h, eva, hr))) break;
   }
   // all current changes at this station; only stops we know as long-distance are kept
   const known = new Map((await rest("GET", `de_plan?eva=eq.${eva}&day=gte.${parisDate(-1)}&select=sid,day`)).map((r) => [r.sid, r.day]));
@@ -154,6 +167,30 @@ async function flix() {
   return { kind: "flix", trains: rows.length, removed };
 }
 
+// DB's plan ahead of time: the nearest hours first, every station, as far as DB has published (about 18 hours)
+async function planAhead() {
+  const t0 = Date.now();
+  const hubs = (await rest("GET", "de_hubs?select=name,eva,station&eva=not.is.null&order=name")).filter((h) => h.eva);
+  const first = Math.floor(Date.now() / 3600000) * 3600000;
+  const have = new Set();
+  for (let off = 0; ; off += 1000) {
+    const page = await rest("GET", `de_plan_hours?hour=gte.${new Date(first).toISOString()}&select=eva,hour&order=eva,hour&limit=1000&offset=${off}`);
+    for (const r of page) have.add(`${r.eva}|${Date.parse(r.hour)}`);
+    if (page.length < 1000) break;
+  }
+  const todo = [];
+  for (let k = 0; k < PLAN_AHEAD; k++) for (const h of hubs) if (!have.has(`${h.eva}|${first + k * 3600000}`)) todo.push([h, first + k * 3600000]);
+  let calls = 0, fetched = 0; const unpublished = new Set(), errors = [];
+  for (const [h, ms] of todo) {
+    if (calls >= PLAN_CALLS) break;
+    if (unpublished.has(h.eva)) continue; // a later hour of the same station is not published either
+    calls++;
+    try { if (await planHour(h, h.eva, new Date(ms))) fetched++; else unpublished.add(h.eva); }
+    catch (e) { errors.push(`${h.name}: ${String(e).slice(0, 120)}`); unpublished.add(h.eva); }
+  }
+  return { kind: "plan", missing: todo.length, calls, fetched, notYetPublished: unpublished.size, errors, ms: Date.now() - t0 };
+}
+
 async function realtime() {
   const t0 = Date.now();
   const hubs = await rest("GET", `de_hubs?select=name,eva,station,last_fchg&order=last_fchg.asc.nullsfirst&limit=${PER_RUN}`);
@@ -163,7 +200,8 @@ async function realtime() {
     catch (e) { errors.push(`${h.name}: ${String(e).slice(0, 120)}`); await rest("PATCH", `de_hubs?name=eq.${encodeURIComponent(h.name)}`, { last_fchg: new Date().toISOString(), last_error: String(e).slice(0, 200) }, { Prefer: "return=minimal" }); }
   }
   // match everything known to the trains running now and write their delays
-  const days = [parisDate(-1), parisDate(0)];
+  // tomorrow too: DB's plan reaches past midnight, and a train gets its number as soon as DB publishes it
+  const days = [parisDate(-1), parisDate(0), parisDate(1)];
   // a station can be written differently in gtfs.de and DB ("Frankfurt (Main) Hbf" / "Frankfurt(Main)Hbf"): both names count
   const evaName = new Map((await rest("GET", "de_hubs?select=name,eva,station&eva=not.is.null")).map((h) => [h.eva, [...new Set([deNorm(h.name), deNorm(h.station || "")].filter(Boolean))]]));
   const plan = [];
@@ -175,20 +213,23 @@ async function realtime() {
     if (page.length < 1000) break;
   }
   const now = Math.floor(Date.now() / 1000);
-  const trains = [];
+  const trains = [], ahead = new Set();
   for (let off = 0; ; off += 1000) {
     const page = await rest("GET", `trains?country=eq.de&service_date=in.(${days.join(",")})&select=id,service_date,type,number,stops,delay_min&order=id&limit=1000&offset=${off}`);
     for (const r of page) {
       const st = r.stops || []; if (st.length < 2) continue;
       const a = fastEpoch(r.service_date, st[0].dep || st[0].arr), b = fastEpoch(r.service_date, st[st.length - 1].arr || st[st.length - 1].dep);
       if (now >= a - 3 * 3600 && now <= b + 7200 + (r.delay_min || 0) * 60) trains.push(r);
+      // a later train still without its number: matched against the plan DB has already published
+      else if (!r.number && r.type !== "FLX" && a > now && a <= now + PLAN_AHEAD * 3600) { trains.push(r); ahead.add(r.id); }
     }
     if (page.length < 1000) break;
   }
-  const updates = germanUpdates(trains, plan, now);
+  // later trains are written only once, when their number is found (no live data yet, so nothing else to write)
+  const updates = germanUpdates(trains, plan, now).filter((u) => !ahead.has(u.id) || u.number);
   let written = 0;
   for (let i = 0; i < updates.length; i += 300) written += await rest("POST", "rpc/apply_de_updates", { payload: updates.slice(i, i + 300) });
-  return { kind: "rt", hubs: hubs.map((h) => h.name), calls, planRows: plan.length, candidates: trains.length, written, errors, ms: Date.now() - t0 };
+  return { kind: "rt", hubs: hubs.map((h) => h.name), calls, planRows: plan.length, candidates: trains.length, numbersAhead: updates.filter((u) => ahead.has(u.id)).length, written, errors, ms: Date.now() - t0 };
 }
 
 Deno.serve(async (req) => {
@@ -198,7 +239,7 @@ Deno.serve(async (req) => {
   if (!DB_ID || !DB_KEY) return json({ error: "DB_CLIENT_ID / DB_API_KEY not set" }, 500);
   try {
     const kind = new URL(req.url).searchParams.get("kind") || "rt";
-    const out = kind === "schedule" ? await schedule() : kind === "flix" ? await flix() : await realtime();
+    const out = kind === "schedule" ? await schedule() : kind === "flix" ? await flix() : kind === "plan" ? await planAhead() : await realtime();
     console.log(JSON.stringify(out));
     return json(out);
   } catch (e) {

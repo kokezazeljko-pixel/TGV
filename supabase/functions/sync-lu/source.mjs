@@ -9,7 +9,9 @@ import { parisDate, gtfsToEpoch } from "../../../ingest/lib/util.mjs";
 const URL_ = Deno.env.get("SUPABASE_URL");
 const KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const LU_KEY = Deno.env.get("LU_API_KEY") || "";
-const PER_RUN = 4; // stations besides Luxembourg per call
+// mobiliteit.lu allows 5000 requests a day (answers 429 after that, until midnight UTC):
+// Luxembourg + 2 other stations a minute = at most 4320 a day, and none at night when no train runs
+const PER_RUN = 2; // stations besides Luxembourg per call
 
 async function rest(method, path, body, extra = {}) {
   const res = await fetch(`${URL_}/rest/v1/${path}`, {
@@ -35,7 +37,13 @@ async function realtime() {
   const toEpoch = (d, t) => gtfsToEpoch(d, t);
   // trains running now (or within the hour)
   const trains = [];
-  for (const r of await rest("GET", `trains?country=eq.lu&service_date=in.(${days.join(",")})&select=id,service_date,number,stops,delay_min&limit=2000`)) {
+  const all = [];
+  for (let off = 0; ; off += 1000) { // in pages: the database gives at most 1000 rows per request
+    const page = await rest("GET", `trains?country=eq.lu&service_date=in.(${days.join(",")})&select=id,service_date,number,stops,delay_min&order=id&limit=1000&offset=${off}`);
+    all.push(...page);
+    if (page.length < 1000) break;
+  }
+  for (const r of all) {
     const st = r.stops || []; if (st.length < 2) continue;
     const a = toEpoch(r.service_date, st[0].dep || st[0].arr), b = toEpoch(r.service_date, st[st.length - 1].arr || st[st.length - 1].dep);
     if (now >= a - 3600 && now <= b + 7200 + (r.delay_min || 0) * 60) trains.push(r);
@@ -46,14 +54,19 @@ async function realtime() {
   const MAIN = "200405060";
   const others = [...count.keys()].filter((e) => e !== MAIN && count.get(e) >= 2).sort();
   const slots = Math.max(1, Math.ceil(others.length / PER_RUN)), slot = Math.floor(now / 60) % slots;
-  const pick = [MAIN, ...others.slice(slot * PER_RUN, slot * PER_RUN + PER_RUN)];
+  const pick = trains.length ? [MAIN, ...others.slice(slot * PER_RUN, slot * PER_RUN + PER_RUN)] : [];
   const rows = [], errors = [];
   for (const ext of pick) { try { rows.push(...await board(ext)); } catch (e) { errors.push(String(e).slice(0, 120)); } }
   const stamp = new Date().toISOString();
   if (rows.length) await rest("POST", "lu_rt?on_conflict=num,ext,pt", rows.map((r) => ({ ...r, updated_at: stamp })), { Prefer: "resolution=merge-duplicates,return=minimal" });
-  // everything known from the last 14 hours
+  // everything known from the last 14 hours (read in pages: the database gives at most 1000 rows per request)
   const since = new Date(Date.now() - 14 * 3600e3).toISOString();
-  const rt = await rest("GET", `lu_rt?pt=gte.${encodeURIComponent(since)}&select=num,ext,pt,ct,cancelled,pf,pf_plan&limit=20000`);
+  const rt = [];
+  for (let off = 0; ; off += 1000) {
+    const page = await rest("GET", `lu_rt?pt=gte.${encodeURIComponent(since)}&select=num,ext,pt,ct,cancelled,pf,pf_plan&order=pt,num,ext&limit=1000&offset=${off}`);
+    rt.push(...page);
+    if (page.length < 1000) break;
+  }
   const updates = luxUpdates(trains, rt, toEpoch, now);
   let written = 0;
   for (let i = 0; i < updates.length; i += 300) written += await rest("POST", "rpc/apply_rt_delays", { payload: updates.slice(i, i + 300) });

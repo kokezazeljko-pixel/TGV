@@ -466,6 +466,8 @@ var DB_ID = Deno.env.get("DB_CLIENT_ID") || "";
 var DB_KEY = Deno.env.get("DB_API_KEY") || "";
 var UA = { "User-Agent": "TrainPunctuality/1.0 (+https://www.trainpunctuality.com)" };
 var PER_RUN = 10;
+var PLAN_AHEAD = 18;
+var PLAN_CALLS = 20;
 async function rest(method, path, body, extra = {}) {
   const res = await fetch(`${URL_}/rest/v1/${path}`, {
     method,
@@ -478,10 +480,10 @@ async function rest(method, path, body, extra = {}) {
   return t ? JSON.parse(t) : null;
 }
 var upsert = (table, rows, onConflict) => rows.length ? rest("POST", `${table}?on_conflict=${onConflict}`, rows, { Prefer: "resolution=merge-duplicates,return=minimal" }) : null;
-async function tt(path) {
+async function tt(path, missing = "") {
   const res = await fetch(DE_TT_BASE + path, { headers: { ...UA, "DB-Client-Id": DB_ID, "DB-Api-Key": DB_KEY, Accept: "application/xml" } });
   if (res.status === 404)
-    return "";
+    return missing;
   if (!res.ok)
     throw new Error(`timetables ${path.split("/")[0]} -> ${res.status}`);
   return res.text();
@@ -506,6 +508,7 @@ async function schedule() {
   }
   await rest("DELETE", `trains?country=eq.de&service_date=lt.${parisDate(-8)}`, null, { Prefer: "return=minimal" });
   await rest("DELETE", `de_plan?day=lt.${parisDate(-1)}`, null, { Prefer: "return=minimal" });
+  await rest("DELETE", `de_plan_hours?hour=lt.${new Date(Date.now() - 2 * 86400000).toISOString()}`, null, { Prefer: "return=minimal" });
   return { kind: "schedule", trains: rows.length, bytes: zip.length };
 }
 async function hubEva(h) {
@@ -518,6 +521,31 @@ async function hubEva(h) {
   await rest("PATCH", `de_hubs?name=eq.${encodeURIComponent(h.name)}`, { eva, last_error: eva ? null : "station not found", ...eva ? {} : { last_fchg: new Date().toISOString() } }, { Prefer: "return=minimal" });
   return eva;
 }
+async function planHour(h, eva, hr) {
+  const p = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", year: "2-digit", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" }).formatToParts(hr);
+  const g = (t) => p.find((x) => x.type === t).value;
+  const xml = await tt(`plan/${eva}/${g("year")}${g("month")}${g("day")}/${g("hour")}`, null);
+  if (xml === null)
+    return false;
+  const { station, stops } = parseTimetable(xml);
+  const rows = stops.filter((s) => s.tl && deCategory(s.tl.c)).map((s) => ({
+    eva,
+    sid: s.sid,
+    day: parisDate(0, new Date(ttTime(s.dp?.pt || s.ar?.pt) || hr)),
+    cat: s.tl.c,
+    num: s.tl.n,
+    ar_pt: ttTime(s.ar?.pt),
+    dp_pt: ttTime(s.dp?.pt),
+    pp: s.dp?.pp || s.ar?.pp || null
+  }));
+  await upsert("de_plan", rows, "eva,sid");
+  await upsert("de_plan_hours", [{ eva, hour: hr.toISOString() }], "eva,hour");
+  if (station && station !== h.station) {
+    h.station = station;
+    await rest("PATCH", `de_hubs?name=eq.${encodeURIComponent(h.name)}`, { station }, { Prefer: "return=minimal" });
+  }
+  return true;
+}
 async function pollHub(h, now) {
   const eva = await hubEva(h);
   if (!eva)
@@ -526,29 +554,11 @@ async function pollHub(h, now) {
   const have = new Set((await rest("GET", `de_plan_hours?eva=eq.${eva}&hour=gte.${hours[0].toISOString()}&select=hour`)).map((r) => Date.parse(r.hour)));
   let calls = 0;
   for (const hr of hours) {
-    if (have.has(hr.getTime()))
+    if (have.has(hr.getTime()) && hr !== hours[1])
       continue;
-    const p = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", year: "2-digit", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" }).formatToParts(hr);
-    const g = (t) => p.find((x) => x.type === t).value;
-    const xml = await tt(`plan/${eva}/${g("year")}${g("month")}${g("day")}/${g("hour")}`);
     calls++;
-    const { station, stops } = parseTimetable(xml);
-    const rows = stops.filter((s) => s.tl && deCategory(s.tl.c)).map((s) => ({
-      eva,
-      sid: s.sid,
-      day: parisDate(0, new Date(ttTime(s.dp?.pt || s.ar?.pt) || hr)),
-      cat: s.tl.c,
-      num: s.tl.n,
-      ar_pt: ttTime(s.ar?.pt),
-      dp_pt: ttTime(s.dp?.pt),
-      pp: s.dp?.pp || s.ar?.pp || null
-    }));
-    await upsert("de_plan", rows, "eva,sid");
-    await upsert("de_plan_hours", [{ eva, hour: hr.toISOString() }], "eva,hour");
-    if (station && station !== h.station) {
-      h.station = station;
-      await rest("PATCH", `de_hubs?name=eq.${encodeURIComponent(h.name)}`, { station }, { Prefer: "return=minimal" });
-    }
+    if (!await planHour(h, eva, hr))
+      break;
   }
   const known = new Map((await rest("GET", `de_plan?eva=eq.${eva}&day=gte.${parisDate(-1)}&select=sid,day`)).map((r) => [r.sid, r.day]));
   const xml = await tt(`fchg/${eva}`);
@@ -664,6 +674,43 @@ async function flix() {
   }
   return { kind: "flix", trains: rows.length, removed };
 }
+async function planAhead() {
+  const t0 = Date.now();
+  const hubs = (await rest("GET", "de_hubs?select=name,eva,station&eva=not.is.null&order=name")).filter((h) => h.eva);
+  const first = Math.floor(Date.now() / 3600000) * 3600000;
+  const have = new Set;
+  for (let off = 0;; off += 1000) {
+    const page = await rest("GET", `de_plan_hours?hour=gte.${new Date(first).toISOString()}&select=eva,hour&order=eva,hour&limit=1000&offset=${off}`);
+    for (const r of page)
+      have.add(`${r.eva}|${Date.parse(r.hour)}`);
+    if (page.length < 1000)
+      break;
+  }
+  const todo = [];
+  for (let k = 0;k < PLAN_AHEAD; k++)
+    for (const h of hubs)
+      if (!have.has(`${h.eva}|${first + k * 3600000}`))
+        todo.push([h, first + k * 3600000]);
+  let calls = 0, fetched = 0;
+  const unpublished = new Set, errors = [];
+  for (const [h, ms] of todo) {
+    if (calls >= PLAN_CALLS)
+      break;
+    if (unpublished.has(h.eva))
+      continue;
+    calls++;
+    try {
+      if (await planHour(h, h.eva, new Date(ms)))
+        fetched++;
+      else
+        unpublished.add(h.eva);
+    } catch (e) {
+      errors.push(`${h.name}: ${String(e).slice(0, 120)}`);
+      unpublished.add(h.eva);
+    }
+  }
+  return { kind: "plan", missing: todo.length, calls, fetched, notYetPublished: unpublished.size, errors, ms: Date.now() - t0 };
+}
 async function realtime() {
   const t0 = Date.now();
   const hubs = await rest("GET", `de_hubs?select=name,eva,station,last_fchg&order=last_fchg.asc.nullsfirst&limit=${PER_RUN}`);
@@ -677,7 +724,7 @@ async function realtime() {
       await rest("PATCH", `de_hubs?name=eq.${encodeURIComponent(h.name)}`, { last_fchg: new Date().toISOString(), last_error: String(e).slice(0, 200) }, { Prefer: "return=minimal" });
     }
   }
-  const days = [parisDate(-1), parisDate(0)];
+  const days = [parisDate(-1), parisDate(0), parisDate(1)];
   const evaName = new Map((await rest("GET", "de_hubs?select=name,eva,station&eva=not.is.null")).map((h) => [h.eva, [...new Set([deNorm(h.name), deNorm(h.station || "")].filter(Boolean))]]));
   const plan = [];
   const since = new Date(Date.now() - 12 * 3600000).toISOString();
@@ -689,7 +736,7 @@ async function realtime() {
       break;
   }
   const now = Math.floor(Date.now() / 1000);
-  const trains = [];
+  const trains = [], ahead = new Set;
   for (let off = 0;; off += 1000) {
     const page = await rest("GET", `trains?country=eq.de&service_date=in.(${days.join(",")})&select=id,service_date,type,number,stops,delay_min&order=id&limit=1000&offset=${off}`);
     for (const r of page) {
@@ -699,15 +746,19 @@ async function realtime() {
       const a = fastEpoch(r.service_date, st[0].dep || st[0].arr), b = fastEpoch(r.service_date, st[st.length - 1].arr || st[st.length - 1].dep);
       if (now >= a - 3 * 3600 && now <= b + 7200 + (r.delay_min || 0) * 60)
         trains.push(r);
+      else if (!r.number && r.type !== "FLX" && a > now && a <= now + PLAN_AHEAD * 3600) {
+        trains.push(r);
+        ahead.add(r.id);
+      }
     }
     if (page.length < 1000)
       break;
   }
-  const updates = germanUpdates(trains, plan, now);
+  const updates = germanUpdates(trains, plan, now).filter((u) => !ahead.has(u.id) || u.number);
   let written = 0;
   for (let i = 0;i < updates.length; i += 300)
     written += await rest("POST", "rpc/apply_de_updates", { payload: updates.slice(i, i + 300) });
-  return { kind: "rt", hubs: hubs.map((h) => h.name), calls, planRows: plan.length, candidates: trains.length, written, errors, ms: Date.now() - t0 };
+  return { kind: "rt", hubs: hubs.map((h) => h.name), calls, planRows: plan.length, candidates: trains.length, numbersAhead: updates.filter((u) => ahead.has(u.id)).length, written, errors, ms: Date.now() - t0 };
 }
 Deno.serve(async (req) => {
   const token = req.headers.get("x-cron-token") || "";
@@ -718,7 +769,7 @@ Deno.serve(async (req) => {
     return json({ error: "DB_CLIENT_ID / DB_API_KEY not set" }, 500);
   try {
     const kind = new URL(req.url).searchParams.get("kind") || "rt";
-    const out = kind === "schedule" ? await schedule() : kind === "flix" ? await flix() : await realtime();
+    const out = kind === "schedule" ? await schedule() : kind === "flix" ? await flix() : kind === "plan" ? await planAhead() : await realtime();
     console.log(JSON.stringify(out));
     return json(out);
   } catch (e) {

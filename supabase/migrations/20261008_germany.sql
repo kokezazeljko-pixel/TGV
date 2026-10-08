@@ -51,3 +51,6 @@ insert into de_hubs(name) select n from unnest(array[
 -- 7.10.2026: FlixTrain (red vožnje iz Flix GTFS, kind=flix), kašnjenja iz DB plana samo za FLX redove sa istim brojem
 insert into de_hubs(name) select n from unnest(array['Frankfurt(Main)Süd','Berlin-Wannsee','Hamburg-Harburg']) n where not exists (select 1 from de_hubs h where h.name = n);
 select cron.schedule('de-flix', '15 0,5 * * *', $$select public.call_sync_de('flix')$$);
+
+-- 8.10.2026: broj voza čim ga DB objavi (DB plan je dostupan ~18 sati unapred): sync-de kind=plan svakog minuta, 20 sati-stanica po pozivu
+select cron.schedule('de-plan', '* * * * *', $$select public.call_sync_de('plan')$$);

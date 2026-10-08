@@ -107,7 +107,7 @@ function gtfsToEpoch(dateStr, hms) {
 var URL_ = Deno.env.get("SUPABASE_URL");
 var KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 var LU_KEY = Deno.env.get("LU_API_KEY") || "";
-var PER_RUN = 4;
+var PER_RUN = 2;
 async function rest(method, path, body, extra = {}) {
   const res = await fetch(`${URL_}/rest/v1/${path}`, {
     method,
@@ -133,7 +133,14 @@ async function realtime() {
   const now = Math.floor(Date.now() / 1000);
   const toEpoch = (d, t) => gtfsToEpoch(d, t);
   const trains = [];
-  for (const r of await rest("GET", `trains?country=eq.lu&service_date=in.(${days.join(",")})&select=id,service_date,number,stops,delay_min&limit=2000`)) {
+  const all = [];
+  for (let off = 0;; off += 1000) {
+    const page = await rest("GET", `trains?country=eq.lu&service_date=in.(${days.join(",")})&select=id,service_date,number,stops,delay_min&order=id&limit=1000&offset=${off}`);
+    all.push(...page);
+    if (page.length < 1000)
+      break;
+  }
+  for (const r of all) {
     const st = r.stops || [];
     if (st.length < 2)
       continue;
@@ -151,7 +158,7 @@ async function realtime() {
   const MAIN = "200405060";
   const others = [...count.keys()].filter((e) => e !== MAIN && count.get(e) >= 2).sort();
   const slots = Math.max(1, Math.ceil(others.length / PER_RUN)), slot = Math.floor(now / 60) % slots;
-  const pick = [MAIN, ...others.slice(slot * PER_RUN, slot * PER_RUN + PER_RUN)];
+  const pick = trains.length ? [MAIN, ...others.slice(slot * PER_RUN, slot * PER_RUN + PER_RUN)] : [];
   const rows = [], errors = [];
   for (const ext of pick) {
     try {
@@ -164,7 +171,13 @@ async function realtime() {
   if (rows.length)
     await rest("POST", "lu_rt?on_conflict=num,ext,pt", rows.map((r) => ({ ...r, updated_at: stamp })), { Prefer: "resolution=merge-duplicates,return=minimal" });
   const since = new Date(Date.now() - 14 * 3600000).toISOString();
-  const rt = await rest("GET", `lu_rt?pt=gte.${encodeURIComponent(since)}&select=num,ext,pt,ct,cancelled,pf,pf_plan&limit=20000`);
+  const rt = [];
+  for (let off = 0;; off += 1000) {
+    const page = await rest("GET", `lu_rt?pt=gte.${encodeURIComponent(since)}&select=num,ext,pt,ct,cancelled,pf,pf_plan&order=pt,num,ext&limit=1000&offset=${off}`);
+    rt.push(...page);
+    if (page.length < 1000)
+      break;
+  }
   const updates = luxUpdates(trains, rt, toEpoch, now);
   let written = 0;
   for (let i = 0;i < updates.length; i += 300)
