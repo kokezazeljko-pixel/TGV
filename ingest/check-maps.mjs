@@ -25,12 +25,22 @@ async function loadTrains() {
   if (process.env.TRAINS_FILE) return JSON.parse(await readFile(process.env.TRAINS_FILE, "utf8"));
   const base = process.env.SUPABASE_URL.replace(/\/$/, "") + "/rest/v1", key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const headers = { apikey: key, ...(key.startsWith("eyJ") ? { Authorization: `Bearer ${key}` } : {}) };
+  // per country and in the order of the index (country, service_date, dep): small fast requests; a busy database is tried again
+  const get = async (url) => {
+    for (let i = 1; ; i++) {
+      const res = await fetch(url, { headers });
+      if (res.ok) return res.json();
+      const msg = `Supabase -> ${res.status}: ${await res.text()}`;
+      if (i >= 5) throw new Error(msg);
+      console.log(`${msg} – ponovo za ${i * 10} s`);
+      await new Promise((r) => setTimeout(r, i * 10000));
+    }
+  };
   const out = [];
-  for (let off = 0; ; off += 1000) {
-    const res = await fetch(`${base}/trains?select=id,country,number,type,stops&service_date=eq.${today}&order=id&limit=1000&offset=${off}`, { headers });
-    if (!res.ok) throw new Error(`Supabase -> ${res.status}: ${await res.text()}`);
-    const page = await res.json(); out.push(...page);
-    if (page.length < 1000) break;
+  for (const c of COUNTRIES) for (let off = 0; ; off += 500) {
+    const page = await get(`${base}/trains?select=id,country,number,type,stops&country=eq.${c}&service_date=eq.${today}&order=dep,id&limit=500&offset=${off}`);
+    out.push(...page);
+    if (page.length < 500) break;
   }
   return out;
 }
