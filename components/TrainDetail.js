@@ -128,7 +128,7 @@ export default function TrainDetail({ initialTrain }) {
     const sb = getBrowserClient();
     if (!sb) return;
     const [{ data: t }, { data: c }, { data: r }, al] = await Promise.all([
-      sb.from("trains").select(TRAIN_FIELDS).eq("id", initialTrain.id).maybeSingle(),
+      sb.from("trains").select(TRAIN_FIELDS + ",rt_checked_at").eq("id", initialTrain.id).maybeSingle(),
       sb.from("comments_feed").select(COMMENT_FIELDS).eq("train_id", initialTrain.id).order("created_at", { ascending: false }).limit(200),
       sb.from("comments_feed").select("rating").eq("route_key", routeKey).not("rating", "is", null).order("created_at", { ascending: false }).limit(500),
       fetchAlertsForTrain(sb, initialTrain.id),
@@ -176,7 +176,7 @@ export default function TrainDetail({ initialTrain }) {
               <div className="n num">{train.cancelled ? t("cancelled") : isScheduleOnly(train) ? t("schedLbl") : train.delay_min ? `+${train.delay_min} min` : t("onTimeLbl")}</div>
               <div className="muted">
                 <span className={`pill ${st.cls}`}>{st.label}</span>
-                <div>{train.rt_updated_at ? t("updated", ago(train.rt_updated_at, t, lang)) : isScheduleOnly(train) ? t("schedShort") : departed === false ? t("notStarted") : t("noReport")}</div>
+                <div>{train.rt_updated_at ? t("updated", ago(train.rt_checked_at || train.rt_updated_at, t, lang)) : isScheduleOnly(train) ? t("schedShort") : departed === false ? t("notStarted") : t("noReport")}</div>
               </div>
             </div>
             {isScheduleOnly(train) && <p className="infobox sched small" role="note"><span aria-hidden="true">💬</span> {t("schedTrainAsk", t("country_" + train.country))}</p>}

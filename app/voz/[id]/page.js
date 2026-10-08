@@ -12,7 +12,7 @@ function decodeId(raw) {
 
 async function loadTrain(id) {
   if (!isConfigured) return null;
-  const { data } = await getServerClient().from("trains").select(TRAIN_FIELDS).eq("id", id).maybeSingle();
+  const { data } = await getServerClient().from("trains").select(TRAIN_FIELDS + ",rt_checked_at").eq("id", id).maybeSingle();
   return data;
 }
 
