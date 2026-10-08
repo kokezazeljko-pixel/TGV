@@ -49,6 +49,10 @@ const servesCountry = (t) => COUNTRY === "ch" ? t.stops.some((s) => /^(ch:|85\d{
 // "R" (routier = drumski) u trip_id umesto "F" (ferré) ili route_type 3 – nijedno nije voz
 const isShuttle = (t, route = {}) => (COUNTRY === "fr" && (/^\d{6,}$/.test(t.trip_short_name || t.trip_headsign || "") || String(route.route_type).trim() === "3" || /^OCESN\d+R/.test(t.trip_id || ""))) || t.stops.length < 2;
 
+// GTFS route_type: 3 = bus, 200–299 = coach, 700–799 = bus (extended), 4 and 1000–1299 = ferry, 1500–1599 = taxi.
+// These are never trains, whatever the line is called (SNCF sells its TGV connecting buses as "TGV INOUI").
+const isRoad = (route = {}) => { const n = parseInt(String(route.route_type ?? "").trim(), 10); return n === 3 || n === 4 || (n >= 200 && n < 300) || (n >= 700 && n < 800) || (n >= 1000 && n < 1300) || (n >= 1500 && n < 1600); };
+
 async function main() {
   console.log(`Zemlja: ${COUNTRY} · red vožnje za: ${dates.join(", ")} · vrste: ${TYPES.join(", ")}`);
   let url = env("GTFS_URL", CONFIG.gtfsUrl || "");
@@ -80,7 +84,9 @@ async function main() {
   //    pa odmah izbacujemo tramvaje, autobuse, S-Bahn… da ne bismo čitali milione nepotrebnih redova.
   const routes = new Map();
   const descCount = {};
+  const road = new Set(); // lines served by buses or boats: their trips are skipped in every country
   await read("routes.txt", (r) => {
+    if (isRoad(r)) { road.add(r.route_id); return; }
     if (routeType) {
       const cat = COUNTRY === "be" ? ((r.route_short_name || "").match(/^[A-Za-z]+/) || [""])[0] : COUNTRY === "nl" || COUNTRY === "lu" ? `${r.agency_id} ${r.route_short_name}` : r.route_desc;
       descCount[cat] = (descCount[cat] || 0) + 1;
@@ -90,7 +96,9 @@ async function main() {
   });
   if (routeType) console.log("Kategorije linija:", Object.fromEntries(Object.entries(descCount).sort((a, b) => b[1] - a[1]).slice(0, 25)));
   const trips = new Map();
+  console.log(`Autobuske i brodske linije (preskočene): ${road.size}`);
   await read("trips.txt", (r) => {
+    if (road.has(r.route_id)) return;
     if (routeType && !routes.has(r.route_id)) return;
     const runs = dates.filter((d) => active.get(d).has(r.service_id));
     if (runs.length) trips.set(r.trip_id, { ...r, runs, stops: [] });
@@ -189,6 +197,8 @@ async function main() {
     }
   }
   await db.del("trains", `country=eq.${COUNTRY}&service_date=lt.${addDays(TODAY, -8)}`); // istorija: 7 prethodnih dana (plaćeni pregled)
+  // SNCF connecting buses ("R" = routier in the trip id) that reached the site before this filter existed: removed from the history too
+  if (COUNTRY === "fr") await db.del("trains", `country=eq.fr&id=match.${encodeURIComponent("_OCESN[0-9]+R")}`);
   console.log(`Gotovo: red vožnje je upisan (obrisano zastarelih: ${removed}).`);
 }
 
