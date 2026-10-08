@@ -1,27 +1,20 @@
 # Automatsko preuzimanje podataka o vozovima (Francuska: SNCF, Švajcarska: opentransportdata.swiss, Belgija: SNCB)
 name: SNCF podaci
 
-# Kašnjenja se osvežavaju automatski u Supabase-u (Edge funkcija sync-realtime, na svakih 3 minuta).
-# Ovde ostaje red vožnje (svakog dana) i ručno pokretanje kašnjenja, ako zatreba.
+# Kašnjenja se osvežavaju automatski u Supabase-u (Edge funkcije, svakog minuta), zato ih ovde više nema.
+# Ovde je samo red vožnje (svakog dana) i provera mapa i podataka posle njega.
 on:
   schedule:
     - cron: "20 1 * * *"    # red vožnje (sve zemlje): jednom dnevno, noću
     - cron: "20 14 * * *"   # švajcarski red vožnje ponovo, posle njihovog popodnevnog ažuriranja
-  workflow_dispatch:
-    inputs:
-      job:
-        description: "Šta da pokrenem"
-        type: choice
-        options: [oba, red-voznje, kasnjenja]
-        default: oba
+  workflow_dispatch:   # ručno pokretanje: Actions -> SNCF podaci -> Run workflow
 
 concurrency:
-  group: sync-${{ github.event.schedule || github.event.inputs.job }}
+  group: sync-${{ github.event.schedule || 'rucno' }}
   cancel-in-progress: false
 
 jobs:
   red-voznje:
-    if: github.event.schedule == '20 1 * * *' || github.event.schedule == '20 14 * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.job != 'kasnjenja')
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -73,37 +66,5 @@ jobs:
         if: github.event.schedule != '20 14 * * *'
         run: node ingest/check-maps.mjs
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-
-  kasnjenja:
-    needs: [red-voznje]
-    if: always() && github.event_name == 'workflow_dispatch' && github.event.inputs.job != 'red-voznje'
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Francuska – kašnjenja
-        continue-on-error: true
-        run: node ingest/sync-realtime.mjs
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      - name: Švajcarska – kašnjenja
-        continue-on-error: true
-        run: node ingest/sync-realtime.mjs
-        env:
-          COUNTRY: ch
-          SWISS_API_KEY: ${{ secrets.SWISS_API_KEY }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      - name: Belgija – kašnjenja
-        continue-on-error: true
-        run: node ingest/sync-realtime.mjs
-        env:
-          COUNTRY: be
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
