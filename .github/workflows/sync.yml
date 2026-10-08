@@ -14,12 +14,6 @@ on:
         type: choice
         options: [oba, red-voznje, kasnjenja]
         default: oba
-  - name: Provera mapa i podataka
-        if: github.event.schedule != '20 14 * * *'
-        run: node ingest/check-maps.mjs
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}      
 
 concurrency:
   group: sync-${{ github.event.schedule || github.event.inputs.job }}
@@ -65,7 +59,7 @@ jobs:
           COUNTRY: nl
           NODE_OPTIONS: --max-old-space-size=4096
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }} 
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       - name: Luksemburg – red vožnje
         if: github.event.schedule != '20 14 * * *'
         continue-on-error: true
@@ -73,8 +67,14 @@ jobs:
         env:
           COUNTRY: lu
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}  
-
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      # bez continue-on-error: ako nešto nije u redu sa mapama ili podacima, korak pada i GitHub šalje e-mail
+      - name: Provera mapa i podataka
+        if: github.event.schedule != '20 14 * * *'
+        run: node ingest/check-maps.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
   kasnjenja:
     needs: [red-voznje]
