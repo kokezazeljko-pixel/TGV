@@ -53,4 +53,5 @@ insert into de_hubs(name) select n from unnest(array['Frankfurt(Main)Süd','Berl
 select cron.schedule('de-flix', '15 0,5 * * *', $$select public.call_sync_de('flix')$$);
 
 -- 8.10.2026: broj voza čim ga DB objavi (DB plan je dostupan ~18 sati unapred): sync-de kind=plan svakog minuta, 20 sati-stanica po pozivu
+-- (9.10.2026 promenjeno na svaka 2 minuta, vidi 20261011_write_only_changes.sql)
 select cron.schedule('de-plan', '* * * * *', $$select public.call_sync_de('plan')$$);

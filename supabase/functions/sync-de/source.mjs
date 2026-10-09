@@ -91,24 +91,25 @@ async function planHour(h, eva, hr) {
 async function pollHub(h, now) {
   const eva = await hubEva(h);
   if (!eva) return 0;
-  // planned stops for this hour and the next two, if kind=plan has not fetched them yet;
-  // the next hour is fetched again (it was fetched up to 18 hours ago: an extra train added since then is picked up)
+  // planned stops for this hour and the next two, if kind=plan has not fetched them yet (each hour is fetched once)
   const hours = [0, 1, 2].map((k) => new Date(Math.floor(now / 3600000) * 3600000 + k * 3600000));
   const have = new Set((await rest("GET", `de_plan_hours?eva=eq.${eva}&hour=gte.${hours[0].toISOString()}&select=hour`)).map((r) => Date.parse(r.hour)));
   let calls = 0;
   for (const hr of hours) {
-    if (have.has(hr.getTime()) && hr !== hours[1]) continue;
+    if (have.has(hr.getTime())) continue;
     calls++;
     if (!(await planHour(h, eva, hr))) break;
   }
   // all current changes at this station; only stops we know as long-distance are kept
-  const known = new Map((await rest("GET", `de_plan?eva=eq.${eva}&day=gte.${parisDate(-1)}&select=sid,day`)).map((r) => [r.sid, r.day]));
+  // only changes that are new are written (the database disk is small: rewriting the same rows every minute overloaded it on 9.10.2026)
+  const known = new Map((await rest("GET", `de_plan?eva=eq.${eva}&day=gte.${parisDate(-1)}&select=sid,day,ar_ct,dp_ct,cp,cs`)).map((r) => [r.sid, r]));
   const xml = await tt(`fchg/${eva}`); calls++;
+  const ms = (t) => (t ? Date.parse(t) : null);
   const ch = parseTimetable(xml).stops.filter((s) => known.has(s.sid)).map((s) => ({
-    eva, sid: s.sid, day: known.get(s.sid),
+    eva, sid: s.sid, day: known.get(s.sid).day,
     ar_ct: ttTime(s.ar?.ct), dp_ct: ttTime(s.dp?.ct), cp: s.dp?.cp || s.ar?.cp || null,
     cs: (s.dp?.cs || s.ar?.cs) === "c" ? "c" : null, updated_at: new Date().toISOString(),
-  }));
+  })).filter((r) => { const o = known.get(r.sid); return ms(o.ar_ct) !== ms(r.ar_ct) || ms(o.dp_ct) !== ms(r.dp_ct) || (o.cp || null) !== r.cp || (o.cs || null) !== r.cs; });
   for (let i = 0; i < ch.length; i += 500) await upsert("de_plan", ch.slice(i, i + 500), "eva,sid");
   await rest("PATCH", `de_hubs?name=eq.${encodeURIComponent(h.name)}`, { last_fchg: new Date().toISOString(), last_error: null }, { Prefer: "return=minimal" });
   return calls;
