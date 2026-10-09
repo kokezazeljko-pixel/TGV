@@ -50,7 +50,10 @@ export function parseLuxBoard(body, ext) {
   for (const d of body?.Departure || []) {
     const num = luxNumber(d.ProductAtStop?.num || ""); if (!num) continue;
     const pt = luxEpoch(d.date, d.time); if (!pt) continue;
-    const ct = luxEpoch(d.rtDate || d.date, d.rtTime) ;
+    let ct = luxEpoch(d.rtDate || d.date, d.rtTime);
+    // mobiliteit.lu sometimes sends a wrong rtDate (9.10.2026: RE 5122 at Wasserbillig came with the next day's date,
+    // shown as "+1450 min" instead of +10): the real time is the one closest to the planned time (within ±12 h)
+    if (ct) ct += Math.round((pt - ct) / 86400) * 86400;
     out.push({ num, ext: d.mainMastExtId || ext, pt: new Date(pt * 1000).toISOString(), ct: ct ? new Date(ct * 1000).toISOString() : null,
       cancelled: d.cancelled === true, pf: d.rtPlatform?.text || d.platform?.text || null, pf_plan: d.platform?.text || null });
   }

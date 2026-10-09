@@ -162,6 +162,16 @@ assert.equal(l1.country, "lu"); assert.ok(l1.id.endsWith("_lu_100"));
 assert.equal(l1.origin, "Luxembourg"); assert.equal(l1.destination, "Troisvierges");
 assert.equal(l1.stops[1].name, "Ettelbruck"); assert.equal(l1.dep, "13:20"); assert.equal(l1.stops[1].lat, 49.848);
 assert.equal(lux.find((t) => t.number === "2800").origin, "Metz-Ville");
+{
+  // mobiliteit.lu sent RE 5122 with the next day's rtDate (9.10.2026): it must be +10 min, not +1450
+  const { parseLuxBoard } = await import("../lib/luxembourg.mjs");
+  const [b] = parseLuxBoard({ Departure: [{ ProductAtStop: { num: "5122" }, date: "2026-10-09", time: "18:54:00", rtDate: "2026-10-10", rtTime: "19:04:00" }] }, "180703009");
+  assert.equal((Date.parse(b.ct) - Date.parse(b.pt)) / 60000, 10, "pogrešan datum uživo -> najbliže planu");
+  const [m] = parseLuxBoard({ Departure: [{ ProductAtStop: { num: "1" }, date: "2026-10-09", time: "23:55:00", rtTime: "00:05:00" }] }, "1");
+  assert.equal((Date.parse(m.ct) - Date.parse(m.pt)) / 60000, 10, "kašnjenje preko ponoći bez rtDate");
+  const [z] = parseLuxBoard({ Departure: [{ ProductAtStop: { num: "2" }, date: "2026-10-09", time: "23:55:00", rtDate: "2026-10-10", rtTime: "00:05:00" }] }, "1");
+  assert.equal((Date.parse(z.ct) - Date.parse(z.pt)) / 60000, 10, "kašnjenje preko ponoći sa rtDate");
+}
 // ---- Španija
 {
   const { buildSpanishSchedule, esTrainKey, esStopName } = await import("../lib/spain.mjs");

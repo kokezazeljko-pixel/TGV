@@ -4,7 +4,8 @@
 //  2) da nijedna stanica nema lažne koordinate 0,0 (to bi je stavilo u Afriku); stanica bez koordinata u feedu
 //     (npr. nemačke stanice u holandskom feedu) samo se ne crta na mapi i nije greška,
 //  3) da svaka stanica ima svoju tačku na liniji mape te zemlje (ne samo "negde blizu linije"),
-//  4) da mapa ima liniju između dve uzastopne stanice, bez velikog zaobilaska.
+//  4) da mapa ima liniju između dve uzastopne stanice, bez velikog zaobilaska,
+//  5) da nijedan voz nema nemoguće kašnjenje (preko 12 sati).
 // Ako nešto nije u redu, ispisuje tačno šta (zemlja, voz, stanice) i završava sa greškom,
 // pa GitHub pošalje e-mail da je korak "Provera mapa i podataka" pao.
 // Za probu bez baze: TRAINS_FILE=trains.json (niz vozova kao u tabeli trains).
@@ -38,7 +39,7 @@ async function loadTrains() {
   };
   const out = [];
   for (const c of COUNTRIES) for (let off = 0; ; off += 500) {
-    const page = await get(`${base}/trains?select=id,country,number,type,stops&country=eq.${c}&service_date=eq.${today}&order=dep,id&limit=500&offset=${off}`);
+    const page = await get(`${base}/trains?select=id,country,number,type,delay_min,stops&country=eq.${c}&service_date=eq.${today}&order=dep,id&limit=500&offset=${off}`);
     out.push(...page);
     if (page.length < 500) break;
   }
@@ -115,6 +116,9 @@ async function main() {
     if (t.country === "fr" && (/_OCESN\d+R/.test(t.id) || /^\d{6,}$/.test(t.number || ""))) problems.push(`fr: autobus ili šatl među vozovima: ${t.type} ${t.number} (${t.id})`);
     const zero = (t.stops || []).filter((s) => s.lat === 0 && s.lon === 0);
     if (zero.length) problems.push(`${t.country}: stanica sa koordinatama 0,0: ${zero.map((s) => s.name).join(", ")} (${t.type} ${t.number})`);
+    // a delay over 12 h is a data error (9.10.2026: RE 5122 "+1450 min" from a wrong date in mobiliteit.lu)
+    const worst = Math.max(t.delay_min || 0, ...(t.stops || []).map((s) => (typeof s.delay === "number" ? s.delay : 0)));
+    if (worst > 720) problems.push(`${t.country}: nemoguće kašnjenje ${worst} min: ${t.type} ${t.number} (${t.id})`);
   }
   for (const c of COUNTRIES) {
     const mine = trains.filter((t) => t.country === c);
@@ -129,7 +133,7 @@ async function main() {
     for (const p of problems.slice(0, 200)) console.log(" - " + p);
     process.exit(1);
   }
-  console.log("\n✔ Sve stanice su na mapama, nema autobusa ni stanica sa koordinatama 0,0.");
+  console.log("\n✔ Sve stanice su na mapama, nema autobusa, stanica sa koordinatama 0,0 ni nemogućih kašnjenja.");
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

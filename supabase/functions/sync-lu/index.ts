@@ -20,7 +20,9 @@ function parseLuxBoard(body, ext) {
     const pt = luxEpoch(d.date, d.time);
     if (!pt)
       continue;
-    const ct = luxEpoch(d.rtDate || d.date, d.rtTime);
+    let ct = luxEpoch(d.rtDate || d.date, d.rtTime);
+    if (ct)
+      ct += Math.round((pt - ct) / 86400) * 86400;
     out.push({
       num,
       ext: d.mainMastExtId || ext,
