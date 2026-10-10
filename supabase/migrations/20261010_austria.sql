@@ -1,4 +1,4 @@
--- Austrija (ÖBB) – PRIPREMLJENO, JOŠ NIJE PRIMENJENO NA BAZU (primenjuje se kad se Austrija objavi).
+-- Austrija (ÖBB) – primenjeno na bazu 10.10.2026 (objava Austrije).
 -- Red vožnje: ÖBB GTFS (Edge funkcija sync-at, kind=schedule; zip se čita range zahtevima, ~3 MB umesto 170 MB).
 -- Kašnjenja: DB Timetables na austrijskim stanicama (isto kao Nemačka; plan i izmene idu u de_plan po broju stanice).
 -- Ključevi DB_CLIENT_ID i DB_API_KEY su već u Supabase -> Edge Functions -> Secrets (isti kao za Nemačku).
@@ -27,20 +27,27 @@ insert into public.at_hubs(name, eva) values
  ('Klagenfurt Hbf','8100085'),('Villach Hbf','8100147')
 on conflict (name) do nothing;
 
--- kašnjenja, otkazivanja i peroni (broj voza ostaje iz ÖBB reda vožnje)
+-- kašnjenja, otkazivanja i peroni (broj voza ostaje iz ÖBB reda vožnje);
+-- piše se samo voz kome se nešto promenilo, i nikad nemoguće kašnjenje (preko 12 h, vidi 20261013_reject_impossible_delays.sql)
 create or replace function public.apply_at_updates(payload jsonb) returns integer language sql security definer set search_path to 'public' as $$
   with u as (
     select * from jsonb_to_recordset(payload) as x(id text, delay_min integer, cancelled boolean, d jsonb)
+  ), n as (
+    select t.id, u.delay_min, u.cancelled, t.rt_updated_at, t.delay_min as old_delay, t.cancelled as old_cancelled, t.stops as old_stops,
+           (select jsonb_agg(
+              (e - 'apf') || jsonb_build_object('delay', coalesce(u.d->(o::int - 1)->0, e->'delay', '0'::jsonb),
+                                                'skipped', coalesce(u.d->(o::int - 1)->1, 'false'::jsonb))
+              || case when jsonb_typeof(u.d->(o::int - 1)->2) = 'string' then jsonb_build_object('apf', u.d->(o::int - 1)->2) else '{}'::jsonb end
+              order by o)
+              from jsonb_array_elements(t.stops) with ordinality as a(e, o)) as stops
+      from public.trains t join u on t.id = u.id
+     where t.country = 'at'
   ), upd as (
     update public.trains t
-       set delay_min = u.delay_min, cancelled = u.cancelled, rt_updated_at = now(),
-           stops = (select jsonb_agg(
-                      (e - 'apf') || jsonb_build_object('delay', coalesce(u.d->(o::int - 1)->0, e->'delay', '0'::jsonb),
-                                                        'skipped', coalesce(u.d->(o::int - 1)->1, 'false'::jsonb))
-                      || case when jsonb_typeof(u.d->(o::int - 1)->2) = 'string' then jsonb_build_object('apf', u.d->(o::int - 1)->2) else '{}'::jsonb end
-                      order by o)
-                      from jsonb_array_elements(t.stops) with ordinality as a(e, o))
-      from u where t.id = u.id and t.country = 'at'
+       set delay_min = n.delay_min, cancelled = n.cancelled, stops = n.stops, rt_checked_at = now(), rt_updated_at = now()
+      from n where t.id = n.id
+       and public.rt_delays_ok(n.delay_min, n.stops)
+       and (n.rt_updated_at is null or n.old_delay is distinct from n.delay_min or n.old_cancelled is distinct from n.cancelled or n.old_stops is distinct from n.stops)
     returning 1
   )
   select count(*)::integer from upd;
@@ -59,3 +66,6 @@ revoke all on function public.call_sync_at(text) from public, anon, authenticate
 select cron.schedule('at-schedule', '20 0,5 * * *', $$select public.call_sync_at('schedule')$$);
 select cron.schedule('at-rt', '* * * * *', $$select public.call_sync_at('rt')$$);
 select public.call_sync_at('schedule');
+-- trains_preview: kind=preview piše tamo za proveru mape pre objave (ranije samo za 'de'); posle objave se briše
+alter table public.trains_preview drop constraint if exists trains_preview_country_check;
+delete from public.trains_preview where country = 'at';

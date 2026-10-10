@@ -2,14 +2,14 @@
 //   ?kind=schedule  red vožnje iz ÖBB GTFS za danas i sutra (jednom dnevno). Zip ima ~170 MB, ali skoro sve je shapes.txt:
 //                   potrebni fajlovi (~3 MB) se čitaju HTTP range zahtevima, bez skidanja celog zipa.
 //   ?kind=rt        DB Timetables (isti izvor i isto uparivanje kao za Nemačku) na austrijskim stanicama iz tabele at_hubs
-//   ?kind=preview   kao schedule, ali NE piše u trains: samo broj vozova i primeri (provera pre objavljivanja)
+//   ?kind=preview   kao schedule, ali piše u trains_preview (ne vidi se na sajtu): provera mape pre objavljivanja
 // Tajne: DB_CLIENT_ID, DB_API_KEY (Edge Functions → Secrets). Zaštita: x-cron-token kao kod sync-de.
 // Izvorni kod je ovde; za objavljivanje se spaja sa ingest/lib u index.ts (bun build).
 import { DE_TT_BASE, parseTimetable, ttTime, deNorm, germanUpdates, fastEpoch } from "../../../ingest/lib/germany.mjs";
 import { AT_GTFS_URL, atCategory, buildAustrianSchedule } from "../../../ingest/lib/austria.mjs";
 import { parisDate } from "../../../ingest/lib/util.mjs";
 import { parseLine } from "../../../ingest/lib/csv.mjs";
-import AT_NET from "../../../lib/network-at.json" with { type: "json" };
+import AT_BORDER from "./at-border.json" with { type: "json" };
 
 const URL_ = Deno.env.get("SUPABASE_URL");
 const KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -94,7 +94,7 @@ async function loadSchedule() {
   const stops = await readCsv(files, "stops.txt");
   const calendar = await readCsv(files, "calendar.txt");
   const calendar_dates = await readCsv(files, "calendar_dates.txt", (l) => ymds.some((y) => l.includes(y)));
-  return { dates, rows: buildAustrianSchedule({ routes, trips, stop_times, stops, calendar, calendar_dates }, dates, AT_NET.land[0]) };
+  return { dates, rows: buildAustrianSchedule({ routes, trips, stop_times, stops, calendar, calendar_dates }, dates, AT_BORDER.ring) };
 }
 
 async function schedule() {
@@ -116,7 +116,11 @@ async function preview() {
   const { dates, rows } = await loadSchedule();
   const byType = {}; for (const r of rows) byType[r.type] = (byType[r.type] || 0) + 1;
   const dup = new Map(); for (const r of rows) { const k = r.service_date + "|" + r.type + "|" + r.number; dup.set(k, (dup.get(k) || 0) + 1); }
-  return { kind: "preview", dates, trains: rows.length, byType, sameNumberTwice: [...dup].filter(([, n]) => n > 1).map(([k]) => k).slice(0, 40), sample: rows.filter((r) => r.service_date === dates[0]).slice(0, 3) };
+  // the rows go into trains_preview (not shown on the site), so the map can be checked before Austria goes live
+  await rest("DELETE", "trains_preview?country=eq.at", null, { Prefer: "return=minimal" });
+  for (let i = 0; i < rows.length; i += 300) await upsert("trains_preview", rows.slice(i, i + 300), "id");
+  const zero = rows.filter((r) => r.stops.some((s) => s.lat === 0 && s.lon === 0)).map((r) => r.type + " " + r.number);
+  return { kind: "preview", dates, trains: rows.length, byType, sameNumberTwice: [...dup].filter(([, n]) => n > 1).map(([k]) => k).slice(0, 40), zeroCoords: zero.slice(0, 20), sample: rows.filter((r) => r.service_date === dates[0]).slice(0, 2) };
 }
 
 // ---- live data: DB Timetables at the Austrian stations (same as Germany, plan rows go into de_plan by station number)
@@ -150,13 +154,15 @@ async function pollHub(h, now) {
     await upsert("de_plan_hours", [{ eva, hour: hr.toISOString() }], "eva,hour");
     if (station && station !== h.station) { h.station = station; await rest("PATCH", `at_hubs?name=eq.${encodeURIComponent(h.name)}`, { station }, { Prefer: "return=minimal" }); }
   }
-  const known = new Map((await rest("GET", `de_plan?eva=eq.${eva}&day=gte.${parisDate(-1)}&select=sid,day`)).map((r) => [r.sid, r.day]));
+  // only changes that are new are written (the database disk is small: rewriting the same rows every minute overloaded it on 9.10.2026)
+  const known = new Map((await rest("GET", `de_plan?eva=eq.${eva}&day=gte.${parisDate(-1)}&select=sid,day,ar_ct,dp_ct,cp,cs`)).map((r) => [r.sid, r]));
   const xml = await tt(`fchg/${eva}`);
   calls++;
+  const ms = (t) => (t ? Date.parse(t) : null);
   const ch = parseTimetable(xml).stops.filter((s) => known.has(s.sid)).map((s) => ({
-    eva, sid: s.sid, day: known.get(s.sid), ar_ct: ttTime(s.ar?.ct), dp_ct: ttTime(s.dp?.ct),
+    eva, sid: s.sid, day: known.get(s.sid).day, ar_ct: ttTime(s.ar?.ct), dp_ct: ttTime(s.dp?.ct),
     cp: s.dp?.cp || s.ar?.cp || null, cs: (s.dp?.cs || s.ar?.cs) === "c" ? "c" : null, updated_at: new Date().toISOString(),
-  }));
+  })).filter((r) => { const o = known.get(r.sid); return ms(o.ar_ct) !== ms(r.ar_ct) || ms(o.dp_ct) !== ms(r.dp_ct) || (o.cp || null) !== r.cp || (o.cs || null) !== r.cs; });
   for (let i = 0; i < ch.length; i += 500) await upsert("de_plan", ch.slice(i, i + 500), "eva,sid");
   await rest("PATCH", `at_hubs?name=eq.${encodeURIComponent(h.name)}`, { last_fchg: new Date().toISOString(), last_error: null }, { Prefer: "return=minimal" });
   return calls;

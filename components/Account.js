@@ -10,7 +10,7 @@ import { KOFI_URL } from "@/lib/site";
 
 const BUCKET_URL = "/storage/v1/object/public/avatars/";
 const LEVELS = [[0, "lvl0"], [1, "lvl1"], [10, "lvl2"], [50, "lvl3"], [200, "lvl4"]]; // reports needed -> title
-const COUNTRIES = ["ch", "fr", "de", "es", "pt", "be", "nl", "lu"];
+const COUNTRIES = ["ch", "fr", "de", "at", "es", "pt", "be", "nl", "lu"];
 const EMPTY = { display_name: "", first_name: "", last_name: "", show_real_name: false, bio: "", home_station: "", home_country: "", fav_train: "" };
 
 // A square 256 px picture, made in the browser before upload (small file, no camera data such as GPS)

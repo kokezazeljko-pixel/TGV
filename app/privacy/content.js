@@ -6,7 +6,7 @@ export const PRIVACY = {
   en: {
     title: "Privacy policy",
     updated: "Last updated",
-    intro: "{site} shows how late trains in France, Switzerland, Belgium, the Netherlands, Luxembourg, Germany, Spain and Portugal are and lets passengers share what is happening on board. This page explains what personal data the site handles, why, and what your rights are under the EU General Data Protection Regulation (GDPR) and the Swiss Federal Act on Data Protection (FADP).",
+    intro: "{site} shows how late trains in France, Switzerland, Belgium, the Netherlands, Luxembourg, Germany, Austria, Spain and Portugal are and lets passengers share what is happening on board. This page explains what personal data the site handles, why, and what your rights are under the EU General Data Protection Regulation (GDPR) and the Swiss Federal Act on Data Protection (FADP).",
     sections: [
       { h: "Who is responsible", p: ["The site is run by the operator of {site}, who is the data controller. You can reach the operator at {email} for any question about your data."] },
       {
@@ -42,7 +42,7 @@ export const PRIVACY = {
       },
       {
         h: "Train data",
-        p: ["Timetables and real-time delays come from SNCF open data (transport.data.gouv.fr), for Switzerland from opentransportdata.swiss for Belgium from SNCB open data (data.belgianmobility.io) for the Netherlands from NS / NDOV open data via OVapi (gtfs.ovapi.nl) and for Luxembourg from the open data of the Administration des transports publics (data.public.lu, mobiliteit.lu), for Germany from Deutsche Bahn open data (gtfs.de timetable, DB Timetables API), for Spain from Renfe open data (data.renfe.com) and for Portugal from the CP timetable (publico.cp.pt). They contain no personal data."],
+        p: ["Timetables and real-time delays come from SNCF open data (transport.data.gouv.fr), for Switzerland from opentransportdata.swiss for Belgium from SNCB open data (data.belgianmobility.io) for the Netherlands from NS / NDOV open data via OVapi (gtfs.ovapi.nl) and for Luxembourg from the open data of the Administration des transports publics (data.public.lu, mobiliteit.lu), for Germany from Deutsche Bahn open data (gtfs.de timetable, DB Timetables API), for Austria from ÖBB open data (data.oebb.at timetable) with real-time data from the DB Timetables API, for Spain from Renfe open data (data.renfe.com) and for Portugal from the CP timetable (publico.cp.pt). They contain no personal data."],
       },
       {
         h: "How long we keep data",
@@ -65,7 +65,7 @@ export const PRIVACY = {
   de: {
     title: "Datenschutzerklärung",
     updated: "Zuletzt aktualisiert",
-    intro: "{site} zeigt, wie verspätet Züge in Frankreich, der Schweiz, Belgien, den Niederlanden, Luxemburg, Deutschland, Spanien und Portugal sind, und lässt Reisende teilen, was an Bord passiert. Diese Seite erklärt, welche personenbezogenen Daten die Website verarbeitet, warum, und welche Rechte Sie nach der EU-Datenschutz-Grundverordnung (DSGVO) und dem Schweizer Datenschutzgesetz (DSG) haben.",
+    intro: "{site} zeigt, wie verspätet Züge in Frankreich, der Schweiz, Belgien, den Niederlanden, Luxemburg, Deutschland, Österreich, Spanien und Portugal sind, und lässt Reisende teilen, was an Bord passiert. Diese Seite erklärt, welche personenbezogenen Daten die Website verarbeitet, warum, und welche Rechte Sie nach der EU-Datenschutz-Grundverordnung (DSGVO) und dem Schweizer Datenschutzgesetz (DSG) haben.",
     sections: [
       { h: "Verantwortlicher", p: ["Die Website wird vom Betreiber von {site} betrieben, der für die Datenverarbeitung verantwortlich ist. Bei Fragen zu Ihren Daten erreichen Sie den Betreiber unter {email}."] },
       {
@@ -99,7 +99,7 @@ export const PRIVACY = {
           "Ko-fi: Spenden und Zahlungen für den Zugang zu früheren Tagen. Ko-fi (mit PayPal oder Stripe) wickelt die Zahlung ab; wir erhalten nur die E-Mail-Adresse, den Betrag und eine Transaktionsnummer und nutzen sie, um den Zugang für das Konto mit dieser E-Mail freizuschalten.",
         ],
       },
-      { h: "Zugdaten", p: ["Fahrpläne und Echtzeit-Verspätungen stammen aus den Open Data der SNCF (transport.data.gouv.fr), für die Schweiz von opentransportdata.swiss für Belgien aus den Open Data der SNCB (data.belgianmobility.io) für die Niederlande aus den Open Data von NS / NDOV über OVapi (gtfs.ovapi.nl) und für Luxemburg aus den Open Data der Administration des transports publics (data.public.lu, mobiliteit.lu), für Deutschland aus den Open Data der Deutschen Bahn (Fahrplan von gtfs.de, DB Timetables API), für Spanien aus den Open Data von Renfe (data.renfe.com) und für Portugal aus dem Fahrplan der CP (publico.cp.pt). Sie enthalten keine personenbezogenen Daten."] },
+      { h: "Zugdaten", p: ["Fahrpläne und Echtzeit-Verspätungen stammen aus den Open Data der SNCF (transport.data.gouv.fr), für die Schweiz von opentransportdata.swiss für Belgien aus den Open Data der SNCB (data.belgianmobility.io) für die Niederlande aus den Open Data von NS / NDOV über OVapi (gtfs.ovapi.nl) und für Luxemburg aus den Open Data der Administration des transports publics (data.public.lu, mobiliteit.lu), für Deutschland aus den Open Data der Deutschen Bahn (Fahrplan von gtfs.de, DB Timetables API), für Österreich aus den Open Data der ÖBB (Fahrplan von data.oebb.at) mit Echtzeitdaten der DB Timetables API, für Spanien aus den Open Data von Renfe (data.renfe.com) und für Portugal aus dem Fahrplan der CP (publico.cp.pt). Sie enthalten keine personenbezogenen Daten."] },
       {
         h: "Wie lange wir Daten speichern",
         list: [
@@ -121,7 +121,7 @@ export const PRIVACY = {
   fr: {
     title: "Politique de confidentialité",
     updated: "Dernière mise à jour",
-    intro: "{site} indique les retards des trains en France, en Suisse, en Belgique, aux Pays-Bas, au Luxembourg, en Allemagne, en Espagne et au Portugal et permet aux voyageurs de partager ce qui se passe à bord. Cette page explique quelles données personnelles le site traite, pourquoi, et quels sont vos droits selon le Règlement général sur la protection des données (RGPD) et la loi suisse sur la protection des données (LPD).",
+    intro: "{site} indique les retards des trains en France, en Suisse, en Belgique, aux Pays-Bas, au Luxembourg, en Allemagne, en Autriche, en Espagne et au Portugal et permet aux voyageurs de partager ce qui se passe à bord. Cette page explique quelles données personnelles le site traite, pourquoi, et quels sont vos droits selon le Règlement général sur la protection des données (RGPD) et la loi suisse sur la protection des données (LPD).",
     sections: [
       { h: "Responsable du traitement", p: ["Le site est géré par l’exploitant de {site}, responsable du traitement. Vous pouvez le contacter à {email} pour toute question sur vos données."] },
       {
@@ -155,7 +155,7 @@ export const PRIVACY = {
           "Ko-fi : dons et paiements pour l’accès aux jours précédents. Ko-fi (avec PayPal ou Stripe) traite le paiement ; nous recevons uniquement l’adresse e-mail, le montant et un numéro de transaction, utilisés pour débloquer l’accès du compte ayant cet e-mail.",
         ],
       },
-      { h: "Données ferroviaires", p: ["Les horaires et les retards en temps réel proviennent de l’open data SNCF (transport.data.gouv.fr), pour la Suisse d’opentransportdata.swiss pour la Belgique de l’open data SNCB (data.belgianmobility.io) pour les Pays-Bas de l’open data NS / NDOV via OVapi (gtfs.ovapi.nl) et pour le Luxembourg de l’open data de l’Administration des transports publics (data.public.lu, mobiliteit.lu), pour l’Allemagne de l’open data de la Deutsche Bahn (horaires gtfs.de, API DB Timetables), pour l’Espagne de l’open data Renfe (data.renfe.com) et pour le Portugal des horaires de la CP (publico.cp.pt). Ils ne contiennent aucune donnée personnelle."] },
+      { h: "Données ferroviaires", p: ["Les horaires et les retards en temps réel proviennent de l’open data SNCF (transport.data.gouv.fr), pour la Suisse d’opentransportdata.swiss pour la Belgique de l’open data SNCB (data.belgianmobility.io) pour les Pays-Bas de l’open data NS / NDOV via OVapi (gtfs.ovapi.nl) et pour le Luxembourg de l’open data de l’Administration des transports publics (data.public.lu, mobiliteit.lu), pour l’Allemagne de l’open data de la Deutsche Bahn (horaires gtfs.de, API DB Timetables), pour l’Autriche de l’open data des ÖBB (horaires data.oebb.at) avec le temps réel de l’API DB Timetables, pour l’Espagne de l’open data Renfe (data.renfe.com) et pour le Portugal des horaires de la CP (publico.cp.pt). Ils ne contiennent aucune donnée personnelle."] },
       {
         h: "Durée de conservation",
         list: [
@@ -177,7 +177,7 @@ export const PRIVACY = {
   nl: {
     title: "Privacybeleid",
     updated: "Laatst bijgewerkt",
-    intro: "{site} toont hoeveel vertraging treinen in Frankrijk, Zwitserland, België, Nederland, Luxemburg, Duitsland, Spanje en Portugal hebben en laat reizigers delen wat er aan boord gebeurt. Deze pagina legt uit welke persoonsgegevens de site verwerkt, waarom, en welke rechten je hebt volgens de Algemene Verordening Gegevensbescherming (AVG) van de EU en de Zwitserse federale wet op de gegevensbescherming (DSG/FADP).",
+    intro: "{site} toont hoeveel vertraging treinen in Frankrijk, Zwitserland, België, Nederland, Luxemburg, Duitsland, Oostenrijk, Spanje en Portugal hebben en laat reizigers delen wat er aan boord gebeurt. Deze pagina legt uit welke persoonsgegevens de site verwerkt, waarom, en welke rechten je hebt volgens de Algemene Verordening Gegevensbescherming (AVG) van de EU en de Zwitserse federale wet op de gegevensbescherming (DSG/FADP).",
     sections: [
       { h: "Wie is verantwoordelijk", p: ["De site wordt beheerd door de uitbater van {site}, die de verwerkingsverantwoordelijke is. Je kunt de uitbater bereiken via {email} voor elke vraag over je gegevens."] },
       {
@@ -213,7 +213,7 @@ export const PRIVACY = {
       },
       {
         h: "Treingegevens",
-        p: ["Dienstregelingen en realtime vertragingen komen uit de open data van SNCF (transport.data.gouv.fr), voor Zwitserland van opentransportdata.swiss voor België uit de open data van de NMBS (data.belgianmobility.io) voor Nederland uit de open data van NS / NDOV via OVapi (gtfs.ovapi.nl) en voor Luxemburg uit de open data van de Administration des transports publics (data.public.lu, mobiliteit.lu), voor Duitsland uit de open data van Deutsche Bahn (dienstregeling gtfs.de, DB Timetables API), voor Spanje uit de open data van Renfe (data.renfe.com) en voor Portugal uit de dienstregeling van CP (publico.cp.pt). Ze bevatten geen persoonsgegevens."],
+        p: ["Dienstregelingen en realtime vertragingen komen uit de open data van SNCF (transport.data.gouv.fr), voor Zwitserland van opentransportdata.swiss voor België uit de open data van de NMBS (data.belgianmobility.io) voor Nederland uit de open data van NS / NDOV via OVapi (gtfs.ovapi.nl) en voor Luxemburg uit de open data van de Administration des transports publics (data.public.lu, mobiliteit.lu), voor Duitsland uit de open data van Deutsche Bahn (dienstregeling gtfs.de, DB Timetables API), voor Oostenrijk uit de open data van de ÖBB (dienstregeling data.oebb.at) met actuele gegevens van de DB Timetables API, voor Spanje uit de open data van Renfe (data.renfe.com) en voor Portugal uit de dienstregeling van CP (publico.cp.pt). Ze bevatten geen persoonsgegevens."],
       },
       {
         h: "Hoe lang we gegevens bewaren",
@@ -236,7 +236,7 @@ export const PRIVACY = {
   es: {
     title: "Política de privacidad",
     updated: "Última actualización",
-    intro: "{site} muestra cuánto se retrasan los trenes en Francia, Suiza, Bélgica, los Países Bajos, Luxemburgo, Alemania, España y Portugal y permite a los viajeros contar lo que pasa a bordo. Esta página explica qué datos personales trata la web, por qué y qué derechos tienes según el Reglamento General de Protección de Datos de la UE (RGPD) y la Ley Federal suiza de Protección de Datos (LPD).",
+    intro: "{site} muestra cuánto se retrasan los trenes en Francia, Suiza, Bélgica, los Países Bajos, Luxemburgo, Alemania, Austria, España y Portugal y permite a los viajeros contar lo que pasa a bordo. Esta página explica qué datos personales trata la web, por qué y qué derechos tienes según el Reglamento General de Protección de Datos de la UE (RGPD) y la Ley Federal suiza de Protección de Datos (LPD).",
     sections: [
       { h: "Quién es responsable", p: ["La web la gestiona el operador de {site}, que es el responsable del tratamiento. Puedes escribir al operador a {email} para cualquier pregunta sobre tus datos."] },
       {
@@ -272,7 +272,7 @@ export const PRIVACY = {
       },
       {
         h: "Datos de los trenes",
-        p: ["Los horarios y los retrasos en tiempo real proceden del open data de SNCF (transport.data.gouv.fr), para Suiza de opentransportdata.swiss, para Bélgica del open data de SNCB (data.belgianmobility.io), para los Países Bajos del open data de NS / NDOV a través de OVapi (gtfs.ovapi.nl), para Luxemburgo del open data de la Administration des transports publics (data.public.lu, mobiliteit.lu), para Alemania del open data de Deutsche Bahn (horario de gtfs.de, API DB Timetables), para España del open data de Renfe (data.renfe.com) y para Portugal del horario de CP (publico.cp.pt). No contienen datos personales."],
+        p: ["Los horarios y los retrasos en tiempo real proceden del open data de SNCF (transport.data.gouv.fr), para Suiza de opentransportdata.swiss, para Bélgica del open data de SNCB (data.belgianmobility.io), para los Países Bajos del open data de NS / NDOV a través de OVapi (gtfs.ovapi.nl), para Luxemburgo del open data de la Administration des transports publics (data.public.lu, mobiliteit.lu), para Alemania del open data de Deutsche Bahn (horario de gtfs.de, API DB Timetables), para Austria del open data de ÖBB (horario de data.oebb.at) con datos en tiempo real de la API DB Timetables, para España del open data de Renfe (data.renfe.com) y para Portugal del horario de CP (publico.cp.pt). No contienen datos personales."],
       },
       {
         h: "Cuánto tiempo guardamos los datos",

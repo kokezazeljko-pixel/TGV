@@ -12,7 +12,7 @@ import { statusOf, toMin, fromMin, trainHref, ago, filterTrains, isShuttle, pari
 import { getGeo } from "@/lib/geo";
 
 // Map views: all countries together first, then Switzerland, France, Belgium and the Netherlands
-const COUNTRIES = ["all", "ch", "fr", "de", "es", "pt", "be", "nl", "lu"];
+const COUNTRIES = ["all", "ch", "fr", "de", "at", "es", "pt", "be", "nl", "lu"];
 const REAL = COUNTRIES.slice(1);
 const DEFAULT_COUNTRY = "all"; // the server sends this view's trains with the page
 import { useLang } from "@/components/LangProvider";

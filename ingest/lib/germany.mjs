@@ -166,7 +166,10 @@ export function ttTime(s) { // "2610052051" -> ISO timestamp (Europe/Berlin = Eu
 
 // ---- matching: trains (stops with name + arr/dep) + plan rows of the main stations -> live updates
 // plan rows: { hubs: [normalized station names], cat, num, ar_pt, dp_pt, ar_ct, dp_ct, pp, cp, cs }
-export function germanUpdates(trains, plan, nowSec) {
+// opts.catOf: category function of the country (Austria: atCategory, which also knows the D trains);
+// opts.keepNumbers: the timetable's own numbers are right (ÖBB): a DB row with the same number counts double, the number is never changed
+export function germanUpdates(trains, plan, nowSec, opts = {}) {
+  const catOf = opts.catOf || deCategory;
   // plan rows by main station and planned minute (departures and arrivals apart)
   const idx = new Map();
   const put = (hub, kind, iso, p) => {
@@ -175,7 +178,7 @@ export function germanUpdates(trains, plan, nowSec) {
     (h.get(m) || h.set(m, []).get(m)).push(p);
   };
   for (const p of plan) {
-    if (!deCategory(p.cat)) continue;
+    if (!catOf(p.cat)) continue;
     for (const hub of p.hubs || [p.hub]) { if (p.dp_pt) put(hub, "d", p.dp_pt, p); if (p.ar_pt) put(hub, "a", p.ar_pt, p); }
   }
   const numOf = (p) => p.num || `?${p.eva}|${p.dp_pt || p.ar_pt}`;
@@ -188,11 +191,12 @@ export function germanUpdates(trains, plan, nowSec) {
     // other trains never take a FLX row
     const flix = tr.type === "FLX";
     for (let dt = -FUZZY; dt <= FUZZY; dt++) for (const p of h.get(min + dt) || []) {
-      const isFlx = deCategory(p.cat) === "FLX";
+      const isFlx = catOf(p.cat) === "FLX";
       if (flix ? !(isFlx && tr.number && p.num === tr.number) : isFlx) continue;
-      const same = deCategory(p.cat) === tr.type;
-      if (dt === 0) out.push([p, same ? 3 : 1.5, true]);
-      else if (same) out.push([p, 1 / (Math.abs(dt) + 1), false]);
+      const same = catOf(p.cat) === tr.type;
+      const k = opts.keepNumbers && tr.number && p.num === tr.number ? 2 : 1;
+      if (dt === 0) out.push([p, (same ? 3 : 1.5) * k, true]);
+      else if (same) out.push([p, k / (Math.abs(dt) + 1), false]);
     }
     return out;
   }
@@ -250,7 +254,7 @@ export function germanUpdates(trains, plan, nowSec) {
     }
     // two trains with the same score (an ICE pair that splits later on, before the stations after the split are known): no number yet
     const tie = ranked[1] && Math.abs(ranked[1][1] - best[1]) < 1e-9;
-    const number = tr.type === "FLX" ? null : tie ? "" : key.startsWith("?") ? null : key;
+    const number = tr.type === "FLX" || opts.keepNumbers ? null : tie ? "" : key.startsWith("?") ? null : key;
     // current delay = at the next stop not reached yet
     let delay_min = d.length ? d[d.length - 1][0] : 0;
     for (let i = 0; i < tr.stops.length; i++) {

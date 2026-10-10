@@ -14,7 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const COUNTRIES = (process.env.COUNTRIES || "fr,ch,be,nl,lu,es,pt,de").split(",");
+const COUNTRIES = (process.env.COUNTRIES || "fr,ch,be,nl,lu,es,pt,de,at").split(",");
 const FILE = { fr: "network.json" }; // ostale: network-XX.json
 const SNAP = { ch: 0.035, lu: 0.025, fr: 0.1 }; // isto kao u lib/geo.js; ostale 0.03
 const DETOUR = 1.8, MIN_HOP = 0.08; // linija sme da vijuga, ali ne duplo duže od prave (Martigny, Albula su ispod 1.8)
