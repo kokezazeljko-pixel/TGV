@@ -29,6 +29,29 @@ const STATUSES = [["all", "allStatus"], ["late", "delayed"], ["ontime", "ontime"
 const HISTORY_DAYS = 7;
 const shiftDay = (iso, n) => new Date(Date.parse(iso + "T12:00:00Z") + n * 86400000).toISOString().slice(0, 10);
 
+// The live map over the whole screen (button on the map; Esc or × closes it). Same trains, filters and station as the page.
+function FullMap({ country, onClose, children }) {
+  const { t } = useLang();
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden"; // the page behind does not scroll
+    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = overflow; };
+  }, [onClose]);
+  return (
+    <div className="mapmodal full" role="dialog" aria-modal="true" aria-label={t("mapFullScreen")}>
+      <div className="mapmodal-box">
+        <div className="mapmodal-head">
+          <h3>{t("country_" + country)}</h3>
+          <button type="button" className="mapmodal-close" onClick={onClose} aria-label={t("close")} title={t("close")}>×</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export default function Board({ initialTrains, initialCounts, today, loadError }) {
   const { t, lang } = useLang();
   const { session } = useSession();
@@ -59,6 +82,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
   const [loading, setLoading] = useState(false);
   const [listCountry, setListCountry] = useState("all"); // whose trains the list under the map shows (Europe view)
   const [alertIds, setAlertIds] = useState(() => new Set()); // trains with an official notice from the railway
+  const [fullMap, setFullMap] = useState(false); // live map over the whole screen
   const usedInitial = useRef(false); // the trains sent with the page are used only once, for the default view
 
   // Remember the chosen country in this browser
@@ -258,7 +282,21 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
           onStationClick={setStation}
           onTrainClick={(tr) => router.push(trainHref(tr.id))}
           onRunning={setRunning}
+          onFull={() => setFullMap(true)}
         />
+        {fullMap && (
+          <FullMap country={country} onClose={() => setFullMap(false)}>
+            <TrainMap
+              key={country + "-full"}
+              country={country}
+              trains={shown}
+              selectedStation={station}
+              onStationClick={setStation}
+              onTrainClick={(tr) => router.push(trainHref(tr.id))}
+              big
+            />
+          </FullMap>
+        )}
         <aside className="side" aria-live="polite">
           {station
             ? <StationPanel station={station} trains={list} country={country} onBack={() => setStation(null)} />

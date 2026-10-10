@@ -18,7 +18,7 @@ const TIER_A = new Set(["Lille", "Strasbourg", "Lyon", "Marseille", "Bordeaux", 
 export const MAP_STYLES = ["classic", "dark"];
 
 // onExpand (route view on the train page): a click on the small map, or the ⛶ button, opens it large; big = shown in that large window
-export default function TrainMap({ country = "fr", trains, onTrainClick, onStationClick, selectedStation, highlight, onRunning, compact, onExpand, big }) {
+export default function TrainMap({ country = "fr", trains, onTrainClick, onStationClick, selectedStation, highlight, onRunning, compact, onExpand, onFull, big }) {
   const { t } = useLang();
   // Map look chosen by the visitor (Classic / Dark), remembered in this browser
   const [mapStyle, setMapStyle] = useState("classic");
@@ -219,7 +219,9 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
         <button type="button" title={t("zout")} aria-label={t("zout")} onClick={() => zoomAt(...center(), 1 / 1.6)}>−</button>
         <button type="button" className="small" title={t("zreset")} aria-label={t("zreset")} onClick={() => { view.current = { x: 0, y: 0, w: W, h: H }; applyView(); }}>⤢</button>
         {onExpand && <button type="button" className="small expand" title={t("mapFull")} aria-label={t("mapFull")} onClick={onExpand}>⛶</button>}
+        {onFull && <button type="button" className="small expand" title={t("mapFullScreen")} aria-label={t("mapFullScreen")} onClick={onFull}>⛶</button>}
       </div>
+      {onFull && <button type="button" className="fullbtn" onClick={onFull}><span aria-hidden="true">⛶</span> {t("mapFullScreen")}</button>}
       {!compact && <div className="maphint">{t("hint")}</div>}
       {(!compact || highlight) && (
         <div className="mapstyle" role="group" aria-label={t("mapStyle")}>
