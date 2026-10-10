@@ -16,6 +16,11 @@ const TIER_A = new Set(["Lille", "Strasbourg", "Lyon", "Marseille", "Bordeaux", 
  * --sr (station radius) and --ts (train arrow size).
  */
 export const MAP_STYLES = ["classic", "dark"];
+// How far a map can be zoomed in (big maps further, so a single station can be seen up close)
+const MAX_ZOOM = { all: 24, de: 16, es: 16, fr: 14 };
+const maxZoom = (c) => MAX_ZOOM[c] || 10;
+// Zoom used when a station is selected: close enough to see exactly where it is
+const SEL_ZOOM = { all: 16, de: 10, es: 10, fr: 9 };
 
 // onExpand (route view on the train page): a click on the small map, or the ⛶ button, opens it large; big = shown in that large window
 export default function TrainMap({ country = "fr", trains, onTrainClick, onStationClick, selectedStation, highlight, onRunning, compact, onExpand, onFull, big }) {
@@ -36,6 +41,8 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
   const [now, setNow] = useState(null);
   const [routeScale, setRouteScale] = useState(0);
   const [routeBounds, setRouteBounds] = useState(null);
+  // the selected station's big pin (on top of the trains)
+  const selPt = !compact && selectedStation ? geo.stationPoint(selectedStation, trains) : null;
 
   // Clock for train movement (every 2 s)
   useEffect(() => {
@@ -64,7 +71,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
   function applyView() {
     const svg = svgRef.current; if (!svg) return;
     const v = view.current, { H, NET } = geoRef.current;
-    v.w = Math.min(W, Math.max(W / 10, v.w)); v.h = (v.w * H) / W;
+    v.w = Math.min(W, Math.max(W / maxZoom(geoRef.current.country), v.w)); v.h = (v.w * H) / W;
     v.x = Math.min(W - v.w, Math.max(0, v.x)); v.y = Math.min(H - v.h, Math.max(0, v.y));
     const zoom = W / v.w; zoomRef.current = zoom;
     svg.setAttribute("viewBox", `${v.x.toFixed(2)} ${v.y.toFixed(2)} ${v.w.toFixed(2)} ${v.h.toFixed(2)}`);
@@ -81,7 +88,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
   }
   function zoomAt(px, py, factor) {
     const v = view.current, { H } = geoRef.current;
-    const nw = Math.min(W, Math.max(W / 10, v.w / factor)), f = nw / v.w;
+    const nw = Math.min(W, Math.max(W / maxZoom(geoRef.current.country), v.w / factor)), f = nw / v.w;
     v.x = px - (px - v.x) * f; v.y = py - (py - v.y) * f; v.w = nw; v.h = (nw * H) / W;
     applyView();
   }
@@ -168,16 +175,9 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
     if (!selectedStation) { animateTo({ x: 0, y: 0, w: W, h: H }); return; }
     const pt = geo.stationPoint(selectedStation, trains);
     if (!pt) return;
-    // Fit the station and the trains now running towards / from it, but never closer than a city-level zoom
-    const nowMin = parisNowMin();
-    const pts = [pt, ...trains.map((tr) => trainPos(tr, nowMin)).filter(Boolean).map((p) => p.xy)];
-    let x0 = Math.min(...pts.map((p) => p[0])), x1 = Math.max(...pts.map((p) => p[0]));
-    let y0 = Math.min(...pts.map((p) => p[1])), y1 = Math.max(...pts.map((p) => p[1]));
-    const minW = W / (country === "ch" || country === "be" || country === "nl" || country === "lu" || country === "pt" ? 2.6 : country === "es" || country === "de" ? 3.2 : country === "all" ? 6 : 4.5);
-    let w = Math.max(minW, (x1 - x0) * 1.25, ((y1 - y0) * 1.25 * W) / H);
-    w = Math.min(W, w);
-    const h = (w * H) / W, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-    animateTo({ x: cx - w / 2, y: cy - h / 2, w, h });
+    // Zoom in close on the station (its pin drops in at the centre), so the visitor sees exactly where it is
+    const w = W / (SEL_ZOOM[country] || 6), h = (w * H) / W;
+    animateTo({ x: pt[0] - w / 2, y: pt[1] - h / 2, w, h });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStation]);
 
@@ -213,6 +213,17 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
             );
           })}
         </g>
+        {selPt && (
+          <g className="selpin" transform={`translate(${selPt[0].toFixed(1)} ${selPt[1].toFixed(1)})`} pointerEvents="none">
+            <circle className="selpin-pulse" r="1" />
+            <g className="selpin-z">
+              <g key={selectedStation} className="selpin-drop">
+                <PinShape airport={isAirport(selectedStation)} />
+                <text className="selpin-lbl" y="-31">{selectedStation}</text>
+              </g>
+            </g>
+          </g>
+        )}
       </svg>
       <div className="mapctl">
         <button type="button" title={t("zin")} aria-label={t("zin")} onClick={() => zoomAt(...center(), 1.6)}>+</button>
