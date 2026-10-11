@@ -82,7 +82,8 @@ async function planHour(h, eva, hr) {
     eva, sid: s.sid, day: parisDate(0, new Date(ttTime(s.dp?.pt || s.ar?.pt) || hr)), cat: s.tl.c, num: s.tl.n,
     ar_pt: ttTime(s.ar?.pt), dp_pt: ttTime(s.dp?.pt), pp: s.dp?.pp || s.ar?.pp || null,
   }));
-  await upsert("de_plan", rows, "eva,sid");
+  // DB sometimes lists the same stop twice in one hour: one row per stop, or the database refuses the whole hour
+  await upsert("de_plan", [...new Map(rows.map((r) => [r.sid, r])).values()], "eva,sid");
   await upsert("de_plan_hours", [{ eva, hour: hr.toISOString() }], "eva,hour");
   if (station && station !== h.station) { h.station = station; await rest("PATCH", `de_hubs?name=eq.${encodeURIComponent(h.name)}`, { station }, { Prefer: "return=minimal" }); }
   return true;
@@ -201,29 +202,21 @@ async function realtime() {
     catch (e) { errors.push(`${h.name}: ${String(e).slice(0, 120)}`); await rest("PATCH", `de_hubs?name=eq.${encodeURIComponent(h.name)}`, { last_fchg: new Date().toISOString(), last_error: String(e).slice(0, 200) }, { Prefer: "return=minimal" }); }
   }
   // match everything known to the trains running now and write their delays
-  // tomorrow too: DB's plan reaches past midnight, and a train gets its number as soon as DB publishes it
-  const days = [parisDate(-1), parisDate(0), parisDate(1)];
   // a station can be written differently in gtfs.de and DB ("Frankfurt (Main) Hbf" / "Frankfurt(Main)Hbf"): both names count
   const evaName = new Map((await rest("GET", "de_hubs?select=name,eva,station&eva=not.is.null")).map((h) => [h.eva, [...new Set([deNorm(h.name), deNorm(h.station || "")].filter(Boolean))]]));
-  const plan = [];
-  const since = new Date(Date.now() - 12 * 3600e3).toISOString();
-  for (let off = 0; ; off += 1000) {
-    // only stops from 12 hours ago on (night trains) are needed for the trains running now
-    const page = await rest("GET", `de_plan?day=in.(${days.join(",")})&or=(dp_pt.gte.%22${since}%22,ar_pt.gte.%22${since}%22)&select=eva,cat,num,ar_pt,dp_pt,ar_ct,dp_ct,pp,cp,cs&order=eva,sid&limit=1000&offset=${off}`);
-    for (const p of page) plan.push({ ...p, hubs: evaName.get(p.eva) || [] });
-    if (page.length < 1000) break;
-  }
+  // only the DB timetable rows near a stop of the trains below (the database picks them; compact arrays, times in seconds;
+  // 5 minutes wider than the train list below, so every train read a moment later has all its rows):
+  // the same matches as with all rows, but about a quarter of the traffic (Supabase egress limit)
+  const iso = (sec) => (sec == null ? null : new Date(sec * 1000).toISOString());
+  const plan = (await rest("POST", "rpc/rt_plan", { p_country: "de", p_before: 3 * 3600 + 300, p_after: 7200 + 300, p_ahead: PLAN_AHEAD * 3600 + 300 }))
+    .map(([eva, cat, num, ar, dp, arc, dpc, pp, cp, cs]) => ({ eva, cat, num, ar_pt: iso(ar), dp_pt: iso(dp), ar_ct: iso(arc), dp_ct: iso(dpc), pp, cp, cs, hubs: evaName.get(eva) || [] }));
   const now = Math.floor(Date.now() / 1000);
   const trains = [], ahead = new Set();
+  // the database picks the trains running now (and later ones still without a number) and sends only the stop fields needed:
+  // reading all trains of three days every minute was most of the project's traffic (Supabase egress limit)
   for (let off = 0; ; off += 1000) {
-    const page = await rest("GET", `trains?country=eq.de&service_date=in.(${days.join(",")})&select=id,service_date,type,number,stops,delay_min&order=id&limit=1000&offset=${off}`);
-    for (const r of page) {
-      const st = r.stops || []; if (st.length < 2) continue;
-      const a = fastEpoch(r.service_date, st[0].dep || st[0].arr), b = fastEpoch(r.service_date, st[st.length - 1].arr || st[st.length - 1].dep);
-      if (now >= a - 3 * 3600 && now <= b + 7200 + (r.delay_min || 0) * 60) trains.push(r);
-      // a later train still without its number: matched against the plan DB has already published
-      else if (!r.number && r.type !== "FLX" && a > now && a <= now + PLAN_AHEAD * 3600) { trains.push(r); ahead.add(r.id); }
-    }
+    const page = await rest("POST", `rpc/rt_trains?order=id&limit=1000&offset=${off}`, { p_country: "de", p_before: 3 * 3600, p_after: 7200, p_ahead: PLAN_AHEAD * 3600 });
+    for (const r of page) { trains.push(r); if (r.ahead) ahead.add(r.id); }
     if (page.length < 1000) break;
   }
   // later trains are written only once, when their number is found (no live data yet, so nothing else to write)
@@ -233,6 +226,31 @@ async function realtime() {
   return { kind: "rt", hubs: hubs.map((h) => h.name), calls, planRows: plan.length, candidates: trains.length, numbersAhead: updates.filter((u) => ahead.has(u.id)).length, written, errors, ms: Date.now() - t0 };
 }
 
+// check (kind=check, writes nothing): the short plan list from rt_plan gives exactly the same result as all rows of the last 12 hours
+async function check() {
+  const evaName = new Map((await rest("GET", "de_hubs?select=name,eva,station&eva=not.is.null")).map((h) => [h.eva, [...new Set([deNorm(h.name), deNorm(h.station || "")].filter(Boolean))]]));
+  const iso = (sec) => (sec == null ? null : new Date(sec * 1000).toISOString());
+  const short = (await rest("POST", "rpc/rt_plan", { p_country: "de", p_before: 3 * 3600 + 300, p_after: 7200 + 300, p_ahead: PLAN_AHEAD * 3600 + 300 }))
+    .map(([eva, cat, num, ar, dp, arc, dpc, pp, cp, cs]) => ({ eva, cat, num, ar_pt: iso(ar), dp_pt: iso(dp), ar_ct: iso(arc), dp_ct: iso(dpc), pp, cp, cs, hubs: evaName.get(eva) || [] }));
+  const days = [parisDate(-1), parisDate(0), parisDate(1)], since = new Date(Date.now() - 12 * 3600e3).toISOString(), full = [];
+  for (let off = 0; ; off += 1000) {
+    const page = await rest("GET", `de_plan?day=in.(${days.join(",")})&or=(dp_pt.gte.%22${since}%22,ar_pt.gte.%22${since}%22)&select=eva,cat,num,ar_pt,dp_pt,ar_ct,dp_ct,pp,cp,cs&order=eva,sid&limit=1000&offset=${off}`);
+    for (const p of page) full.push({ ...p, hubs: evaName.get(p.eva) || [] });
+    if (page.length < 1000) break;
+  }
+  const trains = [];
+  for (let off = 0; ; off += 1000) {
+    const page = await rest("POST", `rpc/rt_trains?order=id&limit=1000&offset=${off}`, { p_country: "de", p_before: 3 * 3600, p_after: 7200, p_ahead: PLAN_AHEAD * 3600 });
+    trains.push(...page);
+    if (page.length < 1000) break;
+  }
+  const now = Math.floor(Date.now() / 1000);
+  const key = (u) => JSON.stringify([u.delay_min, u.cancelled, u.d, u.number]);
+  const a = new Map(germanUpdates(trains, full, now).map((u) => [u.id, key(u)])), b = new Map(germanUpdates(trains, short, now).map((u) => [u.id, key(u)]));
+  const diff = [...new Set([...a.keys(), ...b.keys()])].filter((id) => a.get(id) !== b.get(id));
+  return { kind: "check", trains: trains.length, fullRows: full.length, shortRows: short.length, updates: a.size, same: a.size - diff.length, diff: diff.length, sample: diff.slice(0, 3).map((id) => [id, a.get(id), b.get(id)]) };
+}
+
 Deno.serve(async (req) => {
   const token = req.headers.get("x-cron-token") || "";
   const ok = token && (await rest("POST", "rpc/cron_token_ok", { t: token }));
@@ -240,7 +258,7 @@ Deno.serve(async (req) => {
   if (!DB_ID || !DB_KEY) return json({ error: "DB_CLIENT_ID / DB_API_KEY not set" }, 500);
   try {
     const kind = new URL(req.url).searchParams.get("kind") || "rt";
-    const out = kind === "schedule" ? await schedule() : kind === "flix" ? await flix() : kind === "plan" ? await planAhead() : await realtime();
+    const out = kind === "schedule" ? await schedule() : kind === "flix" ? await flix() : kind === "plan" ? await planAhead() : kind === "check" ? await check() : await realtime();
     console.log(JSON.stringify(out));
     return json(out);
   } catch (e) {

@@ -244,7 +244,8 @@ function ttTime(s) {
   const d = `20${s.slice(0, 2)}-${s.slice(2, 4)}-${s.slice(4, 6)}`;
   return new Date(fastEpoch(d, `${s.slice(6, 8)}:${s.slice(8, 10)}:00`) * 1000).toISOString();
 }
-function germanUpdates(trains, plan, nowSec) {
+function germanUpdates(trains, plan, nowSec, opts = {}) {
+  const catOf = opts.catOf || deCategory;
   const idx = new Map;
   const put = (hub, kind, iso, p) => {
     const m = Math.round(Date.parse(iso) / 60000), k = `${hub}|${kind}`;
@@ -254,7 +255,7 @@ function germanUpdates(trains, plan, nowSec) {
     (h.get(m) || h.set(m, []).get(m)).push(p);
   };
   for (const p of plan) {
-    if (!deCategory(p.cat))
+    if (!catOf(p.cat))
       continue;
     for (const hub of p.hubs || [p.hub]) {
       if (p.dp_pt)
@@ -273,14 +274,15 @@ function germanUpdates(trains, plan, nowSec) {
     const flix = tr.type === "FLX";
     for (let dt = -FUZZY;dt <= FUZZY; dt++)
       for (const p of h.get(min + dt) || []) {
-        const isFlx = deCategory(p.cat) === "FLX";
+        const isFlx = catOf(p.cat) === "FLX";
         if (flix ? !(isFlx && tr.number && p.num === tr.number) : isFlx)
           continue;
-        const same = deCategory(p.cat) === tr.type;
+        const same = catOf(p.cat) === tr.type;
+        const k = opts.keepNumbers && tr.number && p.num === tr.number ? 2 : 1;
         if (dt === 0)
-          out.push([p, same ? 3 : 1.5, true]);
+          out.push([p, (same ? 3 : 1.5) * k, true]);
         else if (same)
-          out.push([p, 1 / (Math.abs(dt) + 1), false]);
+          out.push([p, k / (Math.abs(dt) + 1), false]);
       }
     return out;
   }
@@ -346,7 +348,7 @@ function germanUpdates(trains, plan, nowSec) {
       d.push(apf ? [delay, skipped, apf] : [delay, skipped]);
     }
     const tie = ranked[1] && Math.abs(ranked[1][1] - best[1]) < 0.000000001;
-    const number = tr.type === "FLX" ? null : tie ? "" : key.startsWith("?") ? null : key;
+    const number = tr.type === "FLX" || opts.keepNumbers ? null : tie ? "" : key.startsWith("?") ? null : key;
     let delay_min = d.length ? d[d.length - 1][0] : 0;
     for (let i = 0;i < tr.stops.length; i++) {
       const s = tr.stops[i];
@@ -457,7 +459,9 @@ function buildFlixSchedule(files, dates) {
   return out;
 }
 // ../../../lib/network-de.json (only the outline of Germany is used)
-var network_de_default = { land: [[[7.2,53.25],[7.05,53.6],[7.7,53.7],[8.1,53.55],[8.5,53.55],[8.7,53.87],[8.95,53.9],[8.85,54.13],[8.95,54.5],[8.6,54.9],[9.45,54.805],[9.95,54.75],[10.15,54.4],[10.8,54.3],[11.1,54.45],[10.85,53.95],[11.45,53.9],[12.1,54.18],[12.5,54.47],[13.15,54.4],[13.4,54.65],[13.75,54.25],[14.25,53.9],[14.4,53.3],[14.15,52.85],[14.6,52.6],[14.7,52.1],[14.95,51.45],[15.04,51.0],[14.8,50.85],[14.3,50.88],[13.85,50.73],[13.0,50.45],[12.25,50.25],[12.2,50.1],[12.5,49.7],[12.9,49.35],[13.4,48.95],[13.8,48.75],[13.45,48.57],[13.0,48.25],[12.75,48.13],[12.95,47.95],[13.0,47.75],[13.0,47.45],[12.75,47.68],[12.2,47.6],[11.6,47.58],[11.1,47.4],[10.45,47.55],[10.2,47.3],[9.75,47.55],[9.2,47.65],[8.87,47.66],[8.78,47.73],[8.65,47.8],[8.47,47.76],[8.55,47.62],[8.2,47.6],[7.6,47.58],[7.55,48.1],[7.8,48.6],[8.2,48.98],[7.6,49.08],[7.0,49.12],[7.03,49.19],[6.95,49.225],[6.86,49.22],[6.7,49.2],[6.37,49.46],[6.42,49.55],[6.5,49.71],[6.52,49.81],[6.42,49.81],[6.32,49.84],[6.24,49.9],[6.18,49.95],[6.13,50.05],[6.13,50.13],[6.13,50.18],[6.4,50.32],[6.18,50.55],[6.02,50.75],[6.08,50.92],[5.87,51.05],[6.08,51.17],[6.22,51.36],[6.22,51.51],[6.05,51.66],[5.95,51.81],[6.17,51.9],[6.4,51.83],[6.83,51.97],[6.7,52.03],[7.03,52.23],[7.07,52.39],[6.98,52.46],[6.7,52.49],[6.73,52.65],[7.07,52.84],[7.2,52.98],[7.21,53.18]]] };
+var network_de_default = {
+  land: [[[7.2, 53.25], [7.05, 53.6], [7.7, 53.7], [8.1, 53.55], [8.5, 53.55], [8.7, 53.87], [8.95, 53.9], [8.85, 54.13], [8.95, 54.5], [8.6, 54.9], [9.45, 54.805], [9.95, 54.75], [10.15, 54.4], [10.8, 54.3], [11.1, 54.45], [10.85, 53.95], [11.45, 53.9], [12.1, 54.18], [12.5, 54.47], [13.15, 54.4], [13.4, 54.65], [13.75, 54.25], [14.25, 53.9], [14.4, 53.3], [14.15, 52.85], [14.6, 52.6], [14.7, 52.1], [14.95, 51.45], [15.04, 51], [14.8, 50.85], [14.3, 50.88], [13.85, 50.73], [13, 50.45], [12.25, 50.25], [12.2, 50.1], [12.5, 49.7], [12.9, 49.35], [13.4, 48.95], [13.815, 48.767], [13.785, 48.587], [13.724, 48.542], [13.675, 48.523], [13.487, 48.582], [13.46, 48.565], [13.409, 48.394], [13.375, 48.361], [13.323, 48.331], [13.082, 48.275], [12.814, 48.161], [12.76, 48.107], [12.76, 48.076], [12.954, 47.891], [12.954, 47.808], [12.898, 47.722], [13.034, 47.699], [13.054, 47.655], [13.014, 47.478], [12.968, 47.476], [12.809, 47.542], [12.783, 47.564], [12.796, 47.607], [12.771, 47.639], [12.686, 47.669], [12.483, 47.637], [12.363, 47.688], [12.209, 47.718], [12.186, 47.62], [11.717, 47.583], [11.393, 47.487], [11.374, 47.46], [11.298, 47.425], [11.191, 47.425], [11.042, 47.393], [10.981, 47.398], [10.894, 47.47], [10.873, 47.52], [10.439, 47.552], [10.404, 47.417], [10.369, 47.366], [10.313, 47.313], [10.183, 47.279], [10.2, 47.363], [10.066, 47.393], [10.06, 47.449], [9.972, 47.505], [9.749, 47.576], [9.651, 47.526], [9.58, 47.5], [9.2, 47.65], [8.87, 47.66], [8.78, 47.73], [8.65, 47.8], [8.47, 47.76], [8.55, 47.62], [8.2, 47.6], [7.6, 47.58], [7.55, 48.1], [7.8, 48.6], [8.2, 48.98], [7.6, 49.08], [7, 49.12], [7.03, 49.19], [6.95, 49.225], [6.86, 49.22], [6.7, 49.2], [6.37, 49.46], [6.42, 49.55], [6.5, 49.71], [6.52, 49.81], [6.42, 49.81], [6.32, 49.84], [6.24, 49.9], [6.18, 49.95], [6.13, 50.05], [6.13, 50.13], [6.13, 50.18], [6.4, 50.32], [6.18, 50.55], [6.02, 50.75], [6.08, 50.92], [5.87, 51.05], [6.08, 51.17], [6.22, 51.36], [6.22, 51.51], [6.05, 51.66], [5.95, 51.81], [6.17, 51.9], [6.4, 51.83], [6.83, 51.97], [6.7, 52.03], [7.03, 52.23], [7.07, 52.39], [6.98, 52.46], [6.7, 52.49], [6.73, 52.65], [7.07, 52.84], [7.2, 52.98], [7.21, 53.18]]]
+};
 
 // source.mjs
 var URL_ = Deno.env.get("SUPABASE_URL");
@@ -538,7 +542,7 @@ async function planHour(h, eva, hr) {
     dp_pt: ttTime(s.dp?.pt),
     pp: s.dp?.pp || s.ar?.pp || null
   }));
-  await upsert("de_plan", rows, "eva,sid");
+  await upsert("de_plan", [...new Map(rows.map((r) => [r.sid, r])).values()], "eva,sid");
   await upsert("de_plan_hours", [{ eva, hour: hr.toISOString() }], "eva,hour");
   if (station && station !== h.station) {
     h.station = station;
@@ -728,32 +732,17 @@ async function realtime() {
       await rest("PATCH", `de_hubs?name=eq.${encodeURIComponent(h.name)}`, { last_fchg: new Date().toISOString(), last_error: String(e).slice(0, 200) }, { Prefer: "return=minimal" });
     }
   }
-  const days = [parisDate(-1), parisDate(0), parisDate(1)];
   const evaName = new Map((await rest("GET", "de_hubs?select=name,eva,station&eva=not.is.null")).map((h) => [h.eva, [...new Set([deNorm(h.name), deNorm(h.station || "")].filter(Boolean))]]));
-  const plan = [];
-  const since = new Date(Date.now() - 12 * 3600000).toISOString();
-  for (let off = 0;; off += 1000) {
-    const page = await rest("GET", `de_plan?day=in.(${days.join(",")})&or=(dp_pt.gte.%22${since}%22,ar_pt.gte.%22${since}%22)&select=eva,cat,num,ar_pt,dp_pt,ar_ct,dp_ct,pp,cp,cs&order=eva,sid&limit=1000&offset=${off}`);
-    for (const p of page)
-      plan.push({ ...p, hubs: evaName.get(p.eva) || [] });
-    if (page.length < 1000)
-      break;
-  }
+  const iso = (sec) => sec == null ? null : new Date(sec * 1000).toISOString();
+  const plan = (await rest("POST", "rpc/rt_plan", { p_country: "de", p_before: 3 * 3600 + 300, p_after: 7200 + 300, p_ahead: PLAN_AHEAD * 3600 + 300 })).map(([eva, cat, num, ar, dp, arc, dpc, pp, cp, cs]) => ({ eva, cat, num, ar_pt: iso(ar), dp_pt: iso(dp), ar_ct: iso(arc), dp_ct: iso(dpc), pp, cp, cs, hubs: evaName.get(eva) || [] }));
   const now = Math.floor(Date.now() / 1000);
   const trains = [], ahead = new Set;
   for (let off = 0;; off += 1000) {
-    const page = await rest("GET", `trains?country=eq.de&service_date=in.(${days.join(",")})&select=id,service_date,type,number,stops,delay_min&order=id&limit=1000&offset=${off}`);
+    const page = await rest("POST", `rpc/rt_trains?order=id&limit=1000&offset=${off}`, { p_country: "de", p_before: 3 * 3600, p_after: 7200, p_ahead: PLAN_AHEAD * 3600 });
     for (const r of page) {
-      const st = r.stops || [];
-      if (st.length < 2)
-        continue;
-      const a = fastEpoch(r.service_date, st[0].dep || st[0].arr), b = fastEpoch(r.service_date, st[st.length - 1].arr || st[st.length - 1].dep);
-      if (now >= a - 3 * 3600 && now <= b + 7200 + (r.delay_min || 0) * 60)
-        trains.push(r);
-      else if (!r.number && r.type !== "FLX" && a > now && a <= now + PLAN_AHEAD * 3600) {
-        trains.push(r);
+      trains.push(r);
+      if (r.ahead)
         ahead.add(r.id);
-      }
     }
     if (page.length < 1000)
       break;
@@ -764,6 +753,31 @@ async function realtime() {
     written += await rest("POST", "rpc/apply_de_updates", { payload: updates.slice(i, i + 300) });
   return { kind: "rt", hubs: hubs.map((h) => h.name), calls, planRows: plan.length, candidates: trains.length, numbersAhead: updates.filter((u) => ahead.has(u.id)).length, written, errors, ms: Date.now() - t0 };
 }
+async function check() {
+  const evaName = new Map((await rest("GET", "de_hubs?select=name,eva,station&eva=not.is.null")).map((h) => [h.eva, [...new Set([deNorm(h.name), deNorm(h.station || "")].filter(Boolean))]]));
+  const iso = (sec) => sec == null ? null : new Date(sec * 1000).toISOString();
+  const short = (await rest("POST", "rpc/rt_plan", { p_country: "de", p_before: 3 * 3600 + 300, p_after: 7200 + 300, p_ahead: PLAN_AHEAD * 3600 + 300 })).map(([eva, cat, num, ar, dp, arc, dpc, pp, cp, cs]) => ({ eva, cat, num, ar_pt: iso(ar), dp_pt: iso(dp), ar_ct: iso(arc), dp_ct: iso(dpc), pp, cp, cs, hubs: evaName.get(eva) || [] }));
+  const days = [parisDate(-1), parisDate(0), parisDate(1)], since = new Date(Date.now() - 12 * 3600000).toISOString(), full = [];
+  for (let off = 0;; off += 1000) {
+    const page = await rest("GET", `de_plan?day=in.(${days.join(",")})&or=(dp_pt.gte.%22${since}%22,ar_pt.gte.%22${since}%22)&select=eva,cat,num,ar_pt,dp_pt,ar_ct,dp_ct,pp,cp,cs&order=eva,sid&limit=1000&offset=${off}`);
+    for (const p of page)
+      full.push({ ...p, hubs: evaName.get(p.eva) || [] });
+    if (page.length < 1000)
+      break;
+  }
+  const trains = [];
+  for (let off = 0;; off += 1000) {
+    const page = await rest("POST", `rpc/rt_trains?order=id&limit=1000&offset=${off}`, { p_country: "de", p_before: 3 * 3600, p_after: 7200, p_ahead: PLAN_AHEAD * 3600 });
+    trains.push(...page);
+    if (page.length < 1000)
+      break;
+  }
+  const now = Math.floor(Date.now() / 1000);
+  const key = (u) => JSON.stringify([u.delay_min, u.cancelled, u.d, u.number]);
+  const a = new Map(germanUpdates(trains, full, now).map((u) => [u.id, key(u)])), b = new Map(germanUpdates(trains, short, now).map((u) => [u.id, key(u)]));
+  const diff = [...new Set([...a.keys(), ...b.keys()])].filter((id) => a.get(id) !== b.get(id));
+  return { kind: "check", trains: trains.length, fullRows: full.length, shortRows: short.length, updates: a.size, same: a.size - diff.length, diff: diff.length, sample: diff.slice(0, 3).map((id) => [id, a.get(id), b.get(id)]) };
+}
 Deno.serve(async (req) => {
   const token = req.headers.get("x-cron-token") || "";
   const ok = token && await rest("POST", "rpc/cron_token_ok", { t: token });
@@ -773,7 +787,7 @@ Deno.serve(async (req) => {
     return json({ error: "DB_CLIENT_ID / DB_API_KEY not set" }, 500);
   try {
     const kind = new URL(req.url).searchParams.get("kind") || "rt";
-    const out = kind === "schedule" ? await schedule() : kind === "flix" ? await flix() : kind === "plan" ? await planAhead() : await realtime();
+    const out = kind === "schedule" ? await schedule() : kind === "flix" ? await flix() : kind === "plan" ? await planAhead() : kind === "check" ? await check() : await realtime();
     console.log(JSON.stringify(out));
     return json(out);
   } catch (e) {

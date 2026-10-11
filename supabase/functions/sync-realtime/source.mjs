@@ -39,9 +39,9 @@ Deno.serve(async (req) => {
 
   try {
     const t0 = Date.now();
-    const [rows, feedBuf] = await Promise.all([rpc("rt_candidates", { p_country: country }), fetchFeed(country, swissKey)]);
-    // compact stops [[seq, id, arr, dep, delay, skipped]] -> objects
-    const trains = rows.map((r) => ({ ...r, stops: (r.stops || []).map(([seq, id, arr, dep, delay, skipped, pf, st]) => ({ seq, id, arr, dep, delay, skipped, pf, st })) }));
+    const [rows, feedBuf] = await Promise.all([rpc("rt_candidates_slim", { p_country: country, p_before: 3600, p_after: 3600 }), fetchFeed(country, swissKey)]);
+    // compact stops [[seq, id, arr, dep, pf, st]] -> objects; trains until 1 hour after arrival (plus delay): less Supabase egress
+    const trains = rows.map((r) => ({ ...r, stops: (r.stops || []).map(([seq, id, arr, dep, pf, st]) => ({ seq, id, arr, dep, pf, st })) }));
     const index = new Map();
     for (const r of trains.sort((a, b) => a.service_date.localeCompare(b.service_date))) {
       if (!index.has(r.trip_id)) index.set(r.trip_id, []);

@@ -135,20 +135,11 @@ async function realtime() {
   const now = Math.floor(Date.now() / 1000);
   const toEpoch = (d, t) => gtfsToEpoch(d, t);
   const trains = [];
-  const all = [];
   for (let off = 0;; off += 1000) {
-    const page = await rest("GET", `trains?country=eq.lu&service_date=in.(${days.join(",")})&select=id,service_date,number,stops,delay_min&order=id&limit=1000&offset=${off}`);
-    all.push(...page);
+    const page = await rest("POST", `rpc/rt_trains?order=id&limit=1000&offset=${off}`, { p_country: "lu", p_before: 3600, p_after: 7200, p_ahead: 0 });
+    trains.push(...page);
     if (page.length < 1000)
       break;
-  }
-  for (const r of all) {
-    const st = r.stops || [];
-    if (st.length < 2)
-      continue;
-    const a = toEpoch(r.service_date, st[0].dep || st[0].arr), b = toEpoch(r.service_date, st[st.length - 1].arr || st[st.length - 1].dep);
-    if (now >= a - 3600 && now <= b + 7200 + (r.delay_min || 0) * 60)
-      trains.push(r);
   }
   const count = new Map;
   for (const tr of trains)

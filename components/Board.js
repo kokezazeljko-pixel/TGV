@@ -113,12 +113,13 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
   };
 
   // Load the chosen country's trains, then every minute fetch only the trains whose delays changed
-  // (a full reload every 30 minutes picks up anything else). Keeps the data transfer small.
+  // (a full reload every 3 hours picks up anything else). Nothing is fetched while the tab is in the
+  // background; coming back fetches at once. Keeps the data transfer small (Supabase egress limit).
   const latest = useRef("");
   useEffect(() => {
     const sb = getBrowserClient();
     if (!sb) return;
-    let alive = true, ticks = 0;
+    let alive = true, lastFull = Date.now(), lastPoll = Date.now();
     const ms = (iso) => (iso ? Date.parse(iso) : 0);
     const newest = (rows, from = "") => rows.reduce((a, x) => (ms(x.rt_updated_at) > ms(a) ? new Date(ms(x.rt_updated_at)).toISOString() : a), from);
     const full = async (showLoading) => {
@@ -143,8 +144,16 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
     };
     if (country === DEFAULT_COUNTRY && day === today && !usedInitial.current) { usedInitial.current = true; latest.current = newest(initialTrains); fetchAlertTrainIds(sb).then((al) => alive && setAlertIds(al)); }
     else { usedInitial.current = true; setTrains([]); full(true); }
-    const id = setInterval(() => { ticks++; ticks % 30 === 0 ? full(false) : changes(); }, 60000);
-    return () => { alive = false; clearInterval(id); };
+    const tick = () => {
+      if (document.hidden) return;
+      const now = Date.now();
+      lastPoll = now;
+      if (now - lastFull >= 3 * 3600e3) { lastFull = now; full(false); } else changes();
+    };
+    const onVisible = () => { if (!document.hidden && Date.now() - lastPoll > 55000) tick(); };
+    const id = setInterval(tick, 60000);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { alive = false; clearInterval(id); document.removeEventListener("visibilitychange", onVisible); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [day, country, access]);
 

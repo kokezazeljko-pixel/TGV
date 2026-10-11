@@ -550,7 +550,7 @@ async function pollHub(h, now) {
       dp_pt: ttTime(s.dp?.pt),
       pp: s.dp?.pp || s.ar?.pp || null
     }));
-    await upsert("de_plan", rows, "eva,sid");
+    await upsert("de_plan", [...new Map(rows.map((r) => [r.sid, r])).values()], "eva,sid");
     await upsert("de_plan_hours", [{ eva, hour: hr.toISOString() }], "eva,hour");
     if (station && station !== h.station) {
       h.station = station;
@@ -592,31 +592,15 @@ async function realtime() {
       await rest("PATCH", `at_hubs?name=eq.${encodeURIComponent(h.name)}`, { last_fchg: new Date().toISOString(), last_error: String(e).slice(0, 200) }, { Prefer: "return=minimal" });
     }
   }
-  const days = [parisDate(-1), parisDate(0)];
   const hubRows = await rest("GET", "at_hubs?select=name,eva,station&eva=not.is.null");
   const evaName = new Map(hubRows.map((h) => [h.eva, [...new Set([deNorm(h.name), deNorm(h.station || "")].filter(Boolean))]]));
-  const plan = [];
-  const since = new Date(Date.now() - 12 * 3600000).toISOString();
-  const evas = [...evaName.keys()].join(",");
-  for (let off = 0;; off += 1000) {
-    const page = await rest("GET", `de_plan?eva=in.(${evas})&day=in.(${days.join(",")})&or=(dp_pt.gte.%22${since}%22,ar_pt.gte.%22${since}%22)&select=eva,cat,num,ar_pt,dp_pt,ar_ct,dp_ct,pp,cp,cs&order=eva,sid&limit=1000&offset=${off}`);
-    for (const p of page)
-      plan.push({ ...p, hubs: evaName.get(p.eva) || [] });
-    if (page.length < 1000)
-      break;
-  }
+  const iso = (sec) => sec == null ? null : new Date(sec * 1000).toISOString();
+  const plan = (await rest("POST", "rpc/rt_plan", { p_country: "at", p_before: 3 * 3600 + 300, p_after: 7200 + 300, p_ahead: 0 })).map(([eva, cat, num, ar, dp, arc, dpc, pp, cp, cs]) => ({ eva, cat, num, ar_pt: iso(ar), dp_pt: iso(dp), ar_ct: iso(arc), dp_ct: iso(dpc), pp, cp, cs, hubs: evaName.get(eva) || [] }));
   const now = Math.floor(Date.now() / 1000);
   const trains = [];
   for (let off = 0;; off += 1000) {
-    const page = await rest("GET", `trains?country=eq.at&service_date=in.(${days.join(",")})&select=id,service_date,type,number,stops,delay_min&order=id&limit=1000&offset=${off}`);
-    for (const r of page) {
-      const st = r.stops || [];
-      if (st.length < 2)
-        continue;
-      const a = fastEpoch(r.service_date, st[0].dep || st[0].arr), b = fastEpoch(r.service_date, st[st.length - 1].arr || st[st.length - 1].dep);
-      if (now >= a - 3 * 3600 && now <= b + 7200 + (r.delay_min || 0) * 60)
-        trains.push(r);
-    }
+    const page = await rest("POST", `rpc/rt_trains?order=id&limit=1000&offset=${off}`, { p_country: "at", p_before: 3 * 3600, p_after: 7200, p_ahead: 0 });
+    trains.push(...page);
     if (page.length < 1000)
       break;
   }
