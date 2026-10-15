@@ -2,6 +2,7 @@ import Board from "@/components/Board";
 import { getServerClient, isConfigured } from "@/lib/supabase";
 import { parisDate } from "@/lib/format";
 import { fetchTrainsForDay, fetchCommentCounts } from "@/lib/queries";
+import { packTrains } from "@/lib/pack";
 
 export const revalidate = 3600; // the server rebuilds this page at most once an hour (each rebuild is a Vercel "ISR write"); the browser fetches newer delays itself every minute
 
@@ -12,7 +13,8 @@ export default async function Home() {
   const sb = getServerClient();
   const [{ data: trains, error }, counts] = await Promise.all([fetchTrainsForDay(sb, today, "all"), fetchCommentCounts(sb, today)]);
 
-  return <Board initialTrains={trains || []} initialCounts={counts} today={today} loadError={error?.message} />;
+  // sent in compact form (lib/pack.js): about 6x smaller, the browser unpacks it
+  return <Board initialTrains={packTrains(trains || [], today)} initialCounts={counts} today={today} loadError={error?.message} />;
 }
 
 function SetupNotice() {

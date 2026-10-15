@@ -10,10 +10,12 @@ import { KOFI_URL } from "@/lib/site";
 import { fetchTrainsForDay, fetchTrainsUpdatedSince, fetchCommentCounts, fetchAlertTrainIds } from "@/lib/queries";
 import { statusOf, toMin, fromMin, trainHref, ago, filterTrains, isShuttle, parisNowMin, plannedPf, isScheduleOnly, SCHEDULE_ONLY } from "@/lib/format";
 import { getGeo } from "@/lib/geo";
+import { unpackTrains } from "@/lib/pack";
 
 // Map views: all countries together first, then Switzerland, France, Belgium and the Netherlands
 const COUNTRIES = ["all", "ch", "fr", "de", "at", "es", "pt", "be", "nl", "lu"];
 const REAL = COUNTRIES.slice(1);
+const ROWS = 60, ROWS_STEP = 200; // rows shown at first in each list of the board, and how many more per click
 const DEFAULT_COUNTRY = "all"; // the server sends this view's trains with the page
 import { useLang } from "@/components/LangProvider";
 import { LOCALES } from "@/lib/i18n";
@@ -71,7 +73,10 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
   useEffect(() => { checkAccess(); }, [session]);
   const locked = isPast && !access;
   const router = useRouter();
-  const [trains, setTrains] = useState(initialTrains);
+  // the page sends the trains in compact form (lib/pack.js); unpacked once here
+  const initialList = useRef(null);
+  if (!initialList.current) initialList.current = unpackTrains(initialTrains);
+  const [trains, setTrains] = useState(initialList.current);
   const [counts, setCounts] = useState(initialCounts);
   const [type, setType] = useState("all");
   const [status, setStatus] = useState("all");
@@ -142,7 +147,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
       const byId = new Map(upd.map((x) => [x.id, x]));
       setTrains((old) => old.map((x) => byId.get(x.id) || x));
     };
-    if (country === DEFAULT_COUNTRY && day === today && !usedInitial.current) { usedInitial.current = true; latest.current = newest(initialTrains); fetchAlertTrainIds(sb).then((al) => alive && setAlertIds(al)); }
+    if (country === DEFAULT_COUNTRY && day === today && !usedInitial.current) { usedInitial.current = true; latest.current = newest(initialList.current); fetchAlertTrainIds(sb).then((al) => alive && setAlertIds(al)); }
     else { usedInitial.current = true; setTrains([]); full(true); }
     const tick = () => {
       if (document.hidden) return;
@@ -230,6 +235,9 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
   const liveRows = useMemo(() => sorted.filter((x) => runningIds.has(x.id)), [sorted, runningIds]);
   const dayRows = useMemo(() => sorted.filter((x) => !runningIds.has(x.id)), [sorted, runningIds]);
   const rowFlag = country === "all" && listCountry === "all";
+  // Thousands of rows at once made the page slow (above all on phones): the first ones, more on request
+  const [moreLive, setMoreLive] = useState(ROWS), [moreDay, setMoreDay] = useState(ROWS);
+  useEffect(() => { setMoreLive(ROWS); setMoreDay(ROWS); }, [country, day, station, type, status, q, listCountry]);
 
   return (
     <>
@@ -339,10 +347,12 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
         ) : (
           <>
             {liveRows.length > 0 && <div className="bsec live">● {t("secRunning")} <span className="n">({liveRows.length})</span></div>}
-            {liveRows.map((tr) => <Row key={tr.id} tr={tr} n={counts[tr.id] || 0} live flag={rowFlag} notice={alertIds.has(tr.id)} />)}
+            {liveRows.slice(0, moreLive).map((tr) => <Row key={tr.id} tr={tr} n={counts[tr.id] || 0} live flag={rowFlag} notice={alertIds.has(tr.id)} />)}
+            {liveRows.length > moreLive && <button type="button" className="morerows" onClick={() => setMoreLive((n) => n + ROWS_STEP)}>{t("showMore", liveRows.length - moreLive)}</button>}
             {isPast && access && <div className="bsec unlocked">🔓 {t("histActive", new Date(access).toLocaleString(LOCALES[lang] || "en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" }))}</div>}
             {dayRows.length > 0 && <div className="bsec">{isPast ? t("secDate") : t("secDay")} <span className="n">({dayRows.length})</span></div>}
-            {dayRows.map((tr) => <Row key={tr.id} tr={tr} n={counts[tr.id] || 0} flag={rowFlag} notice={alertIds.has(tr.id)} />)}
+            {dayRows.slice(0, moreDay).map((tr) => <Row key={tr.id} tr={tr} n={counts[tr.id] || 0} flag={rowFlag} notice={alertIds.has(tr.id)} />)}
+            {dayRows.length > moreDay && <button type="button" className="morerows" onClick={() => setMoreDay((n) => n + ROWS_STEP)}>{t("showMore", dayRows.length - moreDay)}</button>}
           </>
         )}
       </section>
