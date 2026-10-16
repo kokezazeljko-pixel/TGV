@@ -1,20 +1,14 @@
 import Board from "@/components/Board";
-import { getServerClient, isConfigured } from "@/lib/supabase";
+import { isConfigured } from "@/lib/supabase";
 import { parisDate } from "@/lib/format";
-import { fetchTrainsForDay, fetchCommentCounts } from "@/lib/queries";
-import { packTrains } from "@/lib/pack";
 
-export const revalidate = 3600; // the server rebuilds this page at most once an hour (each rebuild is a Vercel "ISR write"); the browser fetches newer delays itself every minute
+export const revalidate = 3600; // the server rebuilds this page at most once an hour (each rebuild is a Vercel "ISR write")
 
-export default async function Home() {
+// The page carries no trains: the browser loads them from the database right away (a ready compact copy, made
+// once a minute). So Vercel only sends a small page, however many visitors come.
+export default function Home() {
   if (!isConfigured) return <SetupNotice />;
-
-  const today = parisDate();
-  const sb = getServerClient();
-  const [{ data: trains, error }, counts] = await Promise.all([fetchTrainsForDay(sb, today, "all"), fetchCommentCounts(sb, today)]);
-
-  // sent in compact form (lib/pack.js): about 6x smaller, the browser unpacks it
-  return <Board initialTrains={packTrains(trains || [], today)} initialCounts={counts} today={today} loadError={error?.message} />;
+  return <Board initialCounts={{}} today={parisDate()} />;
 }
 
 function SetupNotice() {

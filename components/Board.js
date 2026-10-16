@@ -7,7 +7,7 @@ import { getBrowserClient } from "@/lib/supabase";
 import { useSession } from "@/components/useSession";
 import { useProfile } from "@/components/Avatar";
 import { KOFI_URL } from "@/lib/site";
-import { fetchTrainsForDay, fetchTrainsUpdatedSince, fetchCommentCounts, fetchAlertTrainIds } from "@/lib/queries";
+import { fetchTrainsForDay, fetchTrainsUpdatedSince, fetchCommentCounts, fetchAlertTrainIds, fetchBoard } from "@/lib/queries";
 import { statusOf, toMin, fromMin, trainHref, ago, filterTrains, isShuttle, parisNowMin, plannedPf, isScheduleOnly, SCHEDULE_ONLY } from "@/lib/format";
 import { getGeo } from "@/lib/geo";
 import { unpackTrains } from "@/lib/pack";
@@ -73,7 +73,8 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
   useEffect(() => { checkAccess(); }, [session]);
   const locked = isPast && !access;
   const router = useRouter();
-  // the page sends the trains in compact form (lib/pack.js); unpacked once here
+  // the page itself no longer carries the trains (less Vercel transfer): the browser loads them right after,
+  // for today's European view from the ready copy the database keeps (lib/queries.js fetchBoard)
   const initialList = useRef(null);
   if (!initialList.current) initialList.current = unpackTrains(initialTrains);
   const [trains, setTrains] = useState(initialList.current);
@@ -84,7 +85,8 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
   const [station, setStation] = useState(null);
   const [running, setRunning] = useState([]);
   const [country, setCountry] = useState(DEFAULT_COUNTRY);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(!initialList.current.length);
+  const [loadErr, setLoadErr] = useState(null); // the trains could not be read (shown above the board)
   const [listCountry, setListCountry] = useState("all"); // whose trains the list under the map shows (Europe view)
   const [alertIds, setAlertIds] = useState(() => new Set()); // trains with an official notice from the railway
   const [fullMap, setFullMap] = useState(false); // live map over the whole screen
@@ -129,10 +131,16 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
     const newest = (rows, from = "") => rows.reduce((a, x) => (ms(x.rt_updated_at) > ms(a) ? new Date(ms(x.rt_updated_at)).toISOString() : a), from);
     const full = async (showLoading) => {
       if (showLoading) setLoading(true);
-      const [{ data: tr, error }, c, al] = await Promise.all([fetchTrainsForDay(sb, day, country), fetchCommentCounts(sb, day), fetchAlertTrainIds(sb)]);
+      // today's European view: the compact copy the database makes once a minute (about 5× smaller); otherwise the trains themselves
+      const loadDay = async () => {
+        if (country === "all" && day === today) { const b = await fetchBoard(sb, day); if (b) return { data: b, error: null }; }
+        return fetchTrainsForDay(sb, day, country);
+      };
+      const [{ data: tr, error }, c, al] = await Promise.all([loadDay(), fetchCommentCounts(sb, day), fetchAlertTrainIds(sb)]);
       setAlertIds(al);
       if (!alive) return;
       if (!error) { setTrains(tr); latest.current = newest(tr); }
+      setLoadErr(error ? error.message || String(error) : null);
       setCounts(c);
       setLoading(false);
     };
@@ -147,7 +155,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
       const byId = new Map(upd.map((x) => [x.id, x]));
       setTrains((old) => old.map((x) => byId.get(x.id) || x));
     };
-    if (country === DEFAULT_COUNTRY && day === today && !usedInitial.current) { usedInitial.current = true; latest.current = newest(initialList.current); fetchAlertTrainIds(sb).then((al) => alive && setAlertIds(al)); }
+    if (country === DEFAULT_COUNTRY && day === today && !usedInitial.current && initialList.current.length) { usedInitial.current = true; latest.current = newest(initialList.current); fetchAlertTrainIds(sb).then((al) => alive && setAlertIds(al)); }
     else { usedInitial.current = true; setTrains([]); full(true); }
     const tick = () => {
       if (document.hidden) return;
@@ -257,7 +265,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
       </section>
 
       {stats.lastRt && <p className="muted" style={{ margin: "8px 0 0" }}>{t("updatedSrc", ago(stats.lastRt, t, lang), t("source_" + country))}</p>}
-      {loadError && <div className="notice"><b>{t("loadError")}</b> {loadError}</div>}
+      {(loadError || loadErr) && <div className="notice"><b>{t("loadError")}</b> {loadError || loadErr}</div>}
       {SCHEDULE_ONLY.has(country) ? <SchedNotice country={country} /> : <AskBubble />}
 
       <div className="filters">
