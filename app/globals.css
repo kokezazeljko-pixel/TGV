@@ -35,6 +35,7 @@ header.top .wrap{padding-block:18px 20px;display:flex;flex-wrap:wrap;align-items
 .logo-svg{display:block;flex:none}
 .brand h1{margin:0;font-family:var(--f-display);font-weight:700;font-size:34px;letter-spacing:.02em;line-height:1}
 @media (max-width:420px){.brand h1{font-size:28px}}
+@media (max-width:700px){header.top.compact .wrap{padding-block:10px 12px;gap:10px}header.top.compact .brand p{display:none}header.top.compact .brand h1{font-size:24px}header.top.compact .clock{font-size:20px}}
 .brand p{margin:2px 0 0;color:color-mix(in srgb,var(--board-fg) 72%,transparent);font-size:14px}
 .top-right{display:flex;flex-wrap:wrap;align-items:center;gap:14px 18px}
 .lang{display:flex;border:1px solid color-mix(in srgb,var(--board-fg) 35%,transparent);border-radius:999px;padding:2px}
@@ -179,8 +180,9 @@ header.top .wrap{padding-block:18px 20px;display:flex;flex-wrap:wrap;align-items
 .stops li .dot{width:12px;height:12px;border-radius:50%;border:2px solid var(--accent);background:var(--surface);justify-self:center;z-index:1}
 .stops li.past .dot{background:var(--accent)}
 .stops li:not(:last-child)::after{content:"";position:absolute;left:8px;top:22px;bottom:-10px;width:2px;background:var(--line)}
-.stops .t{font-family:var(--f-mono);font-size:14px;text-align:right;white-space:nowrap}
-.stops .t em{font-style:normal;font-weight:700;margin-left:6px}
+/* time and delay in fixed columns, so every row lines up (with or without a platform) */
+.stops .t{font-family:var(--f-mono);font-size:14px;white-space:nowrap;display:grid;grid-template-columns:auto minmax(3.3em,auto);column-gap:6px;align-items:baseline}
+.stops .t em{font-style:normal;font-weight:700}
 .d-ok{color:var(--ok)} .d-warn{color:var(--warn)} .d-bad{color:var(--bad)}
 .reasons{display:grid;gap:8px}
 .rbar{display:grid;grid-template-columns:160px minmax(0,1fr) 28px;gap:10px;align-items:center;font-size:14px}
@@ -414,7 +416,7 @@ a.primary{display:inline-block;text-decoration:none}
 
 /* platform ("peron") next to each stop */
 .stops .pf{font-size:12.5px;font-weight:700;color:var(--muted);white-space:nowrap}
-.stops .pf:empty{display:none}
+.stops .pf:empty{min-width:0} /* kept as an empty cell: the time column stays the last one in every row */
 .stops .pf.changed{color:var(--bad)}
 .stops .pf s{font-weight:500;margin-left:5px;color:var(--muted)}
 

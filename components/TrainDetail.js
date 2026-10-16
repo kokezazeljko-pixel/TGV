@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase";
 import { useSession } from "@/components/useSession";
-import { TRAIN_FIELDS, statusOf, toMin, parisTime, parisNowMin, ago, plannedPf, isScheduleOnly, localNowMin } from "@/lib/format";
+import { TRAIN_FIELDS, toMin, parisTime, parisNowMin, ago, plannedPf, isScheduleOnly, localNowMin } from "@/lib/format";
 import { REASON_KEYS } from "@/lib/i18n";
 import { useLang } from "@/components/LangProvider";
 import TrainMap from "@/components/TrainMap";
@@ -147,7 +147,6 @@ export default function TrainDetail({ initialTrain }) {
     return () => clearInterval(id);
   }, [load]);
 
-  const st = statusOf(train, t);
   // Has the train left its first station yet? (computed in the browser, Paris time)
   const [departed, setDeparted] = useState(null);
   const [bigMap, setBigMap] = useState(false);
@@ -173,9 +172,9 @@ export default function TrainDetail({ initialTrain }) {
         <div className="col">
           <section className="card">
             <div className="bigdelay">
-              <div className="n num">{train.cancelled ? t("cancelled") : isScheduleOnly(train) ? t("schedLbl") : train.delay_min ? `+${train.delay_min} min` : t("onTimeLbl")}</div>
+              {/* the big number carries the status colour (the same text was also shown in a pill next to it) */}
+              <div className={`n num ${train.cancelled ? "d-bad" : isScheduleOnly(train) ? "" : (train.delay_min || 0) >= 15 ? "d-bad" : (train.delay_min || 0) >= 5 ? "d-warn" : "d-ok"}`}>{train.cancelled ? t("cancelled") : isScheduleOnly(train) ? t("schedLbl") : train.delay_min ? `+${train.delay_min} min` : t("onTimeLbl")}</div>
               <div className="muted">
-                <span className={`pill ${st.cls}`}>{st.label}</span>
                 <div>{train.rt_updated_at ? t("updated", ago(train.rt_checked_at || train.rt_updated_at, t, lang)) : isScheduleOnly(train) ? t("schedShort") : departed === false ? t("notStarted") : t("noReport")}</div>
               </div>
             </div>

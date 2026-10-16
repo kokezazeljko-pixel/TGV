@@ -2,6 +2,7 @@
 
 import { Avatar, avatarOf, useProfile } from "@/components/Avatar";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { parisTime } from "@/lib/format";
 import { LANGS } from "@/lib/i18n";
@@ -46,6 +47,8 @@ export default function Header() {
   const { session, ready } = useSession();
   const { profile } = useProfile(session);
   const { lang, setLang, t } = useLang();
+  // on a train page the header is smaller on phones, so the train itself is seen at once
+  const compact = (usePathname() || "/").startsWith("/voz/");
 
   useEffect(() => {
     const tick = () => setTime(parisTime());
@@ -55,7 +58,7 @@ export default function Header() {
   }, []);
 
   return (
-    <header className="top">
+    <header className={"top" + (compact ? " compact" : "")}>
       <div className="wrap">
         <Link href="/" className="brand">
           <Logo size={44} />
