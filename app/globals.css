@@ -181,8 +181,8 @@ header.top .wrap{padding-block:18px 20px;display:flex;flex-wrap:wrap;align-items
 .stops li.past .dot{background:var(--accent)}
 .stops li:not(:last-child)::after{content:"";position:absolute;left:8px;top:22px;bottom:-10px;width:2px;background:var(--line)}
 /* time and delay in fixed columns, so every row lines up (with or without a platform) */
-.stops .t{font-family:var(--f-mono);font-size:14px;white-space:nowrap;display:grid;grid-template-columns:auto minmax(3.3em,auto);column-gap:6px;align-items:baseline}
-.stops .t em{font-style:normal;font-weight:700}
+.stops .t{font-family:var(--f-mono);font-size:14px;white-space:nowrap;display:grid;grid-template-columns:auto 3.3em;column-gap:6px;align-items:baseline}
+.stops .t em{font-style:normal;font-weight:700;min-width:0;overflow:visible} /* a longer word ("no stop") runs into the margin instead of moving the time */
 .d-ok{color:var(--ok)} .d-warn{color:var(--warn)} .d-bad{color:var(--bad)}
 .reasons{display:grid;gap:8px}
 .rbar{display:grid;grid-template-columns:160px minmax(0,1fr) 28px;gap:10px;align-items:center;font-size:14px}
