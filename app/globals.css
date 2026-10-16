@@ -346,6 +346,7 @@ a.primary{display:inline-block;text-decoration:none}
 #map .pinlbl{display:none;font-family:var(--f-body);font-size:11px;font-weight:700;text-anchor:middle;fill:var(--fg);paint-order:stroke;stroke:var(--halo);stroke-width:3px;stroke-linejoin:round;pointer-events:none}
 #map.z3 .pinlbl{display:block}
 #map.z3 .lbl.grp{display:none}
+#map .lbl.hid{visibility:hidden} /* would overlap a more important name (TrainMap.js declutter) */
 
 /* ===== route view (one train): focus on its route ===== */
 .mapbox.routeview #map .lbl,.mapbox.routeview #map .pinlbl{display:none}

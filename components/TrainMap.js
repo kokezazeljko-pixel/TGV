@@ -85,6 +85,14 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
     svg.classList.toggle("z2", (sc >= 1.45 && zoom >= 1.4) || all); svg.classList.toggle("z3", sc >= 2.2 && zoom >= 1.8);
     svg.classList.toggle("z5", (sc >= 3.6 && zoom >= 2.6) || all); svg.classList.toggle("small", sc < 0.55);
     if (compact && highlight) { setRouteScale(Math.round(sc * 20) / 20); setRouteBounds({ ...v }); } // route view: labels follow the zoom
+    scheduleDeclutter();
+  }
+  // City names that would overlap another one are hidden (the more important name stays); zooming in brings them back
+  const declutterQueued = useRef(false);
+  function scheduleDeclutter() {
+    if (declutterQueued.current) return;
+    declutterQueued.current = true;
+    requestAnimationFrame(() => { declutterQueued.current = false; declutter(svgRef.current); });
   }
   function zoomAt(px, py, factor) {
     const v = view.current, { H } = geoRef.current;
@@ -93,6 +101,8 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
     applyView();
   }
   const toSvg = (cx, cy) => { const m = screenMap(), v = view.current; return [v.x + (cx - m.r.left - m.ox) / m.s, v.y + (cy - m.r.top - m.oy) / m.s]; };
+
+  useEffect(() => { scheduleDeclutter(); document.fonts?.ready.then(() => scheduleDeclutter()); }, [geo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const svg = svgRef.current;
@@ -213,6 +223,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
             );
           })}
         </g>
+        {!(compact && highlight) && <StationLabels geo={geo} />}
         {selPt && (
           <g className="selpin" transform={`translate(${selPt[0].toFixed(1)} ${selPt[1].toFixed(1)})`} pointerEvents="none">
             <circle className="selpin-pulse" r="1" />
@@ -304,8 +315,6 @@ export function PinShape({ airport }) {
 
 function Stations({ geo, selected, onClick }) {
   const { stations } = geo;
-  // one city label per group of fanned-out stations (Paris, Bruxelles / Brussel), at the group's first station
-  const groupLabels = useMemo(() => { const g = {}; for (const n of stations) if (n.group && !g[n.group]) g[n.group] = n; return Object.entries(g); }, [stations]);
   const pins = useMemo(() => stations.filter((n) => n.lvl === 1 || n.group || isAirport(n.name)), [stations]);
   // Stations of one city (Paris) are only a few hundred metres apart and would cover each other,
   // so their pins are fanned out side by side (west to east) with a thin line to the real spot.
@@ -349,17 +358,43 @@ function Stations({ geo, selected, onClick }) {
           );
         })}
       </g>
-      <g>
-        {groupLabels.map(([name, n]) => <text key={name} x={n.x.toFixed(1)} y={n.y.toFixed(1)} textAnchor="end" className="lbl major a grp pos-l">{name}</text>)}
-        {stations.filter((n) => n.lvl).map((n) => {
-          const cls = n.lvl === 1 ? "lbl major " + (TIER_A.has(n.short) ? "a" : "b") : n.lvl === 5 ? "lbl l5" : n.lvl === 3 ? "lbl l3" : "lbl l2";
-          if (n.group) return null; // their names sit on the fanned-out pins
-          const pinned = n.lvl === 1 || isAirport(n.name) ? " pinned" : "";
-          return <text key={n.k} x={n.x.toFixed(1)} y={n.y.toFixed(1)} textAnchor={ANCHOR[n.pos] || "start"} className={`${cls}${pinned} pos-${n.pos || "r"}`}>{n.short}</text>;
-        })}
-      </g>
     </>
   );
+}
+
+// Station names, drawn above the trains so the arrows never cover them
+function StationLabels({ geo }) {
+  const { stations } = geo;
+  const groupLabels = useMemo(() => { const g = {}; for (const n of stations) if (n.group && !g[n.group]) g[n.group] = n; return Object.entries(g); }, [stations]);
+  return (
+    <g className="slabels">
+      {groupLabels.map(([name, n]) => <text key={name} x={n.x.toFixed(1)} y={n.y.toFixed(1)} textAnchor="end" className="lbl major a grp pos-l">{name}</text>)}
+      {stations.filter((n) => n.lvl).map((n) => {
+        const cls = n.lvl === 1 ? "lbl major " + (TIER_A.has(n.short) ? "a" : "b") : n.lvl === 5 ? "lbl l5" : n.lvl === 3 ? "lbl l3" : "lbl l2";
+        if (n.group) return null; // their names sit on the fanned-out pins
+        const pinned = n.lvl === 1 || isAirport(n.name) ? " pinned" : "";
+        return <text key={n.k} x={n.x.toFixed(1)} y={n.y.toFixed(1)} textAnchor={ANCHOR[n.pos] || "start"} className={`${cls}${pinned} pos-${n.pos || "r"}`}>{n.short}</text>;
+      })}
+    </g>
+  );
+}
+
+// Hide every name that would overlap a more important one already shown (groups like Paris first, then the
+// big cities, then the rest in map order). Measured on screen, so it follows the zoom and the screen size.
+const LABEL_RANK = (el) => (el.classList.contains("grp") ? 0 : el.classList.contains("a") ? 1 : el.classList.contains("major") ? 2 : el.classList.contains("l3") ? 3 : el.classList.contains("l2") ? 4 : 5);
+function declutter(svg) {
+  if (!svg) return;
+  const els = [...svg.querySelectorAll(".slabels .lbl")];
+  for (const el of els) el.classList.remove("hid");
+  const items = [];
+  els.forEach((el, i) => { const r = el.getBoundingClientRect(); if (r.width > 0 && r.height > 0) items.push({ el, r, rank: LABEL_RANK(el), i }); });
+  items.sort((a, b) => a.rank - b.rank || a.i - b.i);
+  const shown = [], pad = 2;
+  for (const it of items) {
+    const { r } = it;
+    if (shown.some((q) => r.left < q.right + pad && r.right > q.left - pad && r.top < q.bottom + pad && r.bottom > q.top - pad)) it.el.classList.add("hid");
+    else shown.push(r);
+  }
 }
 
 // Stops of one train on the route view: name, timetable time and delay. Stops already passed are filled.
