@@ -138,6 +138,20 @@ function inRing(ring, lon, lat) {
   }
   return c;
 }
+function mergeTwins(st) {
+  const wait = (x) => x.arr && x.dep && x.arr !== x.dep;
+  const out = [];
+  for (const s of st) {
+    const p = out[out.length - 1];
+    if (!p || p.name !== s.name) {
+      out.push(s);
+      continue;
+    }
+    if (!p.pf && s.pf || !p.pf === !s.pf && !wait(p) && wait(s))
+      out[out.length - 1] = s;
+  }
+  return out;
+}
 var touchesGermany = (stops, ring) => !ring || new Set(stops.filter((s) => s.lat != null && inRing(ring, s.lon, s.lat)).map((s) => s.name)).size >= 2;
 function buildGermanSchedule(zip, dates, inflateRaw, ring = null) {
   const read = unzip(zip, inflateRaw);
@@ -186,7 +200,7 @@ function buildGermanSchedule(zip, dates, inflateRaw, ring = null) {
     if (t.stops.length < 2)
       continue;
     t.stops.sort((a, b) => a.seq - b.seq);
-    const st = t.stops.map((s) => {
+    const st = mergeTwins(t.stops.map((s) => {
       const r = stops.get(s.id) || {};
       const lat = parseFloat(r.stop_lat), lon = parseFloat(r.stop_lon);
       const pf = (r.platform_code || "").trim();
@@ -198,7 +212,7 @@ function buildGermanSchedule(zip, dates, inflateRaw, ring = null) {
         ...Number.isFinite(lat) ? { lat: Math.round(lat * 1e4) / 1e4, lon: Math.round(lon * 1e4) / 1e4 } : {},
         .../^[0-9]{1,3}[a-z]?$/i.test(pf) ? { pf: pf.toUpperCase() } : {}
       };
-    });
+    }));
     if (!touchesGermany(st, ring))
       continue;
     for (const d of t.runs)

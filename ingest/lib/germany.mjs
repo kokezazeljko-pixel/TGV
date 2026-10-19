@@ -91,6 +91,21 @@ function inRing(ring, lon, lat) {
   }
   return c;
 }
+// gtfs.de also lists the border point under the station's name ("Flensburg (Gr)", right next to Padborg;
+// the same at Bad Bentheim, Emmerich, Frankfurt (Oder) and Kehl), so the train showed the station twice.
+// Two stops in a row with the same name are one stop: keep the real station – the one with a platform,
+// else the one where the train waits, else the first.
+export function mergeTwins(st) {
+  const wait = (x) => x.arr && x.dep && x.arr !== x.dep;
+  const out = [];
+  for (const s of st) {
+    const p = out[out.length - 1];
+    if (!p || p.name !== s.name) { out.push(s); continue; }
+    if ((!p.pf && s.pf) || (!p.pf === !s.pf && !wait(p) && wait(s))) out[out.length - 1] = s;
+  }
+  return out;
+}
+
 export const touchesGermany = (stops, ring) => !ring || new Set(stops.filter((s) => s.lat != null && inRing(ring, s.lon, s.lat)).map((s) => s.name)).size >= 2;
 
 export function buildGermanSchedule(zip, dates, inflateRaw, ring = null) {
@@ -127,14 +142,14 @@ export function buildGermanSchedule(zip, dates, inflateRaw, ring = null) {
   for (const t of trips.values()) {
     if (t.stops.length < 2) continue;
     t.stops.sort((a, b) => a.seq - b.seq);
-    const st = t.stops.map((s) => {
+    const st = mergeTwins(t.stops.map((s) => {
       const r = stops.get(s.id) || {};
       const lat = parseFloat(r.stop_lat), lon = parseFloat(r.stop_lon);
       const pf = (r.platform_code || "").trim();
       return { ...s, name: deStopName(r.stop_name) || s.id, time: hhmm(s.dep || s.arr), delay: 0,
         ...(Number.isFinite(lat) ? { lat: Math.round(lat * 1e4) / 1e4, lon: Math.round(lon * 1e4) / 1e4 } : {}),
         ...(/^[0-9]{1,3}[a-z]?$/i.test(pf) ? { pf: pf.toUpperCase() } : {}) };
-    });
+    }));
     if (!touchesGermany(st, ring)) continue;
     for (const d of t.runs) out.push({
       id: `${d}_de_${t.id}`, trip_id: t.id, service_date: d, country: "de",
