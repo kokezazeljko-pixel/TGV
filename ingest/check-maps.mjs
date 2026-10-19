@@ -96,12 +96,13 @@ function checkCountry(c, net, trains, problems) {
       if (!inside(a) || !inside(b)) continue;
       const A = info(a), B = info(b);
       if (!A.ok || !B.ok || A.node === B.node) continue;
-      const direct = Math.hypot((a.lon - b.lon) * COS, a.lat - b.lat);
-      if (direct < MIN_HOP) continue;
+      const direct = Math.hypot((N[A.node][1] - N[B.node][1]) * COS, N[A.node][0] - N[B.node][0]);
+      // short hops too (19.10.2026: Flensburg → Padborg, 7 km, was drawn back through Schleswig): the line may be
+      // 1.8× the straight distance or MIN_HOP (~9 km) longer, whichever is more
       const key = `${a.name} → ${b.name}`;
       if (detours.has(key) || REAL_DETOURS.has(`${c}:${[a.name, b.name].sort().join("|")}`)) continue;
-      const r = route(A.node, B.node, direct * DETOUR * 1.5) / direct;
-      if (r > DETOUR) detours.set(key, `${t.type} ${t.number}, ${r === Infinity ? "nema linije" : `${r.toFixed(1)}× duže od prave`}`);
+      const limit = Math.max(direct * DETOUR, direct + MIN_HOP), len = route(A.node, B.node, limit * 1.5);
+      if (len > limit) detours.set(key, `${t.type} ${t.number}, ${len === Infinity ? "nema linije" : `${Math.round(len * 111)} km umesto ${Math.round(direct * 111)} km`}`);
     }
   }
   for (const [name, tr] of missing) problems.push(`${c}: stanica nije na mapi: ${name} (npr. ${tr})`);
