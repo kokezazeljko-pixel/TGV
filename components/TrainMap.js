@@ -202,6 +202,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
     animateTo({ x: (x0 + x1) / 2 - w / 2, y: (y0 + y1) / 2 - h / 2, w, h }, 700);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStation]);
+  useEffect(() => { svgRef.current?.classList.toggle("route-on", !!route); }, [route]);
   // zoom onto a route from the records; back to the whole map when it is closed (unless a station is open)
   const hadRoute = useRef(false);
   useEffect(() => {
@@ -237,12 +238,6 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
             ))}
           </g>
         )}
-        {route && (
-          <g key={"route|" + routeHi.a + "|" + routeHi.b} className={"route-hi tone-" + (routeHi.tone || "acc")} pointerEvents="none">
-            <path className="route-casing" d={"M" + route.pts.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join("L")} />
-            <path className="route-line" style={{ "--L": (route.len + 1).toFixed(1) }} d={"M" + route.pts.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join("L")} />
-          </g>
-        )}
         {compact && highlight && <RouteStops geo={geo} tr={highlight} now={now} scale={routeScale} bounds={routeBounds} />}
         {!(compact && highlight) && <Stations
           geo={geo}
@@ -256,12 +251,6 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
                 <circle className={"reach-dot" + (p.big ? " big" : "")} r="1" style={{ animationDelay: `${((p.at / reach.far) * REACH_S).toFixed(2)}s` }}><title>{p.name}</title></circle>
               </g>
             ))}
-          </g>
-        )}
-        {route && (
-          <g key={"route-dots|" + routeHi.a + "|" + routeHi.b} className={"route-hi tone-" + (routeHi.tone || "acc")} pointerEvents="none">
-            {route.stops.map((p, i) => <circle key={i} className="route-stop" cx={p[0].toFixed(1)} cy={p[1].toFixed(1)} r="1" style={{ transformOrigin: `${p[0].toFixed(1)}px ${p[1].toFixed(1)}px` }} />)}
-            {[route.from, route.to].map((p, i) => <circle key={"e" + i} className="route-end" cx={p[0].toFixed(1)} cy={p[1].toFixed(1)} r="1" style={{ transformOrigin: `${p[0].toFixed(1)}px ${p[1].toFixed(1)}px` }} />)}
           </g>
         )}
         <g>
@@ -279,6 +268,18 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
             );
           })}
         </g>
+        {route && (
+          <g key={"route|" + routeHi.a + "|" + routeHi.b} className={"route-hi tone-" + (routeHi.tone || "acc")} pointerEvents="none">
+            <path className="route-casing" d={"M" + route.pts.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join("L")} />
+            <path className="route-line" style={{ "--L": (route.len + 1).toFixed(1) }} d={"M" + route.pts.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join("L")} />
+          </g>
+        )}
+        {route && (
+          <g key={"route-dots|" + routeHi.a + "|" + routeHi.b} className={"route-hi tone-" + (routeHi.tone || "acc")} pointerEvents="none">
+            {route.stops.map((p, i) => <circle key={i} className="route-stop" cx={p[0].toFixed(1)} cy={p[1].toFixed(1)} r="1" style={{ transformOrigin: `${p[0].toFixed(1)}px ${p[1].toFixed(1)}px` }} />)}
+            {[route.from, route.to].map((p, i) => <circle key={"e" + i} className="route-end" cx={p[0].toFixed(1)} cy={p[1].toFixed(1)} r="1" style={{ transformOrigin: `${p[0].toFixed(1)}px ${p[1].toFixed(1)}px` }} />)}
+          </g>
+        )}
         {!(compact && highlight) && onStationClick && <StationHits geo={geo} selected={selectedStation} onClick={(n) => { if (d.moved) return; onStationClick(n.name); }} />}
         {!(compact && highlight) && <StationLabels geo={geo} />}
         {selPt && (
