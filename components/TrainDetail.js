@@ -5,15 +5,21 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase";
 import { useSession } from "@/components/useSession";
-import { TRAIN_FIELDS, toMin, parisTime, parisNowMin, ago, plannedPf, isScheduleOnly, localNowMin, SCHEDULE_ONLY } from "@/lib/format";
+import { TRAIN_FIELDS, toMin, parisNowMin, ago, plannedPf, isScheduleOnly, SCHEDULE_ONLY, stopMins, serviceMin } from "@/lib/format";
 import { REASON_KEYS } from "@/lib/i18n";
 import { useLang } from "@/components/LangProvider";
 import TrainMap from "@/components/TrainMap";
 import { getGeo } from "@/lib/geo";
 import { fetchAlertsForTrain } from "@/lib/queries";
 
-// The train's own country map, or all countries together when the trip leaves that country
-const routeMapFor = (train) => (getGeo(train.country || "fr").fitsTrain(train) ? train.country || "fr" : "all");
+// The train's own country map, or all countries together when the trip leaves that country and the
+// all-countries map can place more of its stops (Roma–Salzburg: only the Austrian part is on any map, so the Austrian map)
+const routeMapFor = (train) => {
+  const c = train.country || "fr", own = getGeo(c);
+  if (own.fitsTrain(train)) return c;
+  const placed = (g) => (train.stops || []).filter((s) => g.stopNode(s)).length;
+  return placed(getGeo("all")) > placed(own) ? "all" : c;
+};
 
 // Notices come as simple HTML from the railway: keep only the text, one paragraph per block (never inject their HTML)
 // A removed tag becomes a space, then spaces are tidied up. SNCF's English text also glues words to its template
@@ -150,7 +156,7 @@ export default function TrainDetail({ initialTrain }) {
   // Has the train left its first station yet? (computed in the browser, Paris time)
   const [departed, setDeparted] = useState(null);
   const [bigMap, setBigMap] = useState(false);
-  useEffect(() => { setDeparted(localNowMin(train.country) >= toMin(train.dep) + (train.stops?.[0]?.delay || 0)); }, [train]);
+  useEffect(() => { setDeparted(serviceMin(train, parisNowMin()) >= toMin(train.dep) + (train.stops?.[0]?.delay || 0)); }, [train]);
   const tally = useMemo(() => {
     const m = {};
     for (const c of comments) if (c.reason) m[c.reason] = (m[c.reason] || 0) + 1;
@@ -235,14 +241,15 @@ export default function TrainDetail({ initialTrain }) {
 function Stops({ train }) {
   const { t } = useLang();
   const [now, setNow] = useState(null);
-  useEffect(() => { setNow(toMin(parisTime())); }, [train]);
+  useEffect(() => { setNow(serviceMin(train, parisNowMin())); }, [train]);
   if (!train.stops?.length) return null;
+  const mins = stopMins(train.stops); // past midnight counted on (a night train's 03:33 comes after 22:54)
   return (
     <section className="card">
       <h3>{t("stops")}</h3>
       <ol className="stops">
         {train.stops.map((s, i) => {
-          const est = toMin(s.time) + (s.delay || 0);
+          const est = mins[i] + (s.delay || 0);
           const cls = [now != null && est <= now ? "past" : "", s.skipped ? "skipped" : ""].join(" ").trim();
           const dcls = s.delay >= 15 ? "d-bad" : s.delay >= 5 ? "d-warn" : "d-ok";
           return (

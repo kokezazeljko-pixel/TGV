@@ -3,7 +3,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { getGeo } from "@/lib/geo";
 import { reachOnMap, routeOnMap } from "@/lib/reach";
-import { parisNowMin, statusOf } from "@/lib/format";
+import { parisNowMin, statusOf, stopMins, serviceMin } from "@/lib/format";
 import { useLang } from "@/components/LangProvider";
 
 const ARROW = "M1.45 0L-0.95 1.05L-0.45 0L-0.95 -1.05Z"; // points right, rotated to the direction of travel
@@ -495,8 +495,10 @@ function declutter(svg) {
 // Each name tries the right side, then left, below and above, and is left out if it would overlap
 // another name or run off the map. First/last stop and big cities get their place first.
 function RouteStops({ geo, tr, now, scale, bounds }) {
-  const st = (tr.stops || []).filter((s) => geo.stopNode(s));
+  const all = tr.stops || [], mins = stopMins(all); // past midnight counted on (night trains)
+  const st = all.filter((s) => geo.stopNode(s));
   const last = st.length - 1;
+  const at = now == null ? null : serviceMin(tr, now);
   const px = scale || 0.7; // screen pixels per map unit
   const clean = (s) => s.name.replace(/ Hall \d.*$/, "");
   const rank = (i) => (i === 0 || i === last ? 3 : TIER_A.has(geo.stopNode(st[i]).short) ? 2 : geo.stopNode(st[i]).lvl === 1 ? 1 : 0);
@@ -529,7 +531,7 @@ function RouteStops({ geo, tr, now, scale, bounds }) {
     <g className="rstops">
       {st.map((s, i) => {
         const n = geo.stopNode(s);
-        const passed = now != null && toMinLocal(s.time) + (s.delay || 0) < now - 1;
+        const passed = at != null && mins[all.indexOf(s)] + (s.delay || 0) < at - 1;
         const end = i === 0 || i === last;
         const side = show.get(i);
         return (
@@ -548,4 +550,3 @@ function RouteStops({ geo, tr, now, scale, bounds }) {
     </g>
   );
 }
-const toMinLocal = (hhmm) => { if (!hhmm) return 0; const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };

@@ -117,7 +117,7 @@ export function buildAustrianSchedule(files, dates, ring) {
         if (ring && !st.some((s) => Number.isFinite(s.lat) && inRing(ring, s.lon, s.lat))) continue; // never in Austria
         const stops = st.map((s, i) => ({
           seq: i + 1, id: s.key, arr: s.arr, dep: s.dep,
-          name: atStopName(s.raw, s.lat, s.lon), time: hhmm(s.dep || s.arr), delay: 0,
+          name: atStopName(s.raw, s.lat, s.lon), time: hhmm(i === st.length - 1 ? s.arr || s.dep : s.dep || s.arr), delay: 0, // the last stop: its arrival
           ...(Number.isFinite(s.lat) ? { lat: Math.round(s.lat * 1e4) / 1e4, lon: Math.round(s.lon * 1e4) / 1e4 } : {}),
           ...(/^[0-9]{1,3}[A-Z]?(-[A-Z])?$/i.test(s.pf) ? { pf: s.pf.toUpperCase() } : {}),
         }));
