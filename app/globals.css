@@ -621,3 +621,10 @@ textarea.input{resize:vertical;font:inherit}
 #map .selpin-x:hover path,#map .selpin-x:focus-visible path{stroke:#fff}
 .mapbox.style-dark #map .selpin-x circle{fill:#151d2e;stroke:#e8ecf4}
 .mapbox.style-dark #map .selpin-x path{stroke:#e8ecf4}
+
+/* stations by zoom: big and medium stations always; stations named only later (l5) after the first zoom-in;
+   the small ones (l0, no name on the map) only when zoomed in further. A chosen station is always shown. */
+#map .stn.l5,#map .stn-hit.l5,#map .stn.l0,#map .stn-hit.l0{display:none}
+#map.z2 .stn.l5,#map.z2 .stn-hit.l5,#map.z3 .stn.l0,#map.z3 .stn-hit.l0,#map .stn.sel,#map .stn-hit.sel{display:inline}
+/* invisible click zone over each station dot (about 22 px wide), above the trains */
+#map .stn-hit{fill:transparent;stroke:none;cursor:pointer;transform:scale(calc(11 * var(--u,1)))}

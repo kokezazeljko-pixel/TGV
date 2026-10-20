@@ -201,7 +201,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
 
   // Every station served today, for the station menu (grouped by country on the combined map).
   // Stops that belong to a map station use its name, so spellings like "Paris-Est" / "Paris Est" become one entry.
-  const stationGroups = useMemo(() => {
+  const stationIndex = useMemo(() => {
     const { stopNode } = getGeo(country);
     const seen = new Map(); // name -> { fr: n, ch: n, be: n }
     for (const tr of real) for (const s of tr.stops || []) {
@@ -216,8 +216,12 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
     for (const [name, c] of seen) groups[REAL.reduce((a, k) => ((c[k] || 0) > (c[a] || 0) ? k : a), "fr")].push(name);
     const loc = LOCALES[lang] || "en-GB";
     for (const g of Object.values(groups)) g.sort((a, b) => a.localeCompare(b, loc));
-    return groups;
+    // the 10 stations with the most trains today, offered first in the menu
+    const total = (c) => Object.values(c).reduce((a, b) => a + b, 0);
+    const popular = [...seen].sort((a, b) => total(b[1]) - total(a[1])).slice(0, 10).map(([name]) => name);
+    return { groups, popular };
   }, [real, lang, country]);
+  const stationGroups = stationIndex.groups;
   const stationNames = useMemo(() => new Set(Object.values(stationGroups).flat()), [stationGroups]);
   // "Direct destinations" mode (button above the map): the station panel opens on that tab and stays there
   // when another station is chosen; with no station yet, the station list opens
@@ -307,6 +311,9 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
           <span className="sr">{t("stationPick")}</span>
           <select ref={stationSel} value={station && stationNames.has(station) ? station : ""} onChange={(e) => pickStation(e.target.value)} aria-label={t("stationPick")}>
             <option value="">{t("stationChoose")}</option>
+            {stationIndex.popular.length > 0 && (
+              <optgroup label={t("popularStations")}>{stationIndex.popular.map((n) => <option key={"top-" + n} value={n}>{n}</option>)}</optgroup>
+            )}
             {(country === "all" ? REAL : [country]).map((c) =>
               stationGroups[c].length ? (
                 country === "all"

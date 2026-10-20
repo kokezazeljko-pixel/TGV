@@ -251,6 +251,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
             );
           })}
         </g>
+        {!(compact && highlight) && onStationClick && <StationHits geo={geo} selected={selectedStation} onClick={(n) => { if (d.moved) return; onStationClick(n.name); }} />}
         {!(compact && highlight) && <StationLabels geo={geo} />}
         {selPt && (
           <g className="selpin" transform={`translate(${selPt[0].toFixed(1)} ${selPt[1].toFixed(1)})`} pointerEvents="none">
@@ -374,7 +375,7 @@ function Stations({ geo, selected, onClick }) {
           const sel = selected && (n.name === selected || n.group === selected);
           return (
             <g key={n.k} transform={`translate(${n.x.toFixed(1)} ${n.y.toFixed(1)})`}>
-              <circle className={"stn" + (major ? " major" : "") + (sel ? " sel" : "")} r="1" onClick={(e) => { e.stopPropagation(); onClick(n); }}>
+              <circle className={"stn l" + (n.lvl || 0) + (major ? " major" : "") + (sel ? " sel" : "")} r="1" onClick={(e) => { e.stopPropagation(); onClick(n); }}>
                 <title>{n.name}</title>
               </circle>
             </g>
@@ -398,6 +399,24 @@ function Stations({ geo, selected, onClick }) {
         })}
       </g>
     </>
+  );
+}
+
+// Invisible click zones (about 22 screen pixels wide) over the station dots, drawn above the trains:
+// once zoomed in a dot is only a few pixels, and choosing a station matters more than hitting a train next to it
+function StationHits({ geo, selected, onClick }) {
+  return (
+    <g className="stn-hits">
+      {geo.stations.map((n) => {
+        const sel = selected && (n.name === selected || n.group === selected);
+        return (
+          <circle key={n.k} className={"stn-hit l" + (n.lvl || 0) + (sel ? " sel" : "")} cx={n.x.toFixed(1)} cy={n.y.toFixed(1)} r="1"
+            style={{ transformOrigin: `${n.x.toFixed(1)}px ${n.y.toFixed(1)}px` }} onClick={(e) => { e.stopPropagation(); onClick(n); }}>
+            <title>{n.name}</title>
+          </circle>
+        );
+      })}
+    </g>
   );
 }
 
