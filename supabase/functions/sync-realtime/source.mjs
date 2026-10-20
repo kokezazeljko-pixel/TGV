@@ -3,7 +3,7 @@
 // Pokreće je pg_cron (vidi supabase/realtime-cron.sql) uz tajni žeton iz Vault-a.
 // Izvorni kod je ovde; za objavljivanje se spaja sa ingest/lib u jedan fajl index.ts (bun build).
 import { decodeFeed } from "../../../ingest/lib/gtfs-rt.mjs";
-import { applyTripUpdate, matchRow, onTimeUpdate } from "../../../ingest/lib/realtime.mjs";
+import { applyTripUpdate, lineKey, matchRow, matchRowLoose, onTimeUpdate, tripBase } from "../../../ingest/lib/realtime.mjs";
 import { FEEDS, fetchFeed, readFeed } from "../../../ingest/lib/realtime-run.mjs";
 import { ALERT_FEEDS, alertRows, alertStats } from "../../../ingest/lib/alerts.mjs";
 import { feedFromJson, belgianAlertRows } from "../../../ingest/lib/belgium.mjs";
@@ -39,7 +39,10 @@ Deno.serve(async (req) => {
 
   try {
     const t0 = Date.now();
-    const [rows, feedBuf] = await Promise.all([rpc("rt_candidates_slim", { p_country: country, p_before: 3600, p_after: 3600 }), fetchFeed(country, swissKey)]);
+    // Belgium: lines the feed never reports (refreshed daily); if this list cannot be read, the run goes on as before
+    const quietQ = FEEDS[country].quietLines ? rpc("rt_quiet_lines_get", { p_country: country }).catch(() => null) : Promise.resolve(null);
+    const [rows, feedBuf, quietList] = await Promise.all([rpc("rt_candidates_slim", { p_country: country, p_before: 3600, p_after: 3600 }), fetchFeed(country, swissKey), quietQ]);
+    const quiet = new Set(Array.isArray(quietList) ? quietList : []);
     // compact stops [[seq, id, arr, dep, pf, st]] -> objects; trains until 1 hour after arrival (plus delay): less Supabase egress
     const trains = rows.map((r) => ({ ...r, stops: (r.stops || []).map(([seq, id, arr, dep, pf, st]) => ({ seq, id, arr, dep, pf, st })) }));
     const index = new Map();
@@ -47,23 +50,46 @@ Deno.serve(async (req) => {
       if (!index.has(r.trip_id)) index.set(r.trip_id, []);
       index.get(r.trip_id).push(r);
     }
-    const feed = readFeed(country, feedBuf, (trip) => !!trip?.tripId && index.has(trip.tripId));
+    // Belgium (looseIds): every feed train is read, so the log can show how many we could not match
+    const loose = !!FEEDS[country].looseIds;
+    const baseIndex = new Map();
+    if (loose) for (const r of trains) { const b = tripBase(r.trip_id); if (b) { if (!baseIndex.has(b)) baseIndex.set(b, []); baseIndex.get(b).push(r); } }
+    const feed = readFeed(country, feedBuf, loose ? null : (trip) => !!trip?.tripId && index.has(trip.tripId));
     const now = Math.floor(Date.now() / 1000);
-    const updates = [];
+    const updates = [], used = new Set();
+    // diag: unmatched trains of the kinds we keep (e.g. SNCB IC "007", EC "100"); local trains we do not keep are only counted
+    const diag = { feedTrips: 0, exact: 0, byBase: 0, unmatched: 0, otherKinds: 0, examples: [] };
+    const kind = (id) => String(id || "").split(":")[3] || "";
+    const ourKinds = new Set(loose ? trains.map((r) => kind(r.trip_id)) : []);
+    // exact ids first; the version-less fallback only for what is left, so it never takes an exactly matched train
+    const pairs = [], rest = [];
     for (const ent of feed.entities) {
       const tu = ent.tripUpdate;
       if (!tu || ent.isDeleted) continue;
+      diag.feedTrips++;
       const row = matchRow(index, tu.trip);
-      if (!row) continue;
+      if (row) { diag.exact++; used.add(row.id); pairs.push([row, tu]); } else rest.push(tu);
+    }
+    for (const tu of rest) {
+      let row = loose ? matchRowLoose(baseIndex, tu.trip) : null;
+      if (row && used.has(row.id)) row = null;
+      if (row) { diag.byBase++; used.add(row.id); pairs.push([row, tu]); continue; }
+      if (loose && !ourKinds.has(kind(tu.trip?.tripId))) { diag.otherKinds++; continue; }
+      diag.unmatched++;
+      if (diag.examples.length < 8) diag.examples.push(`${tu.trip?.tripId}|${tu.trip?.startDate || ""}`);
+    }
+    for (const [row, tu] of pairs) {
       const res = applyTripUpdate(row, tu, now);
       updates.push({ id: res.id, delay_min: res.delay_min, cancelled: res.cancelled, d: res.stops.map((s) => (s.apf ? [s.delay, !!s.skipped, s.apf] : [s.delay, !!s.skipped])) });
     }
     const inFeed = updates.length;
-    // Belgium: running trains missing from the feed are on time
+    // Belgium: running trains missing from the feed are on time, except on lines the feed never reports
+    let quietSkipped = 0;
     if (FEEDS[country].onlyDeviations) {
       const seen = new Set(updates.map((u) => u.id));
       for (const r of trains) {
         if (seen.has(r.id)) continue;
+        if (quiet.has(lineKey(r.trip_id))) { quietSkipped++; continue; }
         const res = onTimeUpdate(r, now);
         if (res) updates.push({ id: res.id, delay_min: 0, cancelled: false, d: res.stops.map(() => [0, false]) });
       }
@@ -71,6 +97,8 @@ Deno.serve(async (req) => {
     let written = 0;
     for (let i = 0; i < updates.length; i += 400) written += await rpc("apply_rt_delays", { payload: updates.slice(i, i + 400) });
     const out = { country, candidates: trains.length, feedBytes: feedBuf.length, matched: inFeed, onTime: updates.length - inFeed, written, ms: Date.now() - t0 };
+    if (loose) out.diag = diag;
+    if (FEEDS[country].quietLines) { out.quietLines = Array.isArray(quietList) ? quiet.size : "unreadable"; out.quietSkipped = quietSkipped; }
     console.log(JSON.stringify(out));
     return json(out);
   } catch (e) {

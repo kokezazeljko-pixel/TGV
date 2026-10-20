@@ -250,6 +250,10 @@ export function germanUpdates(trains, plan, nowSec, opts = {}) {
     // accepted with an exact match somewhere, or a near-time match at two or more stations
     if (!best || !((exact.get(best[0]) || 0) >= 1 || (stopsHit.get(best[0]) || 0) >= 2)) continue;
     const key = best[0];
+    // Austria (keepNumbers: our numbers come from the ÖBB timetable): a DB train with another number is only taken when
+    // both are at two or more stations at exactly the same minutes – the same physical train (a Railjet portion under its
+    // own number). One shared minute is not enough: IC 796 arrives in Salzburg at the minute RJX 60 does and took its delays.
+    if (opts.keepNumbers && tr.number && key !== tr.number && (exact.get(key) || 0) < 2) continue;
     // 2) live data only from that train's own rows
     let carry = null, cancelledAll = true;
     const d = [];

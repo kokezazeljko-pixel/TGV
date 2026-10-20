@@ -1,7 +1,7 @@
 // Jedno osvežavanje kašnjenja za jednu zemlju. Koriste ga i GitHub skripta (sync-realtime.mjs)
 // i Supabase Edge funkcija (supabase/functions/sync-realtime), koja se pokreće na svakih nekoliko minuta.
 import { decodeFeed } from "./gtfs-rt.mjs";
-import { applyTripUpdate, matchRow, onTimeUpdate } from "./realtime.mjs";
+import { applyTripUpdate, lineKey, matchRow, matchRowLoose, onTimeUpdate, tripBase } from "./realtime.mjs";
 import { BE_TRIPS_URL, feedFromJson } from "./belgium.mjs";
 import { NL_TRAINS_URL, NL_HEADERS } from "./netherlands.mjs";
 import { parisDate, chunks } from "./util.mjs";
@@ -11,7 +11,9 @@ export const FEEDS = {
   // https://opentransportdata.swiss/en/cookbook/realtime-prediction-cookbook/gtfs-rt/ (najviše 2 zahteva u minuti)
   ch: { url: "https://api.opentransportdata.swiss/la/gtfs-rt", headers: (key) => ({ Authorization: `Bearer ${key}`, "Accept-Encoding": "br, gzip, deflate" }) },
   // SNCB: GTFS-RT as JSON, only trains with a deviation; missing running trains are on time (onlyDeviations)
-  be: { url: BE_TRIPS_URL, headers: () => ({ Accept: "application/json" }), json: true, onlyDeviations: true },
+  // quietLines: trains of lines the feed never reports are not marked "on time" (rt_quiet_lines)
+  // looseIds: SNCB trip ids carry a version number that can change between our timetable copy and the feed
+  be: { url: BE_TRIPS_URL, headers: () => ({ Accept: "application/json" }), json: true, onlyDeviations: true, looseIds: true, quietLines: true },
   // NS / NDOV via OVapi: every train of today and tomorrow (protobuf), delays, cancellations and track changes
   nl: { url: NL_TRAINS_URL, headers: () => NL_HEADERS },
 };
@@ -41,20 +43,31 @@ export async function fetchFeed(country, swissKey) {
 }
 
 // trains: redovi iz baze; feedBuf: GTFS-RT bajtovi. Vraća izmene za apply_rt_updates.
-export function computeUpdates(trains, feedBuf, nowSec, country = "fr") {
+export function computeUpdates(trains, feedBuf, nowSec, country = "fr", quiet = null) {
   const index = new Map();
   for (const r of [...trains].sort((a, b) => a.service_date.localeCompare(b.service_date))) {
     if (!index.has(r.trip_id)) index.set(r.trip_id, []);
     index.get(r.trip_id).push(r);
   }
-  const feed = readFeed(country, feedBuf, (trip) => !!trip?.tripId && index.has(trip.tripId));
+  const loose = !!FEEDS[country]?.looseIds;
+  const baseIndex = new Map();
+  if (loose) for (const r of trains) { const b = tripBase(r.trip_id); if (b) { if (!baseIndex.has(b)) baseIndex.set(b, []); baseIndex.get(b).push(r); } }
+  const feed = readFeed(country, feedBuf, (trip) => !!trip?.tripId && (index.has(trip.tripId) || (loose && baseIndex.has(tripBase(trip.tripId)))));
   let matched = 0, changed = 0;
-  const updates = [];
+  const updates = [], used = new Set();
+  // exact ids first; the version-less fallback only for what is left
+  const pairs = [], rest = [];
   for (const ent of feed.entities) {
     const tu = ent.tripUpdate;
     if (!tu || ent.isDeleted) continue;
     const row = matchRow(index, tu.trip);
-    if (!row) continue;
+    if (row) { used.add(row.id); pairs.push([row, tu]); } else if (loose) rest.push(tu);
+  }
+  for (const tu of rest) {
+    const row = matchRowLoose(baseIndex, tu.trip);
+    if (row && !used.has(row.id)) { used.add(row.id); pairs.push([row, tu]); }
+  }
+  for (const [row, tu] of pairs) {
     matched++;
     const res = applyTripUpdate(row, tu, nowSec);
     const diff = res.delay_min !== row.delay_min || res.cancelled !== row.cancelled ||
@@ -67,6 +80,7 @@ export function computeUpdates(trains, feedBuf, nowSec, country = "fr") {
     const seen = new Set(updates.map((u) => u.id));
     for (const row of trains) {
       if (seen.has(row.id)) continue;
+      if (quiet?.has(lineKey(row.trip_id))) continue; // a line the feed never reports: no data is not "on time"
       const res = onTimeUpdate(row, nowSec);
       if (res) updates.push(res);
     }

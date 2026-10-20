@@ -11,6 +11,8 @@ import { fetchTrainsForDay, fetchTrainsUpdatedSince, fetchCommentCounts, fetchAl
 import { statusOf, toMin, fromMin, trainHref, ago, filterTrains, isShuttle, parisNowMin, plannedPf, isScheduleOnly, SCHEDULE_ONLY } from "@/lib/format";
 import { getGeo } from "@/lib/geo";
 import { unpackTrains } from "@/lib/pack";
+import { hereMatcher, sameDest } from "@/lib/reach";
+import FunFacts from "@/components/FunFacts";
 
 // Map views: all countries together first, then Switzerland, France, Belgium and the Netherlands
 const COUNTRIES = ["all", "ch", "fr", "de", "at", "es", "pt", "be", "nl", "lu"];
@@ -233,8 +235,8 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
   // With a station selected, the map and the board show only the trains that stop there
   const shown = useMemo(() => {
     if (!station) return list;
-    const { stopMatches } = getGeo(country);
-    return list.filter((tr) => (tr.stops || []).some((s) => stopMatches(s, station)));
+    const here = hereMatcher(list, station, getGeo(country).stopMatches);
+    return list.filter((tr) => (tr.stops || []).some(here));
   }, [list, station, country]);
 
   const runningIds = useMemo(() => new Set(running.map((r) => r.tr.id)), [running]);
@@ -324,10 +326,12 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
         )}
         <aside className="side" aria-live="polite">
           {station
-            ? <StationPanel station={station} trains={list} country={country} onBack={() => setStation(null)} />
+            ? <StationPanel station={station} trains={list} country={country} onBack={() => setStation(null)} isToday={day === today} />
             : <LivePanel running={running} hasTrains={real.length > 0} country={country} />}
         </aside>
       </section>
+
+      <FunFacts country={country} onStation={pickStation} />
 
       <div className="boardbar">
         <h3>{t("listTitle")}</h3>
@@ -537,15 +541,16 @@ function LegendRow({ svg, text, tall }) {
   return <div><svg width="34" height={tall ? 28 : 14} viewBox={tall ? "0 0 34 28" : "0 0 34 14"} aria-hidden="true">{svg}</svg><span>{text}</span></div>;
 }
 
-function StationPanel({ station, trains, country, onBack }) {
+function StationPanel({ station, trains, country, onBack, isToday }) {
   const { stopMatches } = getGeo(country);
   const { t } = useLang();
   const [now, setNow] = useState(null);
   useEffect(() => { setNow(parisNowMin()); }, [station, trains]);
   const items = useMemo(() => {
+    const here = hereMatcher(trains, station, stopMatches);
     const out = [];
     for (const tr of trains) {
-      const idx = (tr.stops || []).findIndex((s) => stopMatches(s, station));
+      const idx = (tr.stops || []).findIndex(here);
       if (idx < 0) continue;
       const s = tr.stops[idx], last = idx === tr.stops.length - 1;
       const sub = last ? `${t("arr")} · ${t("from")} ${tr.origin}` : `${t("depS")} · ${t("to")} ${tr.destination}${station === "Paris" ? " · " + s.name.replace(/^Paris /, "") : ""}`;
@@ -555,15 +560,95 @@ function StationPanel({ station, trains, country, onBack }) {
     }
     return out.sort((a, b) => (a.past - b.past) || (a.past ? b.m - a.m : a.m - b.m)).slice(0, 80);
   }, [trains, station, now, t]);
+  const [tab, setTab] = useState("trains");
+  useEffect(() => { setTab("trains"); }, [station]);
   return (
     <>
       <button type="button" className="linkish" onClick={onBack}>{t("backLive")}</button>
       <div><h4>{t("atStation")}</h4><h3>{station}</h3></div>
-      {!items.length ? <p className="muted">{t("noStop")}</p> : (
-        <ul className="mini">
-          {items.map((it) => <MiniRow key={it.tr.id} tr={it.tr} time={it.s.time} delay={it.s.delay || 0} sub={it.sub} past={it.past} />)}
-        </ul>
-      )}
+      <div className="seg" role="group" aria-label={station}>
+        <button type="button" className="chipbtn" aria-pressed={tab === "trains"} onClick={() => setTab("trains")}>{t("tabTrains")}</button>
+        <button type="button" className="chipbtn" aria-pressed={tab === "direct"} onClick={() => setTab("direct")}>{t("tabDirect")}</button>
+      </div>
+      {tab === "direct" ? <DirectPanel station={station} trains={trains} country={country} now={now} isToday={isToday} />
+        : !items.length ? <p className="muted">{t("noStop")}</p> : (
+          <ul className="mini">
+            {items.map((it) => <MiniRow key={it.tr.id} tr={it.tr} time={it.s.time} delay={it.s.delay || 0} sub={it.sub} past={it.past} />)}
+          </ul>
+        )}
+    </>
+  );
+}
+
+// "Direct destinations": every station that today's trains from here reach without a change, with each train's
+// departure here and time there. Same trains as the board (our high-speed and long-distance trains, the chosen day).
+function DirectPanel({ station, trains, country, now, isToday }) {
+  const { stopMatches } = getGeo(country);
+  const { t, lang } = useLang();
+  const [open, setOpen] = useState(null);
+  const [find, setFind] = useState("");
+  useEffect(() => { setOpen(null); setFind(""); }, [station]);
+  const dests = useMemo(() => {
+    const here = hereMatcher(trains, station, stopMatches);
+    const out = [];
+    for (const tr of trains) {
+      const st = tr.stops || [];
+      const i = st.findIndex(here);
+      if (i < 0 || i === st.length - 1) continue;
+      const from = st[i], seen = new Set();
+      for (let j = i + 1; j < st.length; j++) {
+        const s = st[j];
+        if (!s.name || here(s)) continue;
+        let d = out.find((x) => sameDest(x, s));
+        if (!d) out.push((d = { name: s.name, lat: s.lat, lon: s.lon, names: {}, rows: [] }));
+        if (seen.has(d)) continue; // a train counts once per destination
+        seen.add(d);
+        d.names[s.name] = (d.names[s.name] || 0) + 1;
+        const dep = toMin(from.time);
+        d.rows.push({ tr, dep, depTime: from.time, depDelay: from.delay || 0, at: s.time, atDelay: s.delay || 0,
+          past: now != null && dep + (from.delay || 0) < now - 2 });
+      }
+    }
+    const loc = LOCALES[lang] || "en-GB";
+    for (const d of out) {
+      d.rows.sort((a, b) => a.dep - b.dep);
+      // shown under the spelling most trains use; on a tie not one with a country tag ("Breda (NL)"), then the fuller one
+      // ("Bruxelles-Nord / Brussel-Noord" rather than "Brussel-Noord")
+      const tag = (n) => (/\([A-Z]{2}\)/.test(n) ? 1 : 0);
+      d.name = Object.entries(d.names).sort((a, b) => b[1] - a[1] || tag(a[0]) - tag(b[0]) || b[0].length - a[0].length)[0][0];
+    }
+    return out.sort((a, b) => b.rows.length - a.rows.length || a.name.localeCompare(b.name, loc));
+  }, [trains, station, country, now, lang]);
+  const q = normName(find);
+  const shown = q ? dests.filter((d) => normName(d.name).includes(q)) : dests;
+  if (!dests.length) return <p className="muted">{t("directNone")}</p>;
+  return (
+    <>
+      <p className="muted small">{t("directNote", isToday)} {t("directDests", dests.length)}</p>
+      {dests.length > 8 && <input className="search" type="search" value={find} onChange={(e) => setFind(e.target.value)} placeholder={t("directFind")} aria-label={t("directFind")} />}
+      <ul className="dests">
+        {shown.map((d) => {
+          const first = d.rows[0].depTime, last = d.rows[d.rows.length - 1].depTime;
+          const isOpen = open === d.name;
+          return (
+            <li key={d.name}>
+              <button type="button" className="destrow" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : d.name)}>
+                <b>{d.name}</b>
+                <span>{t("directTrains", d.rows.length)} · {first === last ? first : `${first}–${last}`}</span>
+                <i aria-hidden="true">{isOpen ? "−" : "+"}</i>
+              </button>
+              {isOpen && (
+                <ul className="mini">
+                  {d.rows.map((r) => (
+                    <MiniRow key={r.tr.id} tr={r.tr} time={r.depTime} delay={r.depDelay} past={r.past}
+                      sub={`${t("arr")} ${r.atDelay >= 5 && !r.tr.cancelled ? fromMin(toMin(r.at) + r.atDelay) : r.at} · ${t("to")} ${r.tr.destination}`} />
+                  ))}
+                </ul>
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </>
   );
 }

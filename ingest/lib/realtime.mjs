@@ -67,6 +67,36 @@ export function matchRow(index, trip) {
   return rows[rows.length - 1];
 }
 
+// Belgium: SNCB trip ids end in a validity date and often a version number ("...:20261211:2").
+// When SNCB republishes its timetable the version can change between our daily copy and the live feed,
+// so the exact id no longer matches. tripBase drops only that version number.
+export function tripBase(id) {
+  const m = /^(.*:\d{8})(?::\d{1,3})?$/.exec(id || "");
+  return m ? m[1] : null;
+}
+
+// Belgium: a "line" = the two terminus stations in the trip id, both directions ("8821006-8833001").
+// Used for the lines the SNCB feed never reports (table rt_quiet_lines).
+export function lineKey(tripId) {
+  const p = String(tripId || "").split(":");
+  const a = p[5], b = p[6];
+  if (!/^\d{7}$/.test(a || "") || !/^\d{7}$/.test(b || "")) return null;
+  return a < b ? `${a}-${b}` : `${b}-${a}`;
+}
+
+// Fallback match on the id without its version: only when exactly one of our trains fits that day,
+// so a delay is never attached to the wrong train.
+export function matchRowLoose(baseIndex, trip) {
+  const base = tripBase(trip?.tripId);
+  if (!base) return null;
+  let rows = baseIndex.get(base) || [];
+  if (trip.startDate && /^\d{8}$/.test(trip.startDate)) {
+    const d = `${trip.startDate.slice(0, 4)}-${trip.startDate.slice(4, 6)}-${trip.startDate.slice(6)}`;
+    rows = rows.filter((r) => r.service_date === d);
+  }
+  return rows.length === 1 ? rows[0] : null;
+}
+
 // Belgium: the SNCB feed lists only trains that deviate from the timetable. A train that is running now
 // and is missing from the feed is on time -> all delays 0. A train that already arrived is left as it was
 // (its last known delay stays). Returns null when nothing should be written.

@@ -247,6 +247,28 @@ function matchRow(index, trip) {
   }
   return rows[rows.length - 1];
 }
+function tripBase(id) {
+  const m = /^(.*:\d{8})(?::\d{1,3})?$/.exec(id || "");
+  return m ? m[1] : null;
+}
+function lineKey(tripId) {
+  const p = String(tripId || "").split(":");
+  const a = p[5], b = p[6];
+  if (!/^\d{7}$/.test(a || "") || !/^\d{7}$/.test(b || ""))
+    return null;
+  return a < b ? `${a}-${b}` : `${b}-${a}`;
+}
+function matchRowLoose(baseIndex, trip) {
+  const base = tripBase(trip?.tripId);
+  if (!base)
+    return null;
+  let rows = baseIndex.get(base) || [];
+  if (trip.startDate && /^\d{8}$/.test(trip.startDate)) {
+    const d = `${trip.startDate.slice(0, 4)}-${trip.startDate.slice(4, 6)}-${trip.startDate.slice(6)}`;
+    rows = rows.filter((r) => r.service_date === d);
+  }
+  return rows.length === 1 ? rows[0] : null;
+}
 function onTimeUpdate(row, nowSec) {
   const st = (row.stops || []).filter((s) => s.arr || s.dep);
   if (st.length < 2)
@@ -436,7 +458,7 @@ var NL_AGENCIES = new Set(["IFF:NS", "IFF:NS_INT", "IFF:EU_SLEEPER", "IFF:BLAUWN
 var FEEDS = {
   fr: { url: "https://proxy.transport.data.gouv.fr/resource/sncf-gtfs-rt-trip-updates", headers: () => ({}) },
   ch: { url: "https://api.opentransportdata.swiss/la/gtfs-rt", headers: (key) => ({ Authorization: `Bearer ${key}`, "Accept-Encoding": "br, gzip, deflate" }) },
-  be: { url: BE_TRIPS_URL, headers: () => ({ Accept: "application/json" }), json: true, onlyDeviations: true },
+  be: { url: BE_TRIPS_URL, headers: () => ({ Accept: "application/json" }), json: true, onlyDeviations: true, looseIds: true, quietLines: true },
   nl: { url: NL_TRAINS_URL, headers: () => NL_HEADERS }
 };
 function readFeed(country, buf, keep) {
@@ -562,7 +584,9 @@ Deno.serve(async (req) => {
   }
   try {
     const t0 = Date.now();
-    const [rows, feedBuf] = await Promise.all([rpc("rt_candidates_slim", { p_country: country, p_before: 3600, p_after: 3600 }), fetchFeed(country, swissKey)]);
+    const quietQ = FEEDS[country].quietLines ? rpc("rt_quiet_lines_get", { p_country: country }).catch(() => null) : Promise.resolve(null);
+    const [rows, feedBuf, quietList] = await Promise.all([rpc("rt_candidates_slim", { p_country: country, p_before: 3600, p_after: 3600 }), fetchFeed(country, swissKey), quietQ]);
+    const quiet = new Set(Array.isArray(quietList) ? quietList : []);
     const trains = rows.map((r) => ({ ...r, stops: (r.stops || []).map(([seq, id, arr, dep, pf, st]) => ({ seq, id, arr, dep, pf, st })) }));
     const index = new Map;
     for (const r of trains.sort((a, b) => a.service_date.localeCompare(b.service_date))) {
@@ -570,25 +594,70 @@ Deno.serve(async (req) => {
         index.set(r.trip_id, []);
       index.get(r.trip_id).push(r);
     }
-    const feed = readFeed(country, feedBuf, (trip) => !!trip?.tripId && index.has(trip.tripId));
+    const loose = !!FEEDS[country].looseIds;
+    const baseIndex = new Map;
+    if (loose)
+      for (const r of trains) {
+        const b = tripBase(r.trip_id);
+        if (b) {
+          if (!baseIndex.has(b))
+            baseIndex.set(b, []);
+          baseIndex.get(b).push(r);
+        }
+      }
+    const feed = readFeed(country, feedBuf, loose ? null : (trip) => !!trip?.tripId && index.has(trip.tripId));
     const now = Math.floor(Date.now() / 1000);
-    const updates = [];
+    const updates = [], used = new Set;
+    const diag = { feedTrips: 0, exact: 0, byBase: 0, unmatched: 0, otherKinds: 0, examples: [] };
+    const kind = (id) => String(id || "").split(":")[3] || "";
+    const ourKinds = new Set(loose ? trains.map((r) => kind(r.trip_id)) : []);
+    const pairs = [], rest = [];
     for (const ent of feed.entities) {
       const tu = ent.tripUpdate;
       if (!tu || ent.isDeleted)
         continue;
+      diag.feedTrips++;
       const row = matchRow(index, tu.trip);
-      if (!row)
+      if (row) {
+        diag.exact++;
+        used.add(row.id);
+        pairs.push([row, tu]);
+      } else
+        rest.push(tu);
+    }
+    for (const tu of rest) {
+      let row = loose ? matchRowLoose(baseIndex, tu.trip) : null;
+      if (row && used.has(row.id))
+        row = null;
+      if (row) {
+        diag.byBase++;
+        used.add(row.id);
+        pairs.push([row, tu]);
         continue;
+      }
+      if (loose && !ourKinds.has(kind(tu.trip?.tripId))) {
+        diag.otherKinds++;
+        continue;
+      }
+      diag.unmatched++;
+      if (diag.examples.length < 8)
+        diag.examples.push(`${tu.trip?.tripId}|${tu.trip?.startDate || ""}`);
+    }
+    for (const [row, tu] of pairs) {
       const res = applyTripUpdate(row, tu, now);
       updates.push({ id: res.id, delay_min: res.delay_min, cancelled: res.cancelled, d: res.stops.map((s) => s.apf ? [s.delay, !!s.skipped, s.apf] : [s.delay, !!s.skipped]) });
     }
     const inFeed = updates.length;
+    let quietSkipped = 0;
     if (FEEDS[country].onlyDeviations) {
       const seen = new Set(updates.map((u) => u.id));
       for (const r of trains) {
         if (seen.has(r.id))
           continue;
+        if (quiet.has(lineKey(r.trip_id))) {
+          quietSkipped++;
+          continue;
+        }
         const res = onTimeUpdate(r, now);
         if (res)
           updates.push({ id: res.id, delay_min: 0, cancelled: false, d: res.stops.map(() => [0, false]) });
@@ -598,6 +667,12 @@ Deno.serve(async (req) => {
     for (let i = 0;i < updates.length; i += 400)
       written += await rpc("apply_rt_delays", { payload: updates.slice(i, i + 400) });
     const out = { country, candidates: trains.length, feedBytes: feedBuf.length, matched: inFeed, onTime: updates.length - inFeed, written, ms: Date.now() - t0 };
+    if (loose)
+      out.diag = diag;
+    if (FEEDS[country].quietLines) {
+      out.quietLines = Array.isArray(quietList) ? quiet.size : "unreadable";
+      out.quietSkipped = quietSkipped;
+    }
     console.log(JSON.stringify(out));
     return json(out);
   } catch (e) {

@@ -172,6 +172,8 @@ function germanUpdates(trains, plan, nowSec, opts = {}) {
     if (!best || !((exact.get(best[0]) || 0) >= 1 || (stopsHit.get(best[0]) || 0) >= 2))
       continue;
     const key = best[0];
+    if (opts.keepNumbers && tr.number && key !== tr.number && (exact.get(key) || 0) < 2)
+      continue;
     let carry = null, cancelledAll = true;
     const d = [];
     for (const [i, s] of tr.stops.entries()) {

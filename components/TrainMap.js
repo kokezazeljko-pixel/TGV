@@ -2,6 +2,7 @@
 
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { getGeo } from "@/lib/geo";
+import { reachOnMap } from "@/lib/reach";
 import { parisNowMin, statusOf } from "@/lib/format";
 import { useLang } from "@/components/LangProvider";
 
@@ -60,6 +61,10 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
   useEffect(() => { onRunning?.(running); }, [running, onRunning]);
 
   const hlPaths = useMemo(() => (highlight ? trainRoute(highlight) : []), [highlight]);
+  // A selected station lights up the network it reaches directly: the colour runs out from it along the tracks
+  // its trains take, and every station they stop at lights up when the colour gets there (lib/reach.js)
+  const reach = useMemo(() => (!compact && selectedStation ? reachOnMap(country, trains, selectedStation) : null), [compact, country, trains, selectedStation]);
+  const REACH_S = 2.6; // seconds until the farthest station is reached
 
   // ---- pan & zoom
   function screenMap() {
@@ -185,9 +190,14 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
     if (!selectedStation) { animateTo({ x: 0, y: 0, w: W, h: H }); return; }
     const pt = geo.stationPoint(selectedStation, trains);
     if (!pt) return;
-    // Zoom in close on the station (its pin drops in at the centre), so the visitor sees exactly where it is
-    const w = W / (SEL_ZOOM[country] || 6), h = (w * H) / W;
-    animateTo({ x: pt[0] - w / 2, y: pt[1] - h / 2, w, h });
+    // Zoom onto the station and everything it reaches directly; at least as close as for a station on its own
+    // (its pin drops in), so the visitor sees exactly where it is
+    const xs = [pt[0], ...(reach?.dots || []).map((p) => p.x)], ys = [pt[1], ...(reach?.dots || []).map((p) => p.y)];
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    let w = Math.max(W / (SEL_ZOOM[country] || 6), (x1 - x0) * 1.2, ((y1 - y0) * 1.2 * W) / H);
+    w = Math.min(W, w);
+    const h = (w * H) / W;
+    animateTo({ x: (x0 + x1) / 2 - w / 2, y: (y0 + y1) / 2 - h / 2, w, h }, 700);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStation]);
 
@@ -202,12 +212,30 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
         <GeoLabels geo={geo} />
         <Rails geo={geo} />
         <g>{hlPaths.map((pts, i) => <path key={i} className="rail hl" d={"M" + pts.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join("L")} />)}</g>
+        {reach && (
+          <g key={selectedStation} className="reach" pointerEvents="none">
+            {reach.hops.map((hp) => (
+              <path key={hp.pts[0].join() + ">" + hp.pts[hp.pts.length - 1].join()} className="reach-line"
+                style={{ "--L": (hp.len + 1).toFixed(1), animationDelay: `${((hp.from / reach.far) * REACH_S).toFixed(2)}s`, animationDuration: `${Math.max(0.05, (hp.len / reach.far) * REACH_S).toFixed(2)}s` }}
+                d={"M" + hp.pts.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join("L")} />
+            ))}
+          </g>
+        )}
         {compact && highlight && <RouteStops geo={geo} tr={highlight} now={now} scale={routeScale} bounds={routeBounds} />}
         {!(compact && highlight) && <Stations
           geo={geo}
           selected={selectedStation}
           onClick={(n) => { if (d.moved || !onStationClick) return; onStationClick(n.name); }}
         />}
+        {reach && (
+          <g key={selectedStation} className="reach" pointerEvents="none">
+            {reach.dots.map((p) => (
+              <g key={p.x.toFixed(1) + "," + p.y.toFixed(1)} transform={`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`}>
+                <circle className={"reach-dot" + (p.big ? " big" : "")} r="1" style={{ animationDelay: `${((p.at / reach.far) * REACH_S).toFixed(2)}s` }}><title>{p.name}</title></circle>
+              </g>
+            ))}
+          </g>
+        )}
         <g>
           {running.map(({ tr, p }) => {
             const st = statusOf(tr, t);

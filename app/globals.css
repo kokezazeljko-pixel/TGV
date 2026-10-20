@@ -132,6 +132,17 @@ header.top .wrap{padding-block:18px 20px;display:flex;flex-wrap:wrap;align-items
 .mini .d b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mini .d span{font-size:12px;color:var(--muted)}
 .mini li.past{opacity:.55}
+/* station panel: direct destinations */
+.side .muted.small{font-size:12.5px;margin:0;line-height:1.45}
+.side .search{flex:none}
+.dests{list-style:none;margin:0;padding:0;display:grid}
+.destrow{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:10px;align-items:center;text-align:left;border:0;border-top:1px solid var(--line);background:none;padding:8px 2px;cursor:pointer;color:inherit;font:inherit}
+.dests>li:first-child>.destrow{border-top:0}
+.destrow:hover{background:var(--surface-2)}
+.destrow b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.destrow span{grid-column:1;font-size:12px;color:var(--muted)}
+.destrow i{grid-column:2;grid-row:1/3;font-style:normal;font-weight:700;font-size:18px;color:var(--muted);width:20px;text-align:center}
+.dests .mini{margin:0 0 6px 10px;padding-left:10px;border-left:2px solid var(--line)}
 .linkish{border:0;background:none;color:var(--accent);font-weight:600;padding:0;cursor:pointer;text-align:left}
 
 /* board */
@@ -298,6 +309,17 @@ a.primary{display:inline-block;text-decoration:none}
 #map .pin.sel .pin-icon{fill:#1f2937}
 #map .pin .pz:hover .pin-body{filter:brightness(1.25)}
 /* Selected station: a big pin drops onto it, with its name and a pulsing ring */
+/* reach of a selected station: the colour runs out along the tracks (delays set per section in TrainMap) */
+#map .reach-line{fill:none;stroke:#7048e8;stroke-width:calc(5px * var(--u,1));stroke-linecap:round;stroke-linejoin:round;opacity:.9;stroke-dasharray:var(--L) var(--L);stroke-dashoffset:var(--L);animation-name:reach-run;animation-timing-function:linear;animation-fill-mode:forwards}
+@keyframes reach-run{to{stroke-dashoffset:0}}
+#map .reach-dot{fill:#7048e8;stroke:#fff;stroke-width:1.8;vector-effect:non-scaling-stroke;transform:scale(0);animation:reach-pop .35s cubic-bezier(.3,1.6,.6,1) forwards}
+#map .reach-dot.big{stroke-width:3}
+@keyframes reach-pop{to{transform:scale(calc(5 * var(--u,1)))}}
+#map .reach-dot.big{animation-name:reach-pop-big}
+@keyframes reach-pop-big{to{transform:scale(calc(7 * var(--u,1)))}}
+.mapbox.style-dark #map .reach-line{stroke:#ff8c1a;opacity:.95;filter:drop-shadow(0 0 3px rgba(255,120,20,.85))}
+.mapbox.style-dark #map .reach-dot{fill:#ff8c1a;stroke:#1a1206}
+@media (prefers-reduced-motion:reduce){#map .reach-line{animation:none;stroke-dasharray:none;stroke-dashoffset:0}#map .reach-dot{animation:none;transform:scale(calc(5 * var(--u,1)))}}
 #map .selpin-z{transform:scale(calc(var(--u,1) * 1.9))}
 #map .selpin .pin-body{fill:var(--board-amber);stroke:#1f2937;stroke-width:1.6}
 #map .selpin .pin-face{fill:#fff}
@@ -537,3 +559,47 @@ textarea.input{resize:vertical;font:inherit}
 .fullbtn:hover{border-color:var(--accent)}
 .mapbox.big .fullbtn{display:none}
 @media (max-width:640px){.fullbtn{padding:5px 10px;font-size:12px}}
+
+/* fun facts: records of the last 7 days (components/FunFacts.js) */
+.facts{margin-top:20px}
+.facts-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px}
+.facts-head h3{margin:0;font-family:var(--f-display);font-size:22px}
+.facts-head .muted{font-size:13px}
+.facts-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:10px}
+@media (max-width:860px){.facts-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.facts-grid{grid-template-columns:minmax(0,1fr)}}
+.fact{position:relative;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:var(--r);padding:12px 14px 10px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.fact.tone-ok{border-left-color:var(--ok)}
+.fact.tone-bad{border-left-color:var(--bad)}
+.fact-k{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.fact-v{font-family:var(--f-display);font-weight:700;font-size:21px;line-height:1.2;display:flex;align-items:center;gap:8px;overflow-wrap:anywhere}
+.fact-v .flag{flex:none}
+.fact-link{all:unset;cursor:pointer;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.fact-link:hover{text-decoration-color:currentColor}
+.fact-link:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+.fact-sub{font-size:13px;color:var(--muted)}
+.fact-share{align-self:flex-start;margin-top:4px;background:none;border:1px solid var(--line);border-radius:999px;padding:3px 12px;font:inherit;font-size:12px;font-weight:600;color:var(--accent);cursor:pointer}
+.fact-share:hover{background:var(--surface-2)}
+.facts-more{margin-left:auto;font-size:14px;font-weight:600;color:var(--accent);text-decoration:none}
+.facts-more:hover{text-decoration:underline}
+
+/* page /rekordi: top 5 of every category (app/rekordi/page.js) */
+.records{padding-bottom:24px}
+.records h2{font-family:var(--f-display);font-size:36px;margin:10px 0 2px;text-wrap:balance}
+.rec-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}
+@media (max-width:760px){.rec-grid{grid-template-columns:minmax(0,1fr)}}
+.rec{background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--accent);border-radius:var(--r);padding:12px 14px 8px;min-width:0}
+.rec.tone-ok{border-top-color:var(--ok)}
+.rec.tone-bad{border-top-color:var(--bad)}
+.rec-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.rec-head h3{margin:0;font-family:var(--f-display);font-weight:600;font-size:20px}
+.rec-head .fact-share{margin-top:0;flex:none}
+.rec-list{list-style:none;margin:8px 0 0;padding:0}
+.rec-list li{display:flex;gap:10px;padding:8px 0;border-top:1px solid var(--line);min-width:0}
+.rec-list li:first-child{border-top:0}
+.rec-n{flex:none;width:26px;height:26px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);display:grid;place-items:center;font-family:var(--f-mono);font-weight:700;font-size:13px}
+.rec-list li:first-child .rec-n{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.rec-body{min-width:0}
+.rec-v{display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px;overflow-wrap:anywhere}
+.rec-v a{color:inherit;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.rec-v a:hover{text-decoration-color:currentColor}

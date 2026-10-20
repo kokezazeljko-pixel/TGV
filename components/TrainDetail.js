@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase";
 import { useSession } from "@/components/useSession";
-import { TRAIN_FIELDS, toMin, parisTime, parisNowMin, ago, plannedPf, isScheduleOnly, localNowMin } from "@/lib/format";
+import { TRAIN_FIELDS, toMin, parisTime, parisNowMin, ago, plannedPf, isScheduleOnly, localNowMin, SCHEDULE_ONLY } from "@/lib/format";
 import { REASON_KEYS } from "@/lib/i18n";
 import { useLang } from "@/components/LangProvider";
 import TrainMap from "@/components/TrainMap";
@@ -178,7 +178,7 @@ export default function TrainDetail({ initialTrain }) {
                 <div>{train.rt_updated_at ? t("updated", ago(train.rt_checked_at || train.rt_updated_at, t, lang)) : isScheduleOnly(train) ? t("schedShort") : departed === false ? t("notStarted") : t("noReport")}</div>
               </div>
             </div>
-            {isScheduleOnly(train) && <p className="infobox sched small" role="note"><span aria-hidden="true">💬</span> {t("schedTrainAsk", t("country_" + train.country))}</p>}
+            {isScheduleOnly(train) && <p className="infobox sched small" role="note"><span aria-hidden="true">💬</span> {SCHEDULE_ONLY.has(train.country) ? t("schedTrainAsk", t("country_" + train.country)) : t("schedLineAsk")}</p>}
           </section>
 
           <Stops train={train} />

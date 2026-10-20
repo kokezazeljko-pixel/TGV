@@ -5,6 +5,7 @@ import { SITE_URL } from "@/lib/site";
 export default function sitemap() {
   return [
     { url: `${SITE_URL}/`, lastModified: new Date(), changeFrequency: "always", priority: 1 },
+    { url: `${SITE_URL}/rekordi`, lastModified: new Date(), changeFrequency: "daily", priority: 0.7 },
     { url: `${SITE_URL}/privacy`, lastModified: new Date("2026-10-03"), changeFrequency: "yearly", priority: 0.3 },
   ];
 }
