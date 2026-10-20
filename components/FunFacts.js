@@ -36,7 +36,7 @@ export default function FunFacts({ country, onStation }) {
   };
 
   return (
-    <section className="facts" aria-labelledby="facts-h">
+    <section className="facts" id="facts" aria-labelledby="facts-h">
       <div className="facts-head">
         <h3 id="facts-h">{t("ffTitle")}</h3>
         <span className="muted">{t("ffNote", range)}</span>

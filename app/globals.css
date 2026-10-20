@@ -603,3 +603,21 @@ textarea.input{resize:vertical;font:inherit}
 .rec-v{display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px;overflow-wrap:anywhere}
 .rec-v a{color:inherit;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
 .rec-v a:hover{text-decoration-color:currentColor}
+
+/* quick buttons between the filters and the map: direct destinations mode, jump to the records */
+.quickbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-top:12px}
+.quickbtn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:6px 14px 6px 10px;font:inherit;font-weight:700;font-size:14px;cursor:pointer}
+.quickbtn:hover{background:var(--surface-2)}
+.quickbtn[aria-pressed="true"]{border-color:#7048e8;box-shadow:inset 0 0 0 1px #7048e8;background:var(--surface-2)}
+.quickbtn .qi{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--surface-2);font-size:12px;line-height:1}
+.quickbtn[aria-pressed="true"] .qi{background:#7048e8;color:#fff}
+.quickhint{font-size:13px;flex-basis:100%}
+.facts{scroll-margin-top:16px}
+/* × beside the selected station's pin */
+#map .selpin-x{cursor:pointer;outline:none}
+#map .selpin-x circle{fill:var(--surface);stroke:#1f2937;stroke-width:1.2}
+#map .selpin-x path{fill:none;stroke:#1f2937;stroke-width:1.5;stroke-linecap:round}
+#map .selpin-x:hover circle,#map .selpin-x:focus-visible circle{fill:#1f2937}
+#map .selpin-x:hover path,#map .selpin-x:focus-visible path{stroke:#fff}
+.mapbox.style-dark #map .selpin-x circle{fill:#151d2e;stroke:#e8ecf4}
+.mapbox.style-dark #map .selpin-x path{stroke:#e8ecf4}

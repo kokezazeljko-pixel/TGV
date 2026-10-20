@@ -219,8 +219,27 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
     return groups;
   }, [real, lang, country]);
   const stationNames = useMemo(() => new Set(Object.values(stationGroups).flat()), [stationGroups]);
+  // "Direct destinations" mode (button above the map): the station panel opens on that tab and stays there
+  // when another station is chosen; with no station yet, the station list opens
+  const [reach, setReach] = useState(false);
+  const [panelTab, setPanelTab] = useState("trains");
+  const stationSel = useRef(null);
+  const toggleReach = () => {
+    if (reach) { setReach(false); setPanelTab("trains"); return; }
+    setReach(true); setPanelTab("direct");
+    if (!station) {
+      const sel = stationSel.current;
+      sel?.scrollIntoView({ behavior: "smooth", block: "center" });
+      try { sel?.showPicker?.(); } catch {}
+      sel?.focus({ preventScroll: true });
+    }
+  };
+  const closeStation = () => { setStation(null); setReach(false); setPanelTab("trains"); };
+  const chooseStation = (name) => { setStation(name || null); setPanelTab(reach ? "direct" : "trains"); };
+  const goFacts = () => document.getElementById("facts")?.scrollIntoView({ behavior: "smooth", block: "start" });
   const pickStation = (name) => {
     setStation(name || null);
+    setPanelTab(reach ? "direct" : "trains");
     if (name) requestAnimationFrame(() => document.querySelector(".mapbox")?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
   };
   // the ★ button: the favourite station from "My account" (switching to its country if another one is open)
@@ -286,7 +305,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
         )}
         <label className="stationpick">
           <span className="sr">{t("stationPick")}</span>
-          <select value={station && stationNames.has(station) ? station : ""} onChange={(e) => pickStation(e.target.value)} aria-label={t("stationPick")}>
+          <select ref={stationSel} value={station && stationNames.has(station) ? station : ""} onChange={(e) => pickStation(e.target.value)} aria-label={t("stationPick")}>
             <option value="">{t("stationChoose")}</option>
             {(country === "all" ? REAL : [country]).map((c) =>
               stationGroups[c].length ? (
@@ -300,13 +319,24 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
         <input className="search" type="search" id="q" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search")} aria-label={t("search")} />
       </div>
 
+      <div className="quickbar">
+        <button type="button" className="quickbtn" aria-pressed={reach} onClick={toggleReach}>
+          <span aria-hidden="true" className="qi">◎</span>{t("tabDirect")}
+        </button>
+        <button type="button" className="quickbtn" onClick={goFacts}>
+          <span aria-hidden="true" className="qi">★</span>{t("ffTitle")} <span aria-hidden="true">↓</span>
+        </button>
+        {reach && !station && <span className="muted quickhint">{t("reachPick")}</span>}
+      </div>
+
       <section className="mapgrid">
         <TrainMap
           key={country}
           country={country}
           trains={shown}
           selectedStation={station}
-          onStationClick={setStation}
+          onStationClick={chooseStation}
+          onClearStation={closeStation}
           onTrainClick={(tr) => router.push(trainHref(tr.id))}
           onRunning={setRunning}
           onFull={() => setFullMap(true)}
@@ -318,7 +348,8 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
               country={country}
               trains={shown}
               selectedStation={station}
-              onStationClick={setStation}
+              onStationClick={chooseStation}
+              onClearStation={closeStation}
               onTrainClick={(tr) => router.push(trainHref(tr.id))}
               big
             />
@@ -326,7 +357,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
         )}
         <aside className="side" aria-live="polite">
           {station
-            ? <StationPanel station={station} trains={list} country={country} onBack={() => setStation(null)} isToday={day === today} />
+            ? <StationPanel station={station} trains={list} country={country} onBack={closeStation} isToday={day === today} tab={panelTab} setTab={setPanelTab} />
             : <LivePanel running={running} hasTrains={real.length > 0} country={country} />}
         </aside>
       </section>
@@ -541,7 +572,7 @@ function LegendRow({ svg, text, tall }) {
   return <div><svg width="34" height={tall ? 28 : 14} viewBox={tall ? "0 0 34 28" : "0 0 34 14"} aria-hidden="true">{svg}</svg><span>{text}</span></div>;
 }
 
-function StationPanel({ station, trains, country, onBack, isToday }) {
+function StationPanel({ station, trains, country, onBack, isToday, tab, setTab }) {
   const { stopMatches } = getGeo(country);
   const { t } = useLang();
   const [now, setNow] = useState(null);
@@ -560,8 +591,6 @@ function StationPanel({ station, trains, country, onBack, isToday }) {
     }
     return out.sort((a, b) => (a.past - b.past) || (a.past ? b.m - a.m : a.m - b.m)).slice(0, 80);
   }, [trains, station, now, t]);
-  const [tab, setTab] = useState("trains");
-  useEffect(() => { setTab("trains"); }, [station]);
   return (
     <>
       <button type="button" className="linkish" onClick={onBack}>{t("backLive")}</button>

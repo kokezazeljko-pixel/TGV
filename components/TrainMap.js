@@ -24,7 +24,7 @@ const maxZoom = (c) => MAX_ZOOM[c] || 10;
 const SEL_ZOOM = { all: 16, de: 10, es: 10, fr: 9 };
 
 // onExpand (route view on the train page): a click on the small map, or the ⛶ button, opens it large; big = shown in that large window
-export default function TrainMap({ country = "fr", trains, onTrainClick, onStationClick, selectedStation, highlight, onRunning, compact, onExpand, onFull, big }) {
+export default function TrainMap({ country = "fr", trains, onTrainClick, onStationClick, onClearStation, selectedStation, highlight, onRunning, compact, onExpand, onFull, big }) {
   const { t } = useLang();
   // Map look chosen by the visitor (Classic / Dark), remembered in this browser
   const [mapStyle, setMapStyle] = useState("classic");
@@ -213,7 +213,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
         <Rails geo={geo} />
         <g>{hlPaths.map((pts, i) => <path key={i} className="rail hl" d={"M" + pts.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join("L")} />)}</g>
         {reach && (
-          <g key={selectedStation} className="reach" pointerEvents="none">
+          <g key={"reach-lines|" + selectedStation} className="reach" pointerEvents="none">
             {reach.hops.map((hp) => (
               <path key={hp.pts[0].join() + ">" + hp.pts[hp.pts.length - 1].join()} className="reach-line"
                 style={{ "--L": (hp.len + 1).toFixed(1), animationDelay: `${((hp.from / reach.far) * REACH_S).toFixed(2)}s`, animationDuration: `${Math.max(0.05, (hp.len / reach.far) * REACH_S).toFixed(2)}s` }}
@@ -228,7 +228,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
           onClick={(n) => { if (d.moved || !onStationClick) return; onStationClick(n.name); }}
         />}
         {reach && (
-          <g key={selectedStation} className="reach" pointerEvents="none">
+          <g key={"reach-dots|" + selectedStation} className="reach" pointerEvents="none">
             {reach.dots.map((p) => (
               <g key={p.x.toFixed(1) + "," + p.y.toFixed(1)} transform={`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`}>
                 <circle className={"reach-dot" + (p.big ? " big" : "")} r="1" style={{ animationDelay: `${((p.at / reach.far) * REACH_S).toFixed(2)}s` }}><title>{p.name}</title></circle>
@@ -259,6 +259,17 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
               <g key={selectedStation} className="selpin-drop">
                 <PinShape airport={isAirport(selectedStation)} />
                 <text className="selpin-lbl" y="-31">{selectedStation}</text>
+                {onClearStation && (
+                  // small × beside the pin head: closes the station (and its direct-destinations colour)
+                  <g className="selpin-x" transform="translate(13 -17.5)" pointerEvents="auto" role="button" tabIndex={0} aria-label={t("reachClose")}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => { e.stopPropagation(); onClearStation(); }}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClearStation(); } }}>
+                    <title>{t("reachClose")}</title>
+                    <circle r="5.2" />
+                    <path d="M-2.1,-2.1L2.1,2.1M2.1,-2.1L-2.1,2.1" />
+                  </g>
+                )}
               </g>
             </g>
           </g>
