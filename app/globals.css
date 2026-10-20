@@ -628,3 +628,19 @@ textarea.input{resize:vertical;font:inherit}
 #map.z2 .stn.l5,#map.z2 .stn-hit.l5,#map.z3 .stn.l0,#map.z3 .stn-hit.l0,#map .stn.sel,#map .stn-hit.sel{display:inline}
 /* invisible click zone over each station dot (about 22 px wide), above the trains */
 #map .stn-hit{fill:transparent;stroke:none;cursor:pointer;transform:scale(calc(11 * var(--u,1)))}
+
+/* a route from the records on the map (TrainMap routeHi): drawn along a real train's path */
+#map .route-hi{--rc:var(--accent)}
+#map .route-hi.tone-ok{--rc:var(--ok)}
+#map .route-hi.tone-bad{--rc:var(--bad)}
+#map .route-casing{fill:none;stroke:var(--halo);stroke-width:calc(11px * var(--u,1));stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+#map .route-line{fill:none;stroke:var(--rc);stroke-width:calc(6px * var(--u,1));stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:var(--L) var(--L);stroke-dashoffset:var(--L);animation:reach-run 1.4s ease-out .25s forwards}
+#map .route-stop{fill:var(--surface);stroke:var(--rc);stroke-width:2;vector-effect:non-scaling-stroke;transform:scale(calc(4.5 * var(--u,1)))}
+#map .route-end{fill:var(--rc);stroke:var(--surface);stroke-width:2.5;vector-effect:non-scaling-stroke;transform:scale(calc(7.5 * var(--u,1)))}
+.routechip{position:absolute;left:10px;top:56px;max-width:calc(100% - 20px);display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 6px 5px 12px;font-weight:700;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.routechip .rc-dot{flex:none;width:12px;height:12px;border-radius:50%;background:var(--accent)}
+.routechip.tone-ok .rc-dot{background:var(--ok)} .routechip.tone-bad .rc-dot{background:var(--bad)}
+.routechip .rc-txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.routechip .rc-x{flex:none;width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:var(--surface-2);color:var(--fg);font-size:17px;line-height:1;cursor:pointer}
+.routechip .rc-x:hover{background:var(--fg);color:var(--surface)}
+@media (prefers-reduced-motion:reduce){#map .route-line{animation:none;stroke-dasharray:none;stroke-dashoffset:0}}

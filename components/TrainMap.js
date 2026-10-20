@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { getGeo } from "@/lib/geo";
-import { reachOnMap } from "@/lib/reach";
+import { reachOnMap, routeOnMap } from "@/lib/reach";
 import { parisNowMin, statusOf } from "@/lib/format";
 import { useLang } from "@/components/LangProvider";
 
@@ -24,7 +24,7 @@ const maxZoom = (c) => MAX_ZOOM[c] || 10;
 const SEL_ZOOM = { all: 16, de: 10, es: 10, fr: 9 };
 
 // onExpand (route view on the train page): a click on the small map, or the ⛶ button, opens it large; big = shown in that large window
-export default function TrainMap({ country = "fr", trains, onTrainClick, onStationClick, onClearStation, selectedStation, highlight, onRunning, compact, onExpand, onFull, big }) {
+export default function TrainMap({ country = "fr", trains, onTrainClick, onStationClick, onClearStation, routeHi, onClearRoute, selectedStation, highlight, onRunning, compact, onExpand, onFull, big }) {
   const { t } = useLang();
   // Map look chosen by the visitor (Classic / Dark), remembered in this browser
   const [mapStyle, setMapStyle] = useState("classic");
@@ -65,6 +65,8 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
   // its trains take, and every station they stop at lights up when the colour gets there (lib/reach.js)
   const reach = useMemo(() => (!compact && selectedStation ? reachOnMap(country, trains, selectedStation) : null), [compact, country, trains, selectedStation]);
   const REACH_S = 2.6; // seconds until the farthest station is reached
+  // A route chosen in the records (fun facts): drawn along a real train's path, the map zooms onto it
+  const route = useMemo(() => (!compact && routeHi ? routeOnMap(country, trains, routeHi.a, routeHi.b) : null), [compact, country, trains, routeHi]);
 
   // ---- pan & zoom
   function screenMap() {
@@ -200,6 +202,20 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
     animateTo({ x: (x0 + x1) / 2 - w / 2, y: (y0 + y1) / 2 - h / 2, w, h }, 700);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStation]);
+  // zoom onto a route from the records; back to the whole map when it is closed (unless a station is open)
+  const hadRoute = useRef(false);
+  useEffect(() => {
+    if (compact) return;
+    if (!route) { if (hadRoute.current && !selectedStation) animateTo({ x: 0, y: 0, w: W, h: H }); hadRoute.current = false; return; }
+    hadRoute.current = true;
+    const xs = route.pts.map((p) => p[0]), ys = route.pts.map((p) => p[1]);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    let w = Math.max(W / (SEL_ZOOM[country] || 6), (x1 - x0) * 1.35, ((y1 - y0) * 1.35 * W) / H);
+    w = Math.min(W, w);
+    const h = (w * H) / W;
+    animateTo({ x: (x0 + x1) / 2 - w / 2, y: (y0 + y1) / 2 - h / 2, w, h }, 700);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route]);
 
   return (
     <div className={"mapbox style-" + mapStyle + (compact && highlight ? " routeview" : "") + (big ? " big" : "") + (onExpand ? " expandable" : "")} style={big ? undefined : { aspectRatio: compact && highlight ? "16 / 10" : `${W} / ${H}` }}>
@@ -221,6 +237,12 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
             ))}
           </g>
         )}
+        {route && (
+          <g key={"route|" + routeHi.a + "|" + routeHi.b} className={"route-hi tone-" + (routeHi.tone || "acc")} pointerEvents="none">
+            <path className="route-casing" d={"M" + route.pts.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join("L")} />
+            <path className="route-line" style={{ "--L": (route.len + 1).toFixed(1) }} d={"M" + route.pts.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join("L")} />
+          </g>
+        )}
         {compact && highlight && <RouteStops geo={geo} tr={highlight} now={now} scale={routeScale} bounds={routeBounds} />}
         {!(compact && highlight) && <Stations
           geo={geo}
@@ -234,6 +256,12 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
                 <circle className={"reach-dot" + (p.big ? " big" : "")} r="1" style={{ animationDelay: `${((p.at / reach.far) * REACH_S).toFixed(2)}s` }}><title>{p.name}</title></circle>
               </g>
             ))}
+          </g>
+        )}
+        {route && (
+          <g key={"route-dots|" + routeHi.a + "|" + routeHi.b} className={"route-hi tone-" + (routeHi.tone || "acc")} pointerEvents="none">
+            {route.stops.map((p, i) => <circle key={i} className="route-stop" cx={p[0].toFixed(1)} cy={p[1].toFixed(1)} r="1" style={{ transformOrigin: `${p[0].toFixed(1)}px ${p[1].toFixed(1)}px` }} />)}
+            {[route.from, route.to].map((p, i) => <circle key={"e" + i} className="route-end" cx={p[0].toFixed(1)} cy={p[1].toFixed(1)} r="1" style={{ transformOrigin: `${p[0].toFixed(1)}px ${p[1].toFixed(1)}px` }} />)}
           </g>
         )}
         <g>
@@ -285,6 +313,13 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
       </div>
       {onFull && <button type="button" className="fullbtn" onClick={onFull}><span aria-hidden="true">⛶</span> {t("mapFullScreen")}</button>}
       {!compact && <div className="maphint">{t("hint")}</div>}
+      {!compact && routeHi && (
+        <div className={"routechip tone-" + (routeHi.tone || "acc")} role="status">
+          <span className="rc-dot" aria-hidden="true" />
+          <span className="rc-txt">{route ? routeHi.label : t("routeNotToday", routeHi.label)}</span>
+          {onClearRoute && <button type="button" className="rc-x" onClick={onClearRoute} aria-label={t("routeClose")} title={t("routeClose")}>×</button>}
+        </div>
+      )}
       {(!compact || highlight) && (
         <div className="mapstyle" role="group" aria-label={t("mapStyle")}>
           {MAP_STYLES.map((s) => (

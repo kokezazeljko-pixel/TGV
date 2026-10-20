@@ -100,6 +100,12 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
     const qs = new URLSearchParams(window.location.search);
     const qc = qs.get("c"), qst = qs.get("station");
     if (qst) setStation(qst.slice(0, 80));
+    const qr = qs.get("route");
+    if (qr && qr.includes("~")) {
+      const [a, b] = qr.slice(0, 200).split("~");
+      const tone = ["ok", "bad", "acc"].includes(qs.get("tone")) ? qs.get("tone") : "acc";
+      if (a && b) setRouteHi({ a, b, tone, label: `${a} – ${b}` });
+    }
     if (qc && COUNTRIES.includes(qc)) { if (qc !== DEFAULT_COUNTRY) setCountry(qc); return; }
     let saved = null;
     try { saved = localStorage.getItem("tp-country"); } catch {}
@@ -118,7 +124,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
   const chooseCountry = (c) => {
     if (c === country) return;
     try { localStorage.setItem("tp-country", c); } catch {}
-    setStation(null); setType("all"); setRunning([]); setListCountry("all"); setCountry(c);
+    setStation(null); setRouteHi(null); setType("all"); setRunning([]); setListCountry("all"); setCountry(c);
   };
 
   // Load the chosen country's trains, then every minute fetch only the trains whose delays changed
@@ -204,6 +210,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
   const stationIndex = useMemo(() => {
     const { stopNode } = getGeo(country);
     const seen = new Map(); // name -> { fr: n, ch: n, be: n }
+    const where = new Map(); // name -> [lat, lon] (for "one station per city" in the popular list)
     for (const tr of real) for (const s of tr.stops || []) {
       if (!s.name) continue;
       const n = stopNode(s);
@@ -211,14 +218,31 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
       const c = seen.get(name) || {};
       c[tr.country] = (c[tr.country] || 0) + 1;
       seen.set(name, c);
+      if (!where.has(name) && s.lat != null) where.set(name, [s.lat, s.lon]);
     }
     const groups = Object.fromEntries(REAL.map((k) => [k, []]));
     for (const [name, c] of seen) groups[REAL.reduce((a, k) => ((c[k] || 0) > (c[a] || 0) ? k : a), "fr")].push(name);
     const loc = LOCALES[lang] || "en-GB";
     for (const g of Object.values(groups)) g.sort((a, b) => a.localeCompare(b, loc));
-    // the 10 stations with the most trains today, offered first in the menu
+    // "Most popular stations", offered first in the menu: the busiest stations today, one per city (Brussels has
+    // three big stations a few km apart). Europe view: the busiest station of each country, and a second German city
+    // (the biggest network) – without that the Benelux stations, with the most trains, would fill the whole list.
     const total = (c) => Object.values(c).reduce((a, b) => a + b, 0);
-    const popular = [...seen].sort((a, b) => total(b[1]) - total(a[1])).slice(0, 10).map(([name]) => name);
+    const home = (c) => REAL.reduce((a, k) => ((c[k] || 0) > (c[a] || 0) ? k : a), "fr");
+    const near = (x, y) => { const p = where.get(x), q = where.get(y); return !!p && !!q && Math.hypot(p[0] - q[0], (p[1] - q[1]) * Math.cos((p[0] * Math.PI) / 180)) < 0.072; }; // ~8 km
+    const ranked = [...seen].sort((a, b) => total(b[1]) - total(a[1]));
+    const popular = [];
+    const add = (name) => { if (popular.length < 10 && !popular.some((x) => near(x, name))) popular.push(name); };
+    if (country === "all") {
+      const quota = { de: 2 }, have = {};
+      for (const [name, c] of ranked) {
+        const k = home(c);
+        if ((have[k] || 0) >= (quota[k] || 1)) continue;
+        const before = popular.length; add(name);
+        if (popular.length > before) have[k] = (have[k] || 0) + 1;
+      }
+      popular.sort((x, y) => total(seen.get(y)) - total(seen.get(x)));
+    } else for (const [name] of ranked) add(name);
     return { groups, popular };
   }, [real, lang, country]);
   const stationGroups = stationIndex.groups;
@@ -226,6 +250,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
   // "Direct destinations" mode (button above the map): the station panel opens on that tab and stays there
   // when another station is chosen; with no station yet, the station list opens
   const [reach, setReach] = useState(false);
+  const [routeHi, setRouteHi] = useState(null); // a route chosen in the records: { a, b, tone, label }
   const [panelTab, setPanelTab] = useState("trains");
   const stationSel = useRef(null);
   const toggleReach = () => {
@@ -239,9 +264,15 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
     }
   };
   const closeStation = () => { setStation(null); setReach(false); setPanelTab("trains"); };
-  const chooseStation = (name) => { setStation(name || null); setPanelTab(reach ? "direct" : "trains"); };
+  const chooseStation = (name) => { setRouteHi(null); setStation(name || null); setPanelTab(reach ? "direct" : "trains"); };
+  // a route from the records: shown on the map (the station closes), the page scrolls up to the map
+  const showRoute = (r) => {
+    setStation(null); setReach(false); setPanelTab("trains"); setRouteHi(r);
+    requestAnimationFrame(() => document.querySelector(".mapbox")?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  };
   const goFacts = () => document.getElementById("facts")?.scrollIntoView({ behavior: "smooth", block: "start" });
   const pickStation = (name) => {
+    setRouteHi(null);
     setStation(name || null);
     setPanelTab(reach ? "direct" : "trains");
     if (name) requestAnimationFrame(() => document.querySelector(".mapbox")?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
@@ -344,6 +375,8 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
           selectedStation={station}
           onStationClick={chooseStation}
           onClearStation={closeStation}
+          routeHi={routeHi}
+          onClearRoute={() => setRouteHi(null)}
           onTrainClick={(tr) => router.push(trainHref(tr.id))}
           onRunning={setRunning}
           onFull={() => setFullMap(true)}
@@ -357,6 +390,8 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
               selectedStation={station}
               onStationClick={chooseStation}
               onClearStation={closeStation}
+              routeHi={routeHi}
+              onClearRoute={() => setRouteHi(null)}
               onTrainClick={(tr) => router.push(trainHref(tr.id))}
               big
             />
@@ -369,7 +404,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
         </aside>
       </section>
 
-      <FunFacts country={country} onStation={pickStation} />
+      <FunFacts country={country} onStation={pickStation} onRoute={showRoute} />
 
       <div className="boardbar">
         <h3>{t("listTitle")}</h3>

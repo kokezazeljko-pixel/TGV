@@ -76,7 +76,9 @@ export default function RecordsPage() {
                       {many && <span className={`flag flag-${r.country}`} aria-label={t("country_" + r.country)} />}
                       {r.station
                         ? <Link href={`/?c=${r.country}&station=${encodeURIComponent(r.station)}`} title={t("ffShowMap")}>{r.title}</Link>
-                        : <span>{r.title}</span>}
+                        : r.route
+                          ? <Link href={`/?c=${r.country}&route=${encodeURIComponent(r.route.a + "~" + r.route.b)}&tone=${r.route.tone}`} title={t("ffShowMap")}>{r.title}</Link>
+                          : <span>{r.title}</span>}
                     </div>
                     <div className="fact-sub">{r.sub.join(" · ")}</div>
                   </div>

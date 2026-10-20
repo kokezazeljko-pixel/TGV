@@ -8,7 +8,7 @@ import { useLang } from "@/components/LangProvider";
 import { LOCALES } from "@/lib/i18n";
 import { FF_CATS, loadFunFacts, ffDescribe, ffRange, ffShare } from "@/lib/funfacts";
 
-export default function FunFacts({ country, onStation }) {
+export default function FunFacts({ country, onStation, onRoute }) {
   const { t, lang } = useLang();
   const [data, setData] = useState(null);
   const [copied, setCopied] = useState(null);
@@ -26,7 +26,7 @@ export default function FunFacts({ country, onStation }) {
 
   const cards = FF_CATS.filter(([cat]) => f[cat]?.length).map(([cat, k, tone]) => {
     const d = ffDescribe(cat, f[cat][0], t, num);
-    return { k, tone, ...d, flag: many && d.country, pick: onStation && d.station && (many || d.country === country) ? d.station : null };
+    return { k, tone, ...d, flag: many && d.country, pick: onStation && d.station && (many || d.country === country) ? d.station : null, line: onRoute && d.route && (many || d.country === country) ? d.route : null };
   });
   if (!cards.length) return null;
 
@@ -50,7 +50,9 @@ export default function FunFacts({ country, onStation }) {
               {c.flag && <span className={`flag flag-${c.flag}`} aria-label={t("country_" + c.flag)} />}
               {c.pick
                 ? <button type="button" className="fact-link" onClick={() => onStation(c.pick)} title={t("ffShowMap")}>{c.title}</button>
-                : c.title}
+                : c.line
+                  ? <button type="button" className="fact-link" onClick={() => onRoute(c.line)} title={t("ffShowMap")}>{c.title}</button>
+                  : c.title}
             </div>
             <div className="fact-sub">{c.sub.join(" · ")}</div>
             <button type="button" className="fact-share" onClick={() => share(c)} aria-label={`${t("ffShare")}: ${t(c.k)}`}>
