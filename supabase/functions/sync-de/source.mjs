@@ -2,11 +2,12 @@
 //   ?kind=schedule  red vožnje iz gtfs.de za danas i sutra (jednom dnevno)
 //   ?kind=flix      red vožnje FlixTraina (Flix GTFS) za danas i sutra
 //   ?kind=rt        DB Timetables: nekoliko glavnih stanica po pozivu (red se rotira), pa kašnjenja u trains
+//   ?kind=extra     vozovi kojih nema u gtfs.de (Railjet Praha–Dresden–Berlin–Hamburg…), iz DB plana glavnih stanica
 //   ?kind=plan      DB plan unapred (DB ga objavljuje ~18 sati ranije): broj voza se upisuje čim ga DB objavi
 // Tajne: DB_CLIENT_ID, DB_API_KEY (Edge Functions → Secrets). Zaštita: x-cron-token kao kod sync-realtime.
 // Izvorni kod je ovde; za objavljivanje se spaja sa ingest/lib u index.ts (bun build).
 import { inflateRawSync } from "node:zlib";
-import { DE_GTFS_URL, DE_TT_BASE, FLIX_GTFS_URL, buildFlixSchedule, buildGermanSchedule, parseTimetable, ttTime, deNorm, deCategory, germanUpdates, fastEpoch } from "../../../ingest/lib/germany.mjs";
+import { DE_GTFS_URL, DE_TT_BASE, FLIX_GTFS_URL, buildFlixSchedule, buildGermanSchedule, parseTimetable, ttTime, deNorm, deCategory, germanUpdates, fastEpoch, deExtraTrains, DE_EXTRA_CATS, deStopName } from "../../../ingest/lib/germany.mjs";
 import { parisDate, gtfsToEpoch } from "../../../ingest/lib/util.mjs";
 import { parseLine } from "../../../ingest/lib/csv.mjs";
 import DE_NET from "../../../lib/network-de.json" with { type: "json" };
@@ -51,7 +52,7 @@ async function schedule() {
   const fresh = new Set(rows.map((r) => r.id));
   for (const d of dates) {
     const old = await rest("GET", `trains?select=id&country=eq.de&service_date=eq.${d}&limit=5000`);
-    const stale = old.map((r) => r.id).filter((id) => !fresh.has(id) && !id.includes("_de_FLX")); // FlixTrain rows come from kind=flix
+    const stale = old.map((r) => r.id).filter((id) => !fresh.has(id) && !id.includes("_de_FLX") && !id.includes("_de_X-")); // FlixTrain rows come from kind=flix, X- rows from kind=extra
     for (let i = 0; i < stale.length; i += 80) await rest("DELETE", `trains?id=in.(${encodeURIComponent(stale.slice(i, i + 80).map((id) => `"${id}"`).join(","))})`, null, { Prefer: "return=minimal" });
   }
   await rest("DELETE", `trains?country=eq.de&service_date=lt.${parisDate(-8)}`, null, { Prefer: "return=minimal" });
@@ -221,12 +222,70 @@ async function realtime() {
   }
   // later trains are written only once, when their number is found (no live data yet, so nothing else to write)
   const updates = germanUpdates(trains, plan, now).filter((u) => !ahead.has(u.id) || u.number);
+  // trains built from DB's plan (kind=extra) already carry their own number: a night train planned as NJ 457 and EN 40457
+  // at the same minutes is a tie and would lose it
+  for (const u of updates) if (u.id.includes("_de_X-")) u.number = null;
   let written = 0;
   for (let i = 0; i < updates.length; i += 300) written += await rest("POST", "rpc/apply_de_updates", { payload: updates.slice(i, i + 300) });
   return { kind: "rt", hubs: hubs.map((h) => h.name), calls, planRows: plan.length, candidates: trains.length, numbersAhead: updates.filter((u) => ahead.has(u.id)).length, written, errors, ms: Date.now() - t0 };
 }
 
 // check (kind=check, writes nothing): the short plan list from rt_plan gives exactly the same result as all rows of the last 12 hours
+// kind=extra: international trains DB runs that gtfs.de leaves out (Railjets Praha–Dresden–Berlin–Hamburg…), built from
+// DB's plan of the main stations (ingest/lib/germany.mjs deExtraTrains). Rows "<day>_de_X-RJ171". A row is written only
+// when it is new or its stops changed (the live delays already in it are kept), and removed when DB no longer plans it
+// or another source has the train now.
+async function extra(dry = false) { // dry=1: everything is worked out, nothing is written (for measuring)
+  const t0 = Date.now();
+  const days = [parisDate(-1), parisDate(0), parisDate(1)], build = days.slice(1);
+  const hubs = new Map((await rest("GET", "de_hubs?select=name,eva,station&eva=not.is.null")).map((h) => [h.eva, h]));
+  const plan = [];
+  for (let off = 0; ; off += 1000) {
+    const page = await rest("GET", `de_plan?day=in.(${days.join(",")})&cat=in.(${[...DE_EXTRA_CATS].join(",")})&select=eva,cat,num,ar_pt,dp_pt,pp&order=eva,sid&limit=1000&offset=${off}`);
+    plan.push(...page); if (page.length < 1000) break;
+  }
+  // trains other sources already have: the same numbers (any country), and German trains still without a number
+  const nums = [...new Set(plan.map((p) => String(p.num)).filter((n) => /^\d+$/.test(n)))];
+  const near = [parisDate(-2), ...days];
+  const existing = [];
+  for (let i = 0; i < nums.length; i += 100)
+    existing.push(...await rest("GET", `trains?select=id,number,service_date,stops&service_date=in.(${near.join(",")})&number=in.(${nums.slice(i, i + 100).join(",")})&id=not.like.*_de_X-*`));
+  existing.push(...await rest("GET", `trains?select=id,number,service_date,stops&country=eq.de&service_date=in.(${near.join(",")})&type=in.(EC,Railjet,%22Night%20train%22)&or=(number.is.null,number.eq.)&id=not.like.*_de_X-*`));
+  // station names and places as the stored trains write them (German trains first); others: DB's name, tidied
+  const names = new Map();
+  for (const e of [...existing].sort((a, b) => (b.id.includes("_de_") ? 1 : 0) - (a.id.includes("_de_") ? 1 : 0)))
+    for (const st of e.stops || []) { const k = deNorm(st.name || ""); if (k && st.lat != null && !names.has(k)) names.set(k, { name: st.name, lat: st.lat, lon: st.lon }); }
+  // main stations still without a place: looked up in one of today's German trains, one small query each
+  const missing = [...new Set(plan.map((p) => p.eva))].map((eva) => hubs.get(eva)).filter((h) => h && !names.has(deNorm(h.name)) && !names.has(deNorm(h.station || "")));
+  for (const h of missing) {
+    const nm = deStopName(h.station || h.name);
+    const hit = await rest("GET", `trains?select=stops&country=eq.de&service_date=eq.${days[1]}&stops=cs.${encodeURIComponent(JSON.stringify([{ name: nm }]))}&limit=1`);
+    const st = hit[0]?.stops?.find((x) => x.name === nm && x.lat != null);
+    if (st) names.set(deNorm(nm), { name: st.name, lat: st.lat, lon: st.lon });
+  }
+  const dayOf = (ms) => parisDate(0, new Date(ms));
+  const rows = deExtraTrains(plan, hubs, names, existing, dayOf, build);
+  // what is stored now
+  const old = new Map((await rest("GET", `trains?select=id,stops&id=like.*_de_X-*&service_date=in.(${build.join(",")})`)).map((r) => [r.id, r]));
+  const sig = (st) => JSON.stringify((st || []).map((s) => [s.name, s.arr, s.dep, s.pf || null]));
+  const write = [];
+  for (const r of rows) {
+    const o = old.get(r.id);
+    if (o && sig(o.stops) === sig(r.stops)) continue;
+    if (o) { // keep live data already written for stops that stay
+      const was = new Map((o.stops || []).map((s) => [s.name, s]));
+      r.stops = r.stops.map((s) => { const w = was.get(s.name); if (!w) return s; const { delay, skipped, apf } = w; return { ...s, delay: delay || 0, ...(skipped ? { skipped } : {}), ...(apf ? { apf } : {}) }; });
+    }
+    write.push(r);
+  }
+  if (!dry) for (let i = 0; i < write.length; i += 200) await upsert("trains", write.slice(i, i + 200), "id");
+  // gone: only when DB's plan came back at all (an empty answer never empties the table)
+  const fresh = new Set(rows.map((r) => r.id));
+  const stale = plan.length ? [...old.keys()].filter((id) => !fresh.has(id)) : [];
+  if (!dry) for (let i = 0; i < stale.length; i += 80) await rest("DELETE", `trains?id=in.(${encodeURIComponent(stale.slice(i, i + 80).map((id) => `"${id}"`).join(","))})`, null, { Prefer: "return=minimal" });
+  return { kind: "extra", dry, placesLookedUp: missing.length, planRows: plan.length, existing: existing.length, trains: rows.length, written: write.length, removed: stale.length, sample: rows.slice(0, 4).map((r) => `${r.type} ${r.number} ${r.origin} ${r.dep} → ${r.destination} ${r.arr}`), ms: Date.now() - t0 };
+}
+
 async function check() {
   const evaName = new Map((await rest("GET", "de_hubs?select=name,eva,station&eva=not.is.null")).map((h) => [h.eva, [...new Set([deNorm(h.name), deNorm(h.station || "")].filter(Boolean))]]));
   const iso = (sec) => (sec == null ? null : new Date(sec * 1000).toISOString());
@@ -258,7 +317,7 @@ Deno.serve(async (req) => {
   if (!DB_ID || !DB_KEY) return json({ error: "DB_CLIENT_ID / DB_API_KEY not set" }, 500);
   try {
     const kind = new URL(req.url).searchParams.get("kind") || "rt";
-    const out = kind === "schedule" ? await schedule() : kind === "flix" ? await flix() : kind === "plan" ? await planAhead() : kind === "check" ? await check() : await realtime();
+    const out = kind === "schedule" ? await schedule() : kind === "flix" ? await flix() : kind === "plan" ? await planAhead() : kind === "check" ? await check() : kind === "extra" ? await extra(new URL(req.url).searchParams.get("dry") === "1") : await realtime();
     console.log(JSON.stringify(out));
     return json(out);
   } catch (e) {

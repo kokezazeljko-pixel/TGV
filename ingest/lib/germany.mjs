@@ -22,7 +22,10 @@ export const DE_TT_BASE = "https://apis.deutschebahn.com/db-api-marketplace/apis
 // route_short_name ("ICE 23", "IC 55", "EC", "ECE 85", "EN", "RJ", "NJ") -> type shown on the site
 const DE_CATS = { ICE: "ICE", IC: "IC", EC: "EC", ECE: "EC", EN: "Night train", NJ: "Night train", RJ: "Railjet", RJX: "Railjet", TGV: "TGV", FLX: "FLX" };
 export const deCategory = (s = "") => DE_CATS[(String(s).trim().match(/^[A-Za-z]+/) || [""])[0].toUpperCase()] || null;
-export const DE_SKIP_AGENCIES = new Set(["1"]); // BahnTouristikExpress (special tourist trains)
+// Operators left out. gtfs.de numbers its agencies anew: "1" was BahnTouristikExpress (special tourist trains) and is now
+// České dráhy, and the agency now called BahnTouristikExpress runs the night trains Berlin/Hamburg–Stockholm. So none
+// is skipped by number any more (the Czech pieces in the feed never have two German stations and are dropped anyway).
+export const DE_SKIP_AGENCIES = new Set();
 
 // "Frankfurt(Main)Hbf" = "Frankfurt (Main) Hbf" = "Frankfurt (Main) Hauptbahnhof"
 export const deNorm = (s = "") => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
@@ -348,6 +351,103 @@ export function buildFlixSchedule(files, dates) {
       out.push({ id: `${day}_de_${t.id}`, trip_id: t.id, service_date: day, country: "de", number: flixNumber(t.id), type: "FLX",
         origin: st[0].name, destination: st[st.length - 1].name, dep: hhmm(st[0].dep || st[0].arr), arr: hhmm(st[st.length - 1].arr || st[st.length - 1].dep), stops: st });
     }
+  }
+  return out;
+}
+
+// ---- trains DB runs on its own track but gtfs.de leaves out (21.10.2026) ----
+// The free gtfs.de feed has no German part of some international trains run with other railways, e.g. the Railjets
+// Praha–Dresden–Berlin–Hamburg (RJ 170–179, 382–385): only their Czech part is in it. DB's Timetables plan of our main
+// stations (de_plan) has them, so they are built from it: one train per category + number, its stops = the main
+// stations it calls at, in time order. Only categories gtfs.de misses are used, and never a train another source
+// already has (the same number running at the same time in any country, or two stations at the same minutes).
+export const DE_EXTRA_CATS = new Set(["EC", "ECE", "RJ", "RJX", "NJ", "EN"]);
+const EXTRA_GAP = 6 * 3600e3; // the same number again after 6 hours without a stop is another train (EC 458 Basel / Leipzig)
+
+// times of a stored train's stops [name key, epoch ms] (night trains: a time earlier than the one before is the next day)
+function stopTimes(tr) {
+  const out = []; let add = 0, prev = null;
+  for (const s of tr.stops || []) {
+    let hms = s.dep || s.arr || (s.time ? s.time + ":00" : null); if (!hms) continue;
+    let ms = fastEpoch(tr.service_date, hms) * 1000 + add;
+    if (!s.dep && !s.arr && prev != null && ms < prev - 2 * 3600e3) { add += 86400e3; ms += 86400e3; }
+    prev = ms; out.push([deNorm(s.name || ""), ms]);
+    if (s.arr && s.dep && s.arr !== s.dep) out.push([deNorm(s.name || ""), fastEpoch(tr.service_date, s.arr) * 1000]);
+  }
+  return out;
+}
+
+// plan: de_plan rows {eva, cat, num, ar_pt, dp_pt, pp}; hubs: Map eva -> {name, station}; names: Map name key -> {name, lat, lon}
+// existing: stored trains {id, number, service_date, stops} of any country; dayOf(ms) -> local date "YYYY-MM-DD"; days: dates to build
+export function deExtraTrains(plan, hubs, names, existing, dayOf, days) {
+  const groups = new Map();
+  for (const p of plan) {
+    const cat = String(p.cat || "").toUpperCase();
+    if (!DE_EXTRA_CATS.has(cat) || !p.num || !hubs.has(p.eva)) continue;
+    const ta = p.ar_pt ? Date.parse(p.ar_pt) : null, td = p.dp_pt ? Date.parse(p.dp_pt) : null, t = td ?? ta;
+    if (t == null || !Number.isFinite(t)) continue;
+    const k = cat + "|" + p.num;
+    (groups.get(k) || groups.set(k, []).get(k)).push({ eva: p.eva, cat, num: String(p.num), pp: p.pp, t, ta, td });
+  }
+  let chains = [];
+  for (const list of groups.values()) {
+    list.sort((a, b) => a.t - b.t);
+    let cur = [];
+    for (const p of list) {
+      if (cur.some((x) => x.eva === p.eva && x.t === p.t)) continue; // the same stop twice
+      const last = cur[cur.length - 1];
+      if (last && (p.t - last.t > EXTRA_GAP || cur.some((x) => x.eva === p.eva))) { chains.push(cur); cur = []; }
+      cur.push(p);
+    }
+    if (cur.length) chains.push(cur);
+  }
+  chains = chains.filter((c) => new Set(c.map((p) => p.eva)).size >= 2); // one station only: nothing to draw
+  // the same train under two numbers (Nightjet NJ 457 is also EN 40457): the lower number is kept
+  chains.sort((a, b) => Number(a[0].num) - Number(b[0].num) || a[0].cat.localeCompare(b[0].cat) || a[0].t - b[0].t);
+  const kept = [], pts = new Set();
+  for (const c of chains) {
+    const mine = c.map((p) => `${p.eva}|${p.t}`);
+    if (mine.filter((k) => pts.has(k)).length >= 2) continue;
+    mine.forEach((k) => pts.add(k)); kept.push(c);
+  }
+  // already known from another source? the same number running at overlapping times (1 hour margin), or a train without
+  // a number at two of the chain's stations within 2 minutes
+  const byNum = new Map(), loose = new Set();
+  for (const e of existing) {
+    const st = stopTimes(e); if (!st.length) continue;
+    if (e.number) { const ms = st.map((x) => x[1]); (byNum.get(e.number) || byNum.set(e.number, []).get(e.number)).push([Math.min(...ms), Math.max(...ms)]); }
+    else for (const [n, ms] of st) for (let dm = -2; dm <= 2; dm++) loose.add(`${n}|${Math.round(ms / 60000) + dm}|${e.id}`);
+  }
+  const looseIds = new Map(); // name|minute -> ids
+  for (const k of loose) { const i = k.lastIndexOf("|"), key = k.slice(0, i); (looseIds.get(key) || looseIds.set(key, []).get(key)).push(k.slice(i + 1)); }
+  const keys = (eva) => { const h = hubs.get(eva); return [...new Set([deNorm(h.name), deNorm(h.station || "")].filter(Boolean))]; };
+  const covered = (c) => {
+    if ((byNum.get(c[0].num) || []).some(([a, b]) => a - 3600e3 <= c[c.length - 1].t && c[0].t <= b + 3600e3)) return true;
+    const hits = new Map();
+    for (const p of c) {
+      const ids = new Set();
+      for (const n of keys(p.eva)) for (const x of [p.ta, p.td]) if (x != null) for (const id of looseIds.get(`${n}|${Math.round(x / 60000)}`) || []) ids.add(id);
+      for (const id of ids) hits.set(id, (hits.get(id) || 0) + 1);
+    }
+    return [...hits.values()].some((h) => h >= 2);
+  };
+  const out = [], ids = new Map();
+  for (const c of kept) {
+    const sd = dayOf(c[0].t);
+    if (!days.includes(sd) || covered(c)) continue;
+    const base = fastEpoch(sd, "00:00:00") * 1000;
+    const hms = (ms) => { if (ms == null) return null; const m = Math.round((ms - base) / 60000); return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}:00`; };
+    const last = c.length - 1;
+    const stops = c.map((p, i) => {
+      const h = hubs.get(p.eva), n = names.get(deNorm(h.name)) || names.get(deNorm(h.station || ""));
+      const arr = hms(p.ta), dep = hms(p.td);
+      return { seq: i + 1, id: "eva:" + p.eva, arr, dep, name: n?.name || deStopName(h.station || h.name), time: hhmm(i === last ? arr || dep : dep || arr), delay: 0,
+        ...(n?.lat != null ? { lat: n.lat, lon: n.lon } : {}), ...(/^[0-9]{1,3}[a-z]?$/i.test(p.pp || "") ? { pf: p.pp.toUpperCase() } : {}) };
+    });
+    const tag = `X-${c[0].cat}${c[0].num}`, k = `${sd}|${tag}`, nth = ids.get(k) || 0; ids.set(k, nth + 1);
+    const trip = nth ? `${tag}-${nth + 1}` : tag;
+    out.push({ id: `${sd}_de_${trip}`, trip_id: trip, service_date: sd, country: "de", number: c[0].num, type: deCategory(c[0].cat),
+      origin: stops[0].name, destination: stops[last].name, dep: hhmm(stops[0].dep || stops[0].arr), arr: hhmm(stops[last].arr || stops[last].dep), stops });
   }
   return out;
 }
