@@ -40,6 +40,11 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
   const zoomRef = useRef(1);
   const drag = useRef({ pts: new Map(), moved: false, start: null, pinch: null });
   const [now, setNow] = useState(null);
+  // The map's thousands of lines and station dots are drawn only in the browser, not in the page the server
+  // makes: they made the home page ~700 kB, and every hourly rebuild of it was stored by Vercel as "ISR writes"
+  // (counted per 8 kB, free plan 200 000 a month). The box keeps its size, so nothing jumps when the map appears.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const [routeScale, setRouteScale] = useState(0);
   const [routeBounds, setRouteBounds] = useState(null);
   // the selected station's big pin (on top of the trains)
@@ -225,9 +230,9 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
         onClick={onExpand ? () => { if (!d.moved) onExpand(); } : undefined}
       >
-        <BaseMap geo={geo} />
-        <GeoLabels geo={geo} />
-        <Rails geo={geo} />
+        {mounted && <BaseMap geo={geo} />}
+        {mounted && <GeoLabels geo={geo} />}
+        {mounted && <Rails geo={geo} />}
         <g>{hlPaths.map((pts, i) => <path key={i} className="rail hl" d={"M" + pts.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join("L")} />)}</g>
         {reach && (
           <g key={"reach-lines|" + selectedStation} className="reach" pointerEvents="none">
@@ -239,7 +244,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
           </g>
         )}
         {compact && highlight && <RouteStops geo={geo} tr={highlight} now={now} scale={routeScale} bounds={routeBounds} />}
-        {!(compact && highlight) && <Stations
+        {mounted && !(compact && highlight) && <Stations
           geo={geo}
           selected={selectedStation}
           onClick={(n) => { if (d.moved || !onStationClick) return; onStationClick(n.name); }}
@@ -280,7 +285,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
             {[route.from, route.to].map((p, i) => <circle key={"e" + i} className="route-end" cx={p[0].toFixed(1)} cy={p[1].toFixed(1)} r="1" style={{ transformOrigin: `${p[0].toFixed(1)}px ${p[1].toFixed(1)}px` }} />)}
           </g>
         )}
-        {!(compact && highlight) && onStationClick && <StationHits geo={geo} selected={selectedStation} onClick={(n) => { if (d.moved) return; onStationClick(n.name); }} />}
+        {mounted && !(compact && highlight) && onStationClick && <StationHits geo={geo} selected={selectedStation} onClick={(n) => { if (d.moved) return; onStationClick(n.name); }} />}
         {!(compact && highlight) && <StationLabels geo={geo} />}
         {selPt && (
           <g className="selpin" transform={`translate(${selPt[0].toFixed(1)} ${selPt[1].toFixed(1)})`} pointerEvents="none">
