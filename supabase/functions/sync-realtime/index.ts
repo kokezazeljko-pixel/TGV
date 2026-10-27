@@ -269,6 +269,21 @@ function matchRowLoose(baseIndex, trip) {
   }
   return rows.length === 1 ? rows[0] : null;
 }
+function tripSlot(tripId, startTime, startDate) {
+  const id = String(tripId || ""), line = id.replace(/\.TA\.\d+\./, ".TA.");
+  if (line === id || !/^\d{1,2}:\d{2}:\d{2}$/.test(startTime || "") || !/^\d{8}$/.test(startDate || ""))
+    return null;
+  return `${line}|${startTime.padStart(8, "0")}|${startDate}`;
+}
+var rowSlot = (r) => {
+  const s = (r.stops || []).find((x) => x.dep || x.arr);
+  return s ? tripSlot(r.trip_id, s.dep || s.arr, String(r.service_date || "").replaceAll("-", "")) : null;
+};
+function matchRowSlot(slotIndex, trip) {
+  const k = tripSlot(trip?.tripId, trip?.startTime, trip?.startDate);
+  const rows = k ? slotIndex.get(k) || [] : [];
+  return rows.length === 1 ? rows[0] : null;
+}
 function onTimeUpdate(row, nowSec) {
   const st = (row.stops || []).filter((s) => s.arr || s.dep);
   if (st.length < 2)
@@ -457,7 +472,7 @@ var NL_AGENCIES = new Set(["IFF:NS", "IFF:NS_INT", "IFF:EU_SLEEPER", "IFF:BLAUWN
 // ../../../ingest/lib/realtime-run.mjs
 var FEEDS = {
   fr: { url: "https://proxy.transport.data.gouv.fr/resource/sncf-gtfs-rt-trip-updates", headers: () => ({}) },
-  ch: { url: "https://api.opentransportdata.swiss/la/gtfs-rt", headers: (key) => ({ Authorization: `Bearer ${key}`, "Accept-Encoding": "br, gzip, deflate" }) },
+  ch: { url: "https://api.opentransportdata.swiss/la/gtfs-rt", headers: (key) => ({ Authorization: `Bearer ${key}`, "Accept-Encoding": "br, gzip, deflate" }), slotIds: true },
   be: { url: BE_TRIPS_URL, headers: () => ({ Accept: "application/json" }), json: true, onlyDeviations: true, looseIds: true, quietLines: true },
   nl: { url: NL_TRAINS_URL, headers: () => NL_HEADERS }
 };
@@ -605,10 +620,21 @@ Deno.serve(async (req) => {
           baseIndex.get(b).push(r);
         }
       }
-    const feed = readFeed(country, feedBuf, loose ? null : (trip) => !!trip?.tripId && index.has(trip.tripId));
+    const slots = !!FEEDS[country].slotIds;
+    const slotIndex = new Map;
+    if (slots)
+      for (const r of trains) {
+        const k = rowSlot(r);
+        if (k) {
+          if (!slotIndex.has(k))
+            slotIndex.set(k, []);
+          slotIndex.get(k).push(r);
+        }
+      }
+    const feed = readFeed(country, feedBuf, loose ? null : (trip) => !!trip?.tripId && (index.has(trip.tripId) || slots && slotIndex.has(tripSlot(trip.tripId, trip.startTime, trip.startDate))));
     const now = Math.floor(Date.now() / 1000);
     const updates = [], used = new Set;
-    const diag = { feedTrips: 0, exact: 0, byBase: 0, unmatched: 0, otherKinds: 0, examples: [] };
+    const diag = { feedTrips: 0, exact: 0, byBase: 0, bySlot: 0, unmatched: 0, otherKinds: 0, examples: [] };
     const kind = (id) => String(id || "").split(":")[3] || "";
     const ourKinds = new Set(loose ? trains.map((r) => kind(r.trip_id)) : []);
     const pairs = [], rest = [];
@@ -626,11 +652,14 @@ Deno.serve(async (req) => {
         rest.push(tu);
     }
     for (const tu of rest) {
-      let row = loose ? matchRowLoose(baseIndex, tu.trip) : null;
+      let row = loose ? matchRowLoose(baseIndex, tu.trip) : slots ? matchRowSlot(slotIndex, tu.trip) : null;
       if (row && used.has(row.id))
         row = null;
       if (row) {
-        diag.byBase++;
+        if (loose)
+          diag.byBase++;
+        else
+          diag.bySlot++;
         used.add(row.id);
         pairs.push([row, tu]);
         continue;
@@ -669,6 +698,8 @@ Deno.serve(async (req) => {
     const out = { country, candidates: trains.length, feedBytes: feedBuf.length, matched: inFeed, onTime: updates.length - inFeed, written, ms: Date.now() - t0 };
     if (loose)
       out.diag = diag;
+    if (slots)
+      out.diag = { exact: diag.exact, bySlot: diag.bySlot };
     if (FEEDS[country].quietLines) {
       out.quietLines = Array.isArray(quietList) ? quiet.size : "unreadable";
       out.quietSkipped = quietSkipped;

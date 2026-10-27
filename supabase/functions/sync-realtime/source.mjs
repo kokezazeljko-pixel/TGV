@@ -3,7 +3,7 @@
 // Pokreće je pg_cron (vidi supabase/realtime-cron.sql) uz tajni žeton iz Vault-a.
 // Izvorni kod je ovde; za objavljivanje se spaja sa ingest/lib u jedan fajl index.ts (bun build).
 import { decodeFeed } from "../../../ingest/lib/gtfs-rt.mjs";
-import { applyTripUpdate, lineKey, matchRow, matchRowLoose, onTimeUpdate, tripBase } from "../../../ingest/lib/realtime.mjs";
+import { applyTripUpdate, lineKey, matchRow, matchRowLoose, matchRowSlot, onTimeUpdate, rowSlot, tripBase, tripSlot } from "../../../ingest/lib/realtime.mjs";
 import { FEEDS, fetchFeed, readFeed } from "../../../ingest/lib/realtime-run.mjs";
 import { ALERT_FEEDS, alertRows, alertStats } from "../../../ingest/lib/alerts.mjs";
 import { feedFromJson, belgianAlertRows } from "../../../ingest/lib/belgium.mjs";
@@ -54,11 +54,15 @@ Deno.serve(async (req) => {
     const loose = !!FEEDS[country].looseIds;
     const baseIndex = new Map();
     if (loose) for (const r of trains) { const b = tripBase(r.trip_id); if (b) { if (!baseIndex.has(b)) baseIndex.set(b, []); baseIndex.get(b).push(r); } }
-    const feed = readFeed(country, feedBuf, loose ? null : (trip) => !!trip?.tripId && index.has(trip.tripId));
+    // Switzerland (slotIds): a trip whose id is not ours is still read when its slot (line + start time + date) is
+    const slots = !!FEEDS[country].slotIds;
+    const slotIndex = new Map();
+    if (slots) for (const r of trains) { const k = rowSlot(r); if (k) { if (!slotIndex.has(k)) slotIndex.set(k, []); slotIndex.get(k).push(r); } }
+    const feed = readFeed(country, feedBuf, loose ? null : (trip) => !!trip?.tripId && (index.has(trip.tripId) || (slots && slotIndex.has(tripSlot(trip.tripId, trip.startTime, trip.startDate)))));
     const now = Math.floor(Date.now() / 1000);
     const updates = [], used = new Set();
     // diag: unmatched trains of the kinds we keep (e.g. SNCB IC "007", EC "100"); local trains we do not keep are only counted
-    const diag = { feedTrips: 0, exact: 0, byBase: 0, unmatched: 0, otherKinds: 0, examples: [] };
+    const diag = { feedTrips: 0, exact: 0, byBase: 0, bySlot: 0, unmatched: 0, otherKinds: 0, examples: [] };
     const kind = (id) => String(id || "").split(":")[3] || "";
     const ourKinds = new Set(loose ? trains.map((r) => kind(r.trip_id)) : []);
     // exact ids first; the version-less fallback only for what is left, so it never takes an exactly matched train
@@ -71,9 +75,9 @@ Deno.serve(async (req) => {
       if (row) { diag.exact++; used.add(row.id); pairs.push([row, tu]); } else rest.push(tu);
     }
     for (const tu of rest) {
-      let row = loose ? matchRowLoose(baseIndex, tu.trip) : null;
+      let row = loose ? matchRowLoose(baseIndex, tu.trip) : slots ? matchRowSlot(slotIndex, tu.trip) : null;
       if (row && used.has(row.id)) row = null;
-      if (row) { diag.byBase++; used.add(row.id); pairs.push([row, tu]); continue; }
+      if (row) { if (loose) diag.byBase++; else diag.bySlot++; used.add(row.id); pairs.push([row, tu]); continue; }
       if (loose && !ourKinds.has(kind(tu.trip?.tripId))) { diag.otherKinds++; continue; }
       diag.unmatched++;
       if (diag.examples.length < 8) diag.examples.push(`${tu.trip?.tripId}|${tu.trip?.startDate || ""}`);
@@ -98,6 +102,7 @@ Deno.serve(async (req) => {
     for (let i = 0; i < updates.length; i += 400) written += await rpc("apply_rt_delays", { payload: updates.slice(i, i + 400) });
     const out = { country, candidates: trains.length, feedBytes: feedBuf.length, matched: inFeed, onTime: updates.length - inFeed, written, ms: Date.now() - t0 };
     if (loose) out.diag = diag;
+    if (slots) out.diag = { exact: diag.exact, bySlot: diag.bySlot };
     if (FEEDS[country].quietLines) { out.quietLines = Array.isArray(quietList) ? quiet.size : "unreadable"; out.quietSkipped = quietSkipped; }
     console.log(JSON.stringify(out));
     return json(out);

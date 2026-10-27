@@ -97,6 +97,27 @@ export function matchRowLoose(baseIndex, trip) {
   return rows.length === 1 ? rows[0] : null;
 }
 
+// Switzerland: a trip id carries a running number that changes with every timetable version
+// (IC 870: ".ojp-91-2-G.1.TA.680.j26" on 25.10.2026, ".ojp-91-2-G.1.TA.623.j26" on 26.10.2026). On the days a new
+// timetable comes out (Mondays and Thursdays) our copy has the new ids in the morning while the live feed still used
+// the old ones until the evening: two thirds of the Swiss trains had no live data on those days.
+// The "slot" = the id without that number + the trip's start time + its date, the same in both versions.
+export function tripSlot(tripId, startTime, startDate) {
+  const id = String(tripId || ""), line = id.replace(/\.TA\.\d+\./, ".TA.");
+  if (line === id || !/^\d{1,2}:\d{2}:\d{2}$/.test(startTime || "") || !/^\d{8}$/.test(startDate || "")) return null;
+  return `${line}|${startTime.padStart(8, "0")}|${startDate}`;
+}
+export const rowSlot = (r) => {
+  const s = (r.stops || []).find((x) => x.dep || x.arr);
+  return s ? tripSlot(r.trip_id, s.dep || s.arr, String(r.service_date || "").replaceAll("-", "")) : null;
+};
+// only when exactly one of our trains has that slot
+export function matchRowSlot(slotIndex, trip) {
+  const k = tripSlot(trip?.tripId, trip?.startTime, trip?.startDate);
+  const rows = k ? slotIndex.get(k) || [] : [];
+  return rows.length === 1 ? rows[0] : null;
+}
+
 // Belgium: the SNCB feed lists only trains that deviate from the timetable. A train that is running now
 // and is missing from the feed is on time -> all delays 0. A train that already arrived is left as it was
 // (its last known delay stays). Returns null when nothing should be written.

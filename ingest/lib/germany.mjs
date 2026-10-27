@@ -258,8 +258,8 @@ export function germanUpdates(trains, plan, nowSec, opts = {}) {
     // own number). One shared minute is not enough: IC 796 arrives in Salzburg at the minute RJX 60 does and took its delays.
     if (opts.keepNumbers && tr.number && key !== tr.number && (exact.get(key) || 0) < 2) continue;
     // 2) live data only from that train's own rows
-    let carry = null, cancelledAll = true;
-    const d = [];
+    let carry = null;
+    const d = [], known = [];
     for (const [i, s] of tr.stops.entries()) {
       const mine = per[i].filter((x) => numOf(x[0]) === key).sort((a, b) => b[1] - a[1])[0];
       const p = mine && mine[0];
@@ -270,9 +270,19 @@ export function germanUpdates(trains, plan, nowSec, opts = {}) {
         if (p.cs === "c") skipped = true;
         if (p.cp && p.cp !== (p.pp || s.pf)) apf = p.cp;
       }
-      if (!skipped) cancelledAll = false;
+      known.push(!!p);
       const delay = Math.max(0, Math.round((carry ?? 0) / 60));
       d.push(apf ? [delay, skipped, apf] : [delay, skipped]);
+    }
+    // A stop DB gives nothing for (not one of our main stations, or a cancelled stop DB dropped from its plan, as
+    // Berlin Hbf for ICE 2510 on 27.10.2026) takes the state of the stations around it: between two cancelled stations,
+    // or before/after the first/last one, it is cancelled too. Before, one such stop kept a fully cancelled train "on time".
+    const kn = known.map((k, i) => (k ? i : -1)).filter((i) => i >= 0);
+    if (kn.length >= 2) for (let i = 0; i < d.length; i++) {
+      if (known[i]) continue;
+      const before = kn.filter((j) => j < i).pop(), after = kn.find((j) => j > i);
+      const sk = (j) => j == null || d[j][1];
+      if ((before != null || after != null) && sk(before) && sk(after)) d[i][1] = true;
     }
     // two trains with the same score (an ICE pair that splits later on, before the stations after the split are known): no number yet
     const tie = ranked[1] && Math.abs(ranked[1][1] - best[1]) < 1e-9;
@@ -283,7 +293,8 @@ export function germanUpdates(trains, plan, nowSec, opts = {}) {
       const s = tr.stops[i]; if (d[i][1]) continue;
       if (fastEpoch(tr.service_date, s.arr || s.dep) + d[i][0] * 60 >= nowSec) { delay_min = d[i][0]; break; }
     }
-    const cancelled = cancelledAll && d.length > 0;
+    // cancelled: every stop is cancelled, and DB said so for at least two of them (one cancelled stop alone is a skipped stop)
+    const cancelled = d.length > 0 && d.every((x) => x[1]) && kn.length >= 2;
     updates.push({ id: tr.id, delay_min: cancelled ? 0 : delay_min, cancelled, d, number });
   }
   return updates;

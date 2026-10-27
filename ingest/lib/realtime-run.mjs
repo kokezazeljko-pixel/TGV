@@ -9,7 +9,8 @@ import { parisDate, chunks } from "./util.mjs";
 export const FEEDS = {
   fr: { url: "https://proxy.transport.data.gouv.fr/resource/sncf-gtfs-rt-trip-updates", headers: () => ({}) },
   // https://opentransportdata.swiss/en/cookbook/realtime-prediction-cookbook/gtfs-rt/ (najviše 2 zahteva u minuti)
-  ch: { url: "https://api.opentransportdata.swiss/la/gtfs-rt", headers: (key) => ({ Authorization: `Bearer ${key}`, "Accept-Encoding": "br, gzip, deflate" }) },
+  // slotIds: on new-timetable days the feed keeps the old trip ids for a while (realtime.mjs tripSlot)
+  ch: { url: "https://api.opentransportdata.swiss/la/gtfs-rt", headers: (key) => ({ Authorization: `Bearer ${key}`, "Accept-Encoding": "br, gzip, deflate" }), slotIds: true },
   // SNCB: GTFS-RT as JSON, only trains with a deviation; missing running trains are on time (onlyDeviations)
   // quietLines: trains of lines the feed never reports are not marked "on time" (rt_quiet_lines)
   // looseIds: SNCB trip ids carry a version number that can change between our timetable copy and the feed

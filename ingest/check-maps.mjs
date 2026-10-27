@@ -5,7 +5,11 @@
 //     (npr. nemačke stanice u holandskom feedu) samo se ne crta na mapi i nije greška,
 //  3) da svaka stanica ima svoju tačku na liniji mape te zemlje (ne samo "negde blizu linije"),
 //  4) da mapa ima liniju između dve uzastopne stanice, bez velikog zaobilaska,
-//  5) da nijedan voz nema nemoguće kašnjenje (preko 12 sati).
+//  5) da nijedan voz nema nemoguće kašnjenje (preko 12 sati),
+//  6) kako su izgledali podaci uživo JUČE (upozorenja, ne greške – samo se ispišu, i u rezimeu koraka na GitHubu):
+//     voz kome je otkazano 3/4 stanica ili više a nije označen kao otkazan (27.10.2026: ICE 2510 Berlin–Hamburg bio je
+//     otkazan, a na sajtu "na vreme"), i zemlja u kojoj je broj vozova sa podacima uživo pao na manje od pola
+//     nedeljnog proseka (feed ne radi). Zemlja bez ijednog voza sa podacima uživo juče JESTE greška.
 // Ako nešto nije u redu, ispisuje tačno šta (zemlja, voz, stanice) i završava sa greškom,
 // pa GitHub pošalje e-mail da je korak "Provera mapa i podataka" pao.
 // Za probu bez baze: TRAINS_FILE=trains.json (niz vozova kao u tabeli trains).
@@ -21,9 +25,11 @@ const DETOUR = 1.8, MIN_HOP = 0.08; // linija sme da vijuga, ali ne duplo duže 
 // Stvarna pruga koja zaista ide okolo (provereno): Albula Filisur–Tiefencastel–Thusis–Chur, Alvia Calatayud–Zaragoza–Tudela
 const REAL_DETOURS = new Set(["ch:Chur|Filisur", "es:Calatayud|Tudela de Navarra"]);
 const today = process.env.TODAY || new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Paris" });
+const dayBefore = (d, n = 1) => new Date(Date.parse(d + "T12:00:00Z") - n * 86400000).toISOString().slice(0, 10);
+const NO_LIVE = new Set(["pt"]); // zemlje bez podataka uživo (samo red vožnje)
 
-async function loadTrains() {
-  if (process.env.TRAINS_FILE) return JSON.parse(await readFile(process.env.TRAINS_FILE, "utf8"));
+async function loadTrains(day = today, fields = "id,country,number,type,delay_min,stops") {
+  if (process.env.TRAINS_FILE) return day === today ? JSON.parse(await readFile(process.env.TRAINS_FILE, "utf8")) : [];
   const base = process.env.SUPABASE_URL.replace(/\/$/, "") + "/rest/v1", key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const headers = { apikey: key, ...(key.startsWith("eyJ") ? { Authorization: `Bearer ${key}` } : {}) };
   // per country and in the order of the index (country, service_date, dep): small fast requests; a busy database is tried again
@@ -39,7 +45,7 @@ async function loadTrains() {
   };
   const out = [];
   for (const c of COUNTRIES) for (let off = 0; ; off += 500) {
-    const page = await get(`${base}/trains?select=id,country,number,type,delay_min,stops&country=eq.${c}&service_date=eq.${today}&order=dep,id&limit=500&offset=${off}`);
+    const page = await get(`${base}/trains?select=${fields}&country=eq.${c}&service_date=eq.${day}&order=dep,id&limit=500&offset=${off}`);
     out.push(...page);
     if (page.length < 500) break;
   }
@@ -127,6 +133,40 @@ async function main() {
     const net = JSON.parse(await readFile(join(here, "..", "lib", FILE[c] || `network-${c}.json`), "utf8"));
     const before = problems.length;
     checkCountry(c, net, mine, problems);
+  }
+  // 6) yesterday's live data: warnings only, and an error when a country had no live data at all
+  const warnings = [];
+  try {
+    const y = dayBefore(today);
+    const yt = await loadTrains(y, "id,country,number,type,cancelled,rt_updated_at,stops");
+    for (const t of yt) {
+      const st = t.stops || [], sk = st.filter((s) => s.skipped).length;
+      if (!t.cancelled && st.length >= 3 && sk / st.length >= 0.75)
+        warnings.push(`${t.country}: ${t.type} ${t.number} ${st[0]?.name} → ${st[st.length - 1]?.name}: otkazano ${sk} od ${st.length} stanica, a nije označen kao otkazan`);
+    }
+    // the week before, for comparison: only the count of trains with live data (small requests)
+    const live = (rows) => rows.filter((t) => t.rt_updated_at).length;
+    const week = [];
+    for (let k = 2; k <= 8; k++) week.push(await loadTrains(dayBefore(today, k), "country,rt_updated_at"));
+    for (const c of COUNTRIES) {
+      if (NO_LIVE.has(c)) continue;
+      const mine = yt.filter((t) => t.country === c);
+      if (!mine.length) continue;
+      const n = live(mine), canc = mine.filter((t) => t.cancelled).length;
+      console.log(`${c} juče: ${mine.length} vozova, sa podacima uživo ${n} (${Math.round((100 * n) / mine.length)} %), otkazano ${canc}`);
+      if (!n) { problems.push(`${c}: juče (${y}) nijedan voz nije dobio podatke uživo – feed verovatno ne radi`); continue; }
+      const past = week.map((rows) => live(rows.filter((t) => t.country === c)));
+      const avg = past.reduce((a, b) => a + b, 0) / past.length;
+      if (avg >= 20 && n < avg / 2) warnings.push(`${c}: juče samo ${n} vozova sa podacima uživo, prethodnih 7 dana prosečno ${Math.round(avg)}`);
+    }
+  } catch (e) { warnings.push(`provera jučerašnjih podataka nije uspela: ${String(e).slice(0, 200)}`); }
+  if (warnings.length) {
+    console.log(`\n⚠ Upozorenja (podaci uživo juče): ${warnings.length}`);
+    for (const w of warnings.slice(0, 100)) console.log(" - " + w);
+    if (process.env.GITHUB_STEP_SUMMARY) {
+      const { appendFile } = await import("node:fs/promises");
+      await appendFile(process.env.GITHUB_STEP_SUMMARY, `### ⚠ Podaci uživo juče: ${warnings.length} upozorenja\n\n${warnings.slice(0, 100).map((w) => "- " + w).join("\n")}\n`);
+    }
     console.log(`${c}: ${mine.length} vozova, problema: ${problems.length - before}`);
   }
   if (problems.length) {
