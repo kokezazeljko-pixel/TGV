@@ -133,6 +133,7 @@ async function main() {
     const net = JSON.parse(await readFile(join(here, "..", "lib", FILE[c] || `network-${c}.json`), "utf8"));
     const before = problems.length;
     checkCountry(c, net, mine, problems);
+    console.log(`${c}: ${mine.length} vozova, problema: ${problems.length - before}`);
   }
   // 6) yesterday's live data: warnings only, and an error when a country had no live data at all
   const warnings = [];
@@ -167,7 +168,6 @@ async function main() {
       const { appendFile } = await import("node:fs/promises");
       await appendFile(process.env.GITHUB_STEP_SUMMARY, `### ⚠ Podaci uživo juče: ${warnings.length} upozorenja\n\n${warnings.slice(0, 100).map((w) => "- " + w).join("\n")}\n`);
     }
-    console.log(`${c}: ${mine.length} vozova, problema: ${problems.length - before}`);
   }
   if (problems.length) {
     console.log(`\n✖ Pronađeno problema: ${problems.length}`);
