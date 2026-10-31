@@ -293,8 +293,10 @@ export function germanUpdates(trains, plan, nowSec, opts = {}) {
       const s = tr.stops[i]; if (d[i][1]) continue;
       if (fastEpoch(tr.service_date, s.arr || s.dep) + d[i][0] * 60 >= nowSec) { delay_min = d[i][0]; break; }
     }
-    // cancelled: every stop is cancelled, and DB said so for at least two of them (one cancelled stop alone is a skipped stop)
-    const cancelled = d.length > 0 && d.every((x) => x[1]) && kn.length >= 2;
+    // cancelled: DB data for at least two stops, two or more stops cancelled and at most one still served (a train that
+    // stops at one station only takes nobody anywhere). 30.10.2026: ICE 1674 Frankfurt–Bremen, all 8 stops before Bremen
+    // cancelled and Bremen still "arriving +4" in DB, was shown as running. The same rule is in apply_de/at_updates (SQL).
+    const cancelled = kn.length >= 2 && d.filter((x) => x[1]).length >= 2 && d.filter((x) => !x[1]).length <= 1;
     updates.push({ id: tr.id, delay_min: cancelled ? 0 : delay_min, cancelled, d, number });
   }
   return updates;
