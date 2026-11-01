@@ -7,7 +7,7 @@
 //  4) da mapa ima liniju između dve uzastopne stanice, bez velikog zaobilaska,
 //  5) da nijedan voz nema nemoguće kašnjenje (preko 12 sati),
 //  6) kako su izgledali podaci uživo JUČE (upozorenja, ne greške – samo se ispišu, i u rezimeu koraka na GitHubu):
-//     voz kome je otkazano 3/4 stanica ili više a nije označen kao otkazan (27.10.2026: ICE 2510 Berlin–Hamburg bio je
+//     voz koji staje na najviše jednoj stanici a nije označen kao otkazan (27.10.2026: ICE 2510 Berlin–Hamburg bio je
 //     otkazan, a na sajtu "na vreme"), i zemlja u kojoj je broj vozova sa podacima uživo pao na manje od pola
 //     nedeljnog proseka (feed ne radi). Zemlja bez ijednog voza sa podacima uživo juče JESTE greška.
 // Ako nešto nije u redu, ispisuje tačno šta (zemlja, voz, stanice) i završava sa greškom,
@@ -142,7 +142,9 @@ async function main() {
     const yt = await loadTrains(y, "id,country,number,type,cancelled,rt_updated_at,stops");
     for (const t of yt) {
       const st = t.stops || [], sk = st.filter((s) => s.skipped).length;
-      if (!t.cancelled && st.length >= 3 && sk / st.length >= 0.75)
+      // a train that still stops at one station at most takes nobody anywhere; one running part of its route
+      // (IC 2162 30.10.2026: only Vaihingen–Karlsruhe) is a real partial cancellation, not an error
+      if (!t.cancelled && sk >= 2 && st.length - sk <= 1)
         warnings.push(`${t.country}: ${t.type} ${t.number} ${st[0]?.name} → ${st[st.length - 1]?.name}: otkazano ${sk} od ${st.length} stanica, a nije označen kao otkazan`);
     }
     // the week before, for comparison: only the count of trains with live data (small requests)

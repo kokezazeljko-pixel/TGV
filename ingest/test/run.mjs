@@ -188,4 +188,21 @@ assert.equal(lux.find((t) => t.number === "2800").origin, "Metz-Ville");
   assert.equal(esStopName("Córdoba-Julio Anguita"), "Córdoba");
   assert.equal(esStopName("Bilbao-Intermod. Abando Indalecio Prieto"), "Bilbao-Abando");
 }
+// Nemačka: voz koji staje još samo na jednoj stanici je otkazan (30.10.2026: ICE 1674 Frankfurt–Bremen, 8 od 9 otkazano),
+// a voz koji vozi bar deo puta (IC 2162 samo Vaihingen–Karlsruhe) nije
+{
+  const { germanUpdates, deNorm, fastEpoch } = await import("../lib/germany.mjs");
+  const day = "2026-10-30", iso = (hms) => new Date(fastEpoch(day, hms) * 1000).toISOString();
+  const mk = (id, names, times) => ({ id, service_date: day, type: "ICE", number: "", stops: names.map((name, i) => ({ name, arr: i ? times[i] : null, dep: i < names.length - 1 ? times[i] : null })) });
+  const plan = (num, names, times, cancelledUpTo) => names.map((n, i) => ({ cat: "ICE", num, hub: deNorm(n), eva: i,
+    ar_pt: i ? iso(times[i]) : null, dp_pt: i < names.length - 1 ? iso(times[i]) : null, cs: i < cancelledUpTo ? "c" : null }));
+  const names = ["Frankfurt(Main)Hbf", "Gießen", "Kassel-Wilhelmshöhe", "Hannover Hbf", "Bremen Hbf"];
+  const times = ["06:26:00", "07:08:00", "08:29:00", "09:45:00", "10:45:00"];
+  const [one] = germanUpdates([mk("a", names, times)], plan("1674", names, times, 4), 0);
+  assert.equal(one.cancelled, true, "ICE samo sa jednom stanicom = otkazan");
+  const [part] = germanUpdates([mk("b", names, times)], plan("1676", names, times, 3), 0);
+  assert.equal(part.cancelled, false, "deo puta vozi = nije otkazan");
+  const [full] = germanUpdates([mk("c", names, times)], plan("1678", names, times, 0), 0);
+  assert.equal(full.cancelled, false);
+}
 console.log("✔ Svi testovi su prošli");
