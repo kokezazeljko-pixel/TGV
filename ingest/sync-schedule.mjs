@@ -178,7 +178,20 @@ async function main() {
   if (!rows.length) throw new Error("Nijedan voz nije pronađen – baza nije menjana. Proveri ispis iznad (kategorije i vrste).");
 
   const db = supabaseRest();
-  for (const part of chunks(rows, 500)) await db.upsert("trains", part);
+
+  // Today's trains that already have live data are left alone. A reload during the day (manual "Run workflow",
+  // or the afternoon Swiss run) would otherwise reset their delays, and when the new timetable renamed the trips
+  // (Switzerland 2.11.2026) it deleted them and wrote new ones without live data: that day lost three quarters of its live trains.
+  const live = new Map(); // id -> row
+  for (let offset = 0; ; offset += 1000) {
+    const page = await db.select("trains", `select=id,number,dep&country=eq.${COUNTRY}&service_date=eq.${TODAY}&rt_updated_at=not.is.null&order=id&limit=1000&offset=${offset}`);
+    for (const r of page) live.set(r.id, r);
+    if (page.length < 1000) break;
+  }
+  const liveSlot = new Set([...live.values()].map((r) => `${r.number}|${r.dep}`));
+  const write = rows.filter((r) => r.service_date !== TODAY || (!live.has(r.id) && !liveSlot.has(`${r.number}|${r.dep}`)));
+  if (live.size) console.log(`Danas već ima podatke uživo: ${live.size} vozova – njih ne diramo (preskočeno redova: ${rows.length - write.length}).`);
+  for (const part of chunks(write, 500)) await db.upsert("trains", part);
 
   // Novi red vožnje može da promeni oznake vožnji (trip_id): brišemo stare redove za iste dane
   const fresh = new Set(rows.map((r) => r.id));
@@ -190,7 +203,7 @@ async function main() {
       old.push(...page.map((r) => r.id));
       if (page.length < 1000) break;
     }
-    const stale = old.filter((id) => !fresh.has(id));
+    const stale = old.filter((id) => !fresh.has(id) && !live.has(id));
     for (const part of chunks(stale, 80)) {
       await db.del("trains", `id=in.(${encodeURIComponent(part.map((id) => `"${id.replaceAll('"', "")}"`).join(","))})`);
       removed += part.length;
