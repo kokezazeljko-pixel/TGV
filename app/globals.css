@@ -659,3 +659,11 @@ textarea.input{resize:vertical;font:inherit}
 .tpstops th{font-weight:600;color:var(--muted);font-size:13px}
 .thead h1{margin:0;font-family:var(--f-display);font-size:36px;line-height:1.05;text-wrap:balance}
 .card p.small,.thead p.small{font-size:13.5px}
+/* punctuality table on /rekordi */
+.ptable{margin-top:18px}
+.ptable-wrap{overflow-x:auto}
+.ptable table{width:100%;border-collapse:collapse;font-size:15px;min-width:520px}
+.ptable th,.ptable td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+.ptable th{font-weight:600;color:var(--muted);font-size:13px}
+.ptable .num{text-align:right}
+.ptable .flag{vertical-align:-2px}

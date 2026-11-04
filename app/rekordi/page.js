@@ -7,6 +7,7 @@ import { useLang } from "@/components/LangProvider";
 import { LOCALES } from "@/lib/i18n";
 import { SCHEDULE_ONLY } from "@/lib/format";
 import { FF_CATS, loadFunFacts, ffDescribe, ffRange, ffShare } from "@/lib/funfacts";
+import PunctualityTable from "@/components/PunctualityTable";
 
 const COUNTRIES = ["all", "ch", "fr", "de", "at", "es", "pt", "be", "nl", "lu"]; // same order as the main page
 
@@ -57,6 +58,8 @@ export default function RecordsPage() {
 
       {data && SCHEDULE_ONLY.has(country) && <p className="notice">{t("ffSchedOnly", place)}</p>}
       {data && !lists.length && <p className="notice">{t("ffNone")}</p>}
+
+      <PunctualityTable country={country} t={t} lang={lang} />
 
       <div className="rec-grid">
         {lists.map((l) => (
