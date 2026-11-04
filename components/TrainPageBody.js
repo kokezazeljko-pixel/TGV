@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import TrainLive from "@/components/TrainLive";
+import ShareTrain from "@/components/ShareTrain";
 import { useLang } from "@/components/LangProvider";
 import { COUNTRY_NAME, TP, fill, shortName } from "@/lib/trainpage";
 
@@ -25,6 +26,7 @@ export default function TrainPageBody({ tr }) {
         <div>
           <h1>{n}</h1>
           <p>{shortName(tr.origin)} → {shortName(tr.destination)} · {tr.dep} – {tr.arr} · {(COUNTRY_NAME[lang] || COUNTRY_NAME.en)[tr.country] || tr.country}</p>
+          <ShareTrain country={tr.country} type={tr.type} number={tr.number} />
         </div>
       </div>
 

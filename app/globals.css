@@ -667,3 +667,26 @@ textarea.input{resize:vertical;font:inherit}
 .ptable th{font-weight:600;color:var(--muted);font-size:13px}
 .ptable .num{text-align:right}
 .ptable .flag{vertical-align:-2px}
+/* glowing "Share this train" button */
+.sharetrain{display:inline-flex;align-items:center;gap:10px;margin-top:12px;padding:9px 16px 9px 12px;border-radius:999px;border:0;cursor:pointer;
+  background:linear-gradient(135deg,#2f6fde,#7b4fe0);color:#fff;font:inherit;text-align:left;animation:stglow 2.4s ease-in-out infinite}
+.sharetrain:hover{filter:brightness(1.08)}
+.sharetrain .st-ico{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.22);font-size:17px;font-weight:700}
+.sharetrain .st-txt{display:flex;flex-direction:column;line-height:1.15}
+.sharetrain .st-txt b{font-size:15px}
+.sharetrain .st-txt small{font-size:12px;opacity:.85}
+@keyframes stglow{0%,100%{box-shadow:0 0 0 0 rgba(91,110,240,.55)}50%{box-shadow:0 0 0 9px rgba(91,110,240,0),0 0 22px 4px rgba(123,79,224,.45)}}
+@media (prefers-reduced-motion:reduce){.sharetrain{animation:none;box-shadow:0 0 0 3px rgba(91,110,240,.35)}}
+/* "What you can do here" on the main page */
+.features{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.features-head{display:flex;justify-content:space-between;align-items:center}
+.features-head h3{margin:0;font-family:var(--f-display);font-weight:600;font-size:19px}
+.features-x{border:0;background:transparent;color:var(--muted);font-size:22px;line-height:1;cursor:pointer;padding:2px 6px}
+.features-list{list-style:none;margin:10px 0 0;padding:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+@media (max-width:900px){.features-list{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:4px}.features-list li{flex:0 0 72%;scroll-snap-align:start}}
+.f-card{display:flex;gap:10px;align-items:flex-start;height:100%;box-sizing:border-box;padding:10px;border-radius:10px;background:var(--bg,transparent);border:1px solid var(--line);color:inherit;text-decoration:none}
+.f-card.link:hover{border-color:var(--accent)}
+.f-ico{font-size:22px;line-height:1}
+.f-txt{display:flex;flex-direction:column;gap:2px}
+.f-txt b{font-size:14.5px}
+.f-txt small{font-size:12.5px;color:var(--muted);line-height:1.35}

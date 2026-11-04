@@ -22,6 +22,7 @@ const DEFAULT_COUNTRY = "all"; // the server sends this view's trains with the p
 import { useLang } from "@/components/LangProvider";
 import { LOCALES } from "@/lib/i18n";
 import TrainMap, { PinShape } from "@/components/TrainMap";
+import Features from "@/components/Features";
 
 // "Paris-Est" = "Paris Est", "Paris Gare de Lyon Hall 1 - 2" = "Paris Gare de Lyon", but "Lyon Perrache" ≠ "Lyon Part-Dieu"
 const normName = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\bhall\b|\d+/g, " ").replace(/[^a-z]+/g, " ").trim();
@@ -323,6 +324,7 @@ export default function Board({ initialTrains, initialCounts, today, loadError }
       {stats.lastRt && <p className="muted" style={{ margin: "8px 0 0" }}>{t("updatedSrc", ago(stats.lastRt, t, lang), t("source_" + country))}</p>}
       {(loadError || loadErr) && <div className="notice"><b>{t("loadError")}</b> {loadError || loadErr}</div>}
       {SCHEDULE_ONLY.has(country) ? <SchedNotice country={country} /> : <AskBubble />}
+      <Features />
 
       <div className="filters">
         <div className="seg" role="group" aria-label={t("typeGroup")}>
