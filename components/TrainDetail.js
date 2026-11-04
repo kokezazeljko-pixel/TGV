@@ -11,6 +11,7 @@ import { useLang } from "@/components/LangProvider";
 import TrainMap from "@/components/TrainMap";
 import { getGeo } from "@/lib/geo";
 import { fetchAlertsForTrain } from "@/lib/queries";
+import { TP, trainPageHref } from "@/lib/trainpage";
 
 // The train's own country map, or all countries together when the trip leaves that country and the
 // all-countries map can place more of its stops (Roma–Salzburg: only the Austrian part is on any map, so the Austrian map)
@@ -171,6 +172,7 @@ export default function TrainDetail({ initialTrain }) {
         <div>
           <h2>{train.type} {train.number}</h2>
           <p>{train.origin} → {train.destination} · {t("departsArrives", train.dep, train.arr)}</p>
+          {/^\d+$/.test(train.number || "") && <p className="small"><Link href={trainPageHref(train.country || "fr", train.type, train.number)} prefetch={false}>{(TP[lang] || TP.en).trainPage}</Link></p>}
         </div>
       </div>
 

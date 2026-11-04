@@ -652,3 +652,10 @@ textarea.input{resize:vertical;font:inherit}
 .routechip .rc-x{flex:none;width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--fg);font-size:17px;line-height:1;cursor:pointer}
 .routechip .rc-x:hover{background:var(--fg);color:var(--surface)}
 @media (prefers-reduced-motion:reduce){#map .route-line{animation:none;stroke-dasharray:none;stroke-dashoffset:0}}
+/* lasting train pages (/train/…) */
+.tpweek,.tpstops{width:100%;border-collapse:collapse;font-size:15px}
+.tpweek td,.tpstops td,.tpstops th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left}
+.tpweek td.num,.tpstops td.num,.tpstops th.num{text-align:right;white-space:nowrap}
+.tpstops th{font-weight:600;color:var(--muted);font-size:13px}
+.thead h1{margin:0;font-family:var(--f-display);font-size:36px;line-height:1.05;text-wrap:balance}
+.card p.small,.thead p.small{font-size:13.5px}
