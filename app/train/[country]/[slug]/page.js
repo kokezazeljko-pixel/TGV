@@ -4,13 +4,12 @@ import { getServerClient, isConfigured } from "@/lib/supabase";
 import { COUNTRIES, PAGE_LANG, TP, fill, parseTrainSlug, typeSlug, trainPageHref, shortName } from "@/lib/trainpage";
 
 // One lasting page per train number, for search engines ("ICE 597 delay", "TGV 8702 retard").
-// Pages are made when first asked for and kept for 7 days (one Vercel "ISR write" per page per week);
-// today's delay is loaded in the browser (TrainLive), so it is always current.
+// Rendered on each visit (no ISR cache): with ~9,000 train pages and search engines crawling them, cached pages
+// used up Vercel's free ISR writes (200,000 a month) within days (4.11.2026). A render costs one function call
+// and two small database calls; today's delay is loaded in the browser (TrainLive), so it is always current.
 // The text is English (like the rest of the site) and follows the language the visitor picks;
 // the title also carries the search words of the train's country ("Verspätung heute").
-export const revalidate = 604800;
-export const dynamicParams = true;
-export async function generateStaticParams() { return []; }
+export const dynamic = "force-dynamic";
 
 async function load(country, slug) {
   if (!isConfigured || !COUNTRIES.includes(country)) return null;

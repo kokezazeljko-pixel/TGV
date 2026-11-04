@@ -4,8 +4,8 @@ import { COUNTRIES, parseTrainSlug, typeSlug, shortName } from "@/lib/trainpage"
 
 // Picture shown when a train page is shared (LinkedIn, WhatsApp, X…): average delay and one coloured bar per day
 // of the last 7 days. Only the colour of each day, never its minutes – the day-by-day delays stay a paid extra.
-// Made when first asked for and kept 7 days, like the page.
-export const revalidate = 604800;
+// Rendered on each request, like the page (no ISR writes); share sites fetch it once and keep their own copy.
+export const dynamic = "force-dynamic";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const alt = "Train punctuality over the last 7 days";
