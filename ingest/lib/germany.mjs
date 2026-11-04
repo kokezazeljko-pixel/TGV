@@ -47,6 +47,12 @@ export function deStopName(raw = "") {
   return s.replace(/\s*\(([^)]+)\)\s*/g, " ($1) ").replace(/\s+/g, " ").trim();
 }
 
+// gtfs.de names Erfurt Hbf only "Hauptbahnhof" (no town): named from its place
+export function deFixName(n, lat, lon) {
+  if (/^Hauptbahnhof\b/.test(n || "") && Math.abs(lat - 50.9725) < 0.02 && Math.abs(lon - 11.038) < 0.03) return "Erfurt Hbf";
+  return n;
+}
+
 // ---- minimal ZIP + CSV reading (works in Node and in Deno edge functions; inflateRaw is passed in)
 function unzip(buf, inflateRaw) {
   const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
@@ -149,7 +155,7 @@ export function buildGermanSchedule(zip, dates, inflateRaw, ring = null) {
       const r = stops.get(s.id) || {};
       const lat = parseFloat(r.stop_lat), lon = parseFloat(r.stop_lon);
       const pf = (r.platform_code || "").trim();
-      return { ...s, name: deStopName(r.stop_name) || s.id, time: hhmm(s.dep || s.arr), delay: 0,
+      return { ...s, name: deFixName(deStopName(r.stop_name), lat, lon) || s.id, time: hhmm(s.dep || s.arr), delay: 0,
         ...(Number.isFinite(lat) ? { lat: Math.round(lat * 1e4) / 1e4, lon: Math.round(lon * 1e4) / 1e4 } : {}),
         ...(/^[0-9]{1,3}[a-z]?$/i.test(pf) ? { pf: pf.toUpperCase() } : {}) };
     }));
