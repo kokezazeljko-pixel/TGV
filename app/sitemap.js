@@ -1,10 +1,13 @@
 import { SITE_URL } from "@/lib/site";
 import { getServerClient, isConfigured } from "@/lib/supabase";
 import { trainPageHref } from "@/lib/trainpage";
+import { routePageHref } from "@/lib/routepage";
+import { routeAddresses } from "@/lib/routes-server";
 
 // Sitemap for search engines: /sitemap.xml
 // The day pages (/voz/…) are left out on purpose: each one exists only for its travel day.
 // Instead every train number has a lasting page (/train/<country>/<type>-<number>), listed here.
+// So has every route of our trains (/route/<country>/<from>--<to>).
 // Rebuilt once a day (one Vercel "ISR write").
 export const revalidate = 86400;
 
@@ -27,5 +30,6 @@ export default async function sitemap() {
     { url: `${SITE_URL}/rekordi`, lastModified: new Date(), changeFrequency: "daily", priority: 0.7 },
     { url: `${SITE_URL}/privacy`, lastModified: new Date("2026-10-03"), changeFrequency: "yearly", priority: 0.3 },
     ...(await trainPages()),
+    ...(await routeAddresses()).map((r) => ({ url: `${SITE_URL}${routePageHref(r.country, r.origin, r.destination)}`, lastModified: new Date(r.last_day + "T12:00:00Z"), changeFrequency: "daily", priority: 0.6 })),
   ];
 }
