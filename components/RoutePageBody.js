@@ -72,7 +72,7 @@ export default function RoutePageBody({ r }) {
                 </tbody>
               </table>
             </div>
-            <p className="muted small">{L.note}</p>
+            <p className="muted small">{r.pair ? fill(L.noteAt, { d }) : L.note}</p>
           </section>
         </div>
       </div>
