@@ -1,6 +1,7 @@
 // Pushes files to the GitHub repo (kokezazeljko-pixel/TGV, branch main) as one commit, while the owner is away
 // from his laptop. The GitHub token lives in Vault (github_push_token, read through the service-role-only function
-// github_push_token()) and never leaves this function. Body: { message, files: [{ path, content } | { path, delete: true }],
+// github_push_token()) and never leaves this function. Body: { message, files: [{ path, content } | { path, edits: [{ old, new }] }
+// | { path, delete: true }],
 // expect_head?: sha } or { check: true }. With expect_head the push is refused if main has moved (no overwrites).
 // Auth: custom x-cron-token header checked against a Vault secret (verify_jwt is off on purpose).
 const URL_ = Deno.env.get("SUPABASE_URL")!, KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -41,7 +42,18 @@ Deno.serve(async (req) => {
     for (const f of files) {
       if (!f.path || String(f.path).startsWith("/") || String(f.path).includes("..")) return json({ error: `bad path ${f.path}` }, 400);
       if (f.delete) { tree.push({ path: f.path, mode: "100644", type: "blob", sha: null }); continue; }
-      const blob = await gh("/git/blobs", "POST", f.content_b64 != null ? { content: f.content_b64, encoding: "base64" } : { content: String(f.content ?? ""), encoding: "utf-8" });
+      let content = f.content;
+      if (Array.isArray(f.edits)) { // small changes: each old text must occur exactly once in the file as it is on main
+        const cur = await gh(`/contents/${encodeURI(f.path)}?ref=${head}`);
+        const bytes = Uint8Array.from(atob(String(cur.content).replace(/\n/g, "")), (c) => c.charCodeAt(0));
+        content = new TextDecoder().decode(bytes);
+        for (const e of f.edits) {
+          const n = content.split(e.old).length - 1;
+          if (n !== 1) return json({ error: `${f.path}: text found ${n} times, expected once`, old: String(e.old).slice(0, 120) }, 409);
+          content = content.replace(e.old, () => e.new);
+        }
+      }
+      const blob = await gh("/git/blobs", "POST", f.content_b64 != null ? { content: f.content_b64, encoding: "base64" } : { content: String(content ?? ""), encoding: "utf-8" });
       tree.push({ path: f.path, mode: "100644", type: "blob", sha: blob.sha });
     }
     const newTree = await gh("/git/trees", "POST", { base_tree: base, tree });
