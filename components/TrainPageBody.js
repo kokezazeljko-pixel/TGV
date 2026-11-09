@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
+import TrainMap from "@/components/TrainMap";
+import { getGeo } from "@/lib/geo";
 import TrainLive from "@/components/TrainLive";
 import ShareTrain from "@/components/ShareTrain";
 import { RP, routePageHref } from "@/lib/routepage";
@@ -9,6 +12,13 @@ import { COUNTRY_NAME, TP, fill, shortName } from "@/lib/trainpage";
 
 const SOURCE = { fr: "SNCF", ch: "opentransportdata.swiss", be: "SNCB / NMBS", nl: "NS / NDOV", lu: "CFL / mobiliteit.lu", es: "Renfe", pt: "CP", de: "Deutsche Bahn", at: "ÖBB / DB" };
 const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0);
+// The country map that shows the whole route (or the map of all countries for a train that leaves its own)
+const routeMapFor = (train) => {
+  const c = train.country || "fr", own = getGeo(c);
+  if (own.fitsTrain(train)) return c;
+  const placed = (g) => (train.stops || []).filter((s) => g.stopNode(s)).length;
+  return placed(getGeo("all")) > placed(own) ? "all" : c;
+};
 
 // The lasting train page in the site language the visitor chose (English first, like the rest of the site).
 // The server sends it in English, so that is also what search engines read.
@@ -19,6 +29,10 @@ export default function TrainPageBody({ tr }) {
   const w = tr.week;
   const stops = tr.stops || [];
   const loc = lang === "en" ? "en-GB" : lang;
+  // Route map: today's run when there is one (it also shows where the train is now), else the timetable's stops
+  const [live, setLive] = useState(null);
+  const mapTrain = live || { id: `page-${tr.country}-${tr.type}-${tr.number}`, country: tr.country, type: tr.type, number: tr.number, origin: tr.origin, destination: tr.destination, stops };
+  const canMap = stops.filter((s) => s.lat != null).length >= 2 || !!live;
 
   return (
     <>
@@ -34,7 +48,14 @@ export default function TrainPageBody({ tr }) {
 
       <div className="cols">
         <div className="col">
-          <TrainLive country={tr.country} type={tr.type} number={tr.number} lang={lang} />
+          <TrainLive country={tr.country} type={tr.type} number={tr.number} lang={lang} onTrain={setLive} />
+
+          {canMap && (
+            <section className="card">
+              <h3>{L.map}</h3>
+              <TrainMap key={mapTrain.id} country={routeMapFor(mapTrain)} trains={live ? [live] : []} highlight={mapTrain} compact />
+            </section>
+          )}
 
           <section className="card">
             <h3>{L.week}</h3>

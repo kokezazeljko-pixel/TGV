@@ -8,8 +8,8 @@ import { translate } from "@/lib/i18n";
 import { TP, fill } from "@/lib/trainpage";
 
 // Today's run of one train on its search-engine page: loaded in the browser, so the page itself can stay
-// cached for days while the delay shown is always the live one.
-export default function TrainLive({ country, type, number, lang }) {
+// cached for days while the delay shown is always the live one. onTrain hands that run to the page (for its map).
+export default function TrainLive({ country, type, number, lang, onTrain }) {
   const L = TP[lang] || TP.en;
   const t = (k, ...a) => translate(lang === "pt" ? "es" : lang, k, ...a);
   const [state, setState] = useState({ loading: true, train: null });
@@ -30,7 +30,9 @@ export default function TrainLive({ country, type, number, lang }) {
         const m = stopMins(r.stops);
         return m.length && serviceMin(r, now) <= m[m.length - 1] + (r.delay_min || 0) + 30;
       });
-      setState({ loading: false, train: running || rows.find((r) => r.service_date === days[1]) || null });
+      const train = running || rows.find((r) => r.service_date === days[1]) || null;
+      setState({ loading: false, train });
+      onTrain?.(train);
     };
     load();
     const id = setInterval(load, 60000);
