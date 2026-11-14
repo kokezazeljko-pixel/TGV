@@ -6,8 +6,9 @@ export const NL_TRAINS_URL = "https://gtfs.ovapi.nl/nl/trainUpdates.pb";
 // OVapi asks clients to identify themselves
 export const NL_HEADERS = { "User-Agent": "TrainPunctuality/1.0 (+https://www.trainpunctuality.com)" };
 
-// Railway companies kept: NS, NS International, European Sleeper and the Keolis intercity Zwolle–Enschede
-const NL_AGENCIES = new Set(["IFF:NS", "IFF:NS_INT", "IFF:EU_SLEEPER", "IFF:BLAUWNET_K"]);
+// Railway companies kept: NS, NS International, European Sleeper and the Keolis/Blauwnet intercity Zwolle–Enschede.
+// The feed renamed them in November 2026 (IFF:NS -> NS, IFF:NS_INT -> NSI, IFF:BLAUWNET_K -> BN): both are kept.
+const NL_AGENCIES = new Set(["IFF:NS", "IFF:NS_INT", "IFF:EU_SLEEPER", "IFF:BLAUWNET_K", "NS", "NSI", "BN"]);
 // routes.txt route_short_name -> train type on the site (Sprinter, buses, metro replacements are left out)
 const NL_CATS = [
   [/^intercity direct$/i, "ICD"],
@@ -21,6 +22,7 @@ const NL_CATS = [
 export function detectDutchType(route = {}) {
   if (String(route.route_type) !== "2" || !NL_AGENCIES.has(route.agency_id)) return null;
   const name = (route.route_short_name || "").trim();
+  if (route.agency_id === "BN") return /^IC\s?\d*$/i.test(name) ? "IC" : null; // Blauwnet: only its intercity ("IC23"), not its stopping trains
   for (const [re, type] of NL_CATS) if (re.test(name)) return type;
   return null;
 }

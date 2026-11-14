@@ -142,6 +142,12 @@ assert.equal(n2.stops[0].pf, "10A"); assert.equal(n2.stops[3].pf, undefined); as
   assert.equal(detectDutchType({ agency_id: "IFF:NS_INT", route_short_name: "Eurocity Direct", route_type: "2" }), "ECD");
   assert.equal(detectDutchType({ agency_id: "IFF:NS", route_short_name: "Drempelvrije bus", route_type: "2" }), null);
   assert.equal(detectDutchType({ agency_id: "IFF:BLAUWNET_K", route_short_name: "Intercity IC23", route_type: "2" }), "IC");
+  // agency ids since November 2026
+  assert.equal(detectDutchType({ agency_id: "NS", route_short_name: "Intercity", route_type: "2" }), "IC");
+  assert.equal(detectDutchType({ agency_id: "NS", route_short_name: "Sprinter", route_type: "2" }), null);
+  assert.equal(detectDutchType({ agency_id: "NSI", route_short_name: "EuroCity", route_type: "2" }), "EC");
+  assert.equal(detectDutchType({ agency_id: "BN", route_short_name: "IC23", route_type: "2" }), "IC");
+  assert.equal(detectDutchType({ agency_id: "BN", route_short_name: "RS23", route_type: "2" }), null);
 }
 run("sync-realtime.mjs", { COUNTRY: "nl", RT_FILE: join(dir, "feed-nl.pb"), TRAINS_FILE: join(dir, "trains-nl.json"), NOW: now, OUT_FILE: join(dir, "updates-nl.json") });
 const upnl = JSON.parse(readFileSync(join(dir, "updates-nl.json"), "utf8"));
