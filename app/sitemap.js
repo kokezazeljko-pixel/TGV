@@ -10,6 +10,9 @@ import { routeAddresses } from "@/lib/routes-server";
 // So has every route of our trains (/route/<country>/<from>--<to>).
 // Rebuilt once a day (one Vercel "ISR write").
 export const revalidate = 86400;
+// Countries without live data yet (Portugal: timetable only) stay out: their pages still work, but search engines
+// see them as thin and spend their time better on the others.
+const NO_LIVE = new Set(["pt"]);
 
 async function trainPages() {
   if (!isConfigured) return [];
@@ -21,7 +24,7 @@ async function trainPages() {
     data.push(...part);
     if (part.length < 1000) break;
   }
-  return data.map((r) => ({ url: `${SITE_URL}${trainPageHref(r.country, r.type, r.number)}`, lastModified: new Date(r.last_day + "T12:00:00Z"), changeFrequency: "daily", priority: 0.6 }));
+  return data.filter((r) => !NO_LIVE.has(r.country)).map((r) => ({ url: `${SITE_URL}${trainPageHref(r.country, r.type, r.number)}`, lastModified: new Date(r.last_day + "T12:00:00Z"), changeFrequency: "daily", priority: 0.6 }));
 }
 
 export default async function sitemap() {
@@ -30,6 +33,6 @@ export default async function sitemap() {
     { url: `${SITE_URL}/rekordi`, lastModified: new Date(), changeFrequency: "daily", priority: 0.7 },
     { url: `${SITE_URL}/privacy`, lastModified: new Date("2026-10-03"), changeFrequency: "yearly", priority: 0.3 },
     ...(await trainPages()),
-    ...(await routeAddresses()).map((r) => ({ url: `${SITE_URL}${routePageHref(r.country, r.origin, r.destination)}`, lastModified: new Date(r.last_day + "T12:00:00Z"), changeFrequency: "daily", priority: 0.6 })),
+    ...(await routeAddresses()).filter((r) => !NO_LIVE.has(r.country)).map((r) => ({ url: `${SITE_URL}${routePageHref(r.country, r.origin, r.destination)}`, lastModified: new Date(r.last_day + "T12:00:00Z"), changeFrequency: "daily", priority: 0.6 })),
   ];
 }
