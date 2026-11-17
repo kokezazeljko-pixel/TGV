@@ -5,6 +5,7 @@ import { useLang } from "@/components/LangProvider";
 import { LOCALES } from "@/lib/i18n";
 import { COUNTRY_NAME, fill, shortName, trainPageHref } from "@/lib/trainpage";
 import { RP } from "@/lib/routepage";
+import { SP, stationName } from "@/lib/stationpage";
 
 const pct = (a, b) => (b ? Math.round((100 * a) / b) : null);
 
@@ -25,6 +26,10 @@ export default function RoutePageBody({ r }) {
           <h1>{o} → {d}</h1>
           <p>{fill(L.sub, { n: trains.length })} · {(COUNTRY_NAME[lang] || COUNTRY_NAME.en)[r.country] || r.country}
             {r.back && <> · <Link href={r.back} prefetch={false}>{L.back} ⇄</Link></>}</p>
+          {(r.links?.[r.origin] || r.links?.[r.destination]) && (
+            <p className="small">{(SP[lang] || SP.en).station}: {[r.origin, r.destination].filter((x) => r.links?.[x]).map((x, i) => (
+              <span key={x}>{i > 0 && " · "}<Link href={r.links[x]} prefetch={false}>{stationName(x)}</Link></span>))}</p>
+          )}
         </div>
       </div>
 

@@ -4,6 +4,7 @@ import { getServerClient } from "@/lib/supabase";
 import { COUNTRIES, PAGE_LANG, fill, shortName } from "@/lib/trainpage";
 import { RP, routePageHref } from "@/lib/routepage";
 import { findRoute } from "@/lib/routes-server";
+import { stationLinks } from "@/lib/stations-server";
 
 // One lasting page per route (origin → destination of our trains, or a pair of busy stations on the way),
 // for searches like "Paris Lyon train delay".
@@ -20,7 +21,8 @@ async function load(country, slug) {
     : await sb.rpc("route_page_info", { p_country: country, p_origin: r.origin, p_destination: r.destination });
   if (!data) return null;
   const back = await findRoute(country, slug.split("--").reverse().join("--"));
-  return { ...data, back: back ? routePageHref(country, back.origin, back.destination) : null };
+  const links = await stationLinks(country, [data.origin, data.destination]); // stations that have their own page
+  return { ...data, back: back ? routePageHref(country, back.origin, back.destination) : null, links };
 }
 
 export async function generateMetadata({ params }) {

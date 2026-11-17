@@ -85,7 +85,7 @@ export default function TrainPageBody({ tr }) {
             <table className="tpstops">
               <thead><tr><th>{L.station}</th><th className="num">{L.time}</th></tr></thead>
               <tbody>
-                {stops.map((s, i) => <tr key={i}><td>{s.name}</td><td className="num">{s.time}</td></tr>)}
+                {stops.map((s, i) => <tr key={i}><td>{tr.links?.[s.name] ? <Link href={tr.links[s.name]} prefetch={false}>{s.name}</Link> : s.name}</td><td className="num">{s.time}</td></tr>)}
               </tbody>
             </table>
             <p className="muted small">{fill(L.source, { s: SOURCE[tr.country] || "" })}</p>

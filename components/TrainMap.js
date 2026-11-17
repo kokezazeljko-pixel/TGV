@@ -24,7 +24,7 @@ const maxZoom = (c) => MAX_ZOOM[c] || 10;
 const SEL_ZOOM = { all: 16, de: 10, es: 10, fr: 9 };
 
 // onExpand (route view on the train page): a click on the small map, or the ⛶ button, opens it large; big = shown in that large window
-export default function TrainMap({ country = "fr", trains, onTrainClick, onStationClick, onClearStation, routeHi, onClearRoute, selectedStation, highlight, onRunning, compact, onExpand, onFull, big }) {
+export default function TrainMap({ country = "fr", trains, onTrainClick, onStationClick, onClearStation, routeHi, onClearRoute, selectedStation, reachBoth, highlight, onRunning, compact, onExpand, onFull, big }) {
   const { t } = useLang();
   // Map look chosen by the visitor (Classic / Dark), remembered in this browser
   const [mapStyle, setMapStyle] = useState("classic");
@@ -68,7 +68,7 @@ export default function TrainMap({ country = "fr", trains, onTrainClick, onStati
   const hlPaths = useMemo(() => (highlight ? trainRoute(highlight) : []), [highlight]);
   // A selected station lights up the network it reaches directly: the colour runs out from it along the tracks
   // its trains take, and every station they stop at lights up when the colour gets there (lib/reach.js)
-  const reach = useMemo(() => (!compact && selectedStation ? reachOnMap(country, trains, selectedStation) : null), [compact, country, trains, selectedStation]);
+  const reach = useMemo(() => (!compact && selectedStation ? reachOnMap(country, trains, selectedStation, !!reachBoth) : null), [compact, country, trains, selectedStation, reachBoth]);
   const REACH_S = 2.6; // seconds until the farthest station is reached
   // A route chosen in the records (fun facts): drawn along a real train's path, the map zooms onto it
   const route = useMemo(() => (!compact && routeHi ? routeOnMap(country, trains, routeHi.a, routeHi.b) : null), [compact, country, trains, routeHi]);

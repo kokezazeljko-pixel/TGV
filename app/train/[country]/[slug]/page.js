@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import TrainPageBody from "@/components/TrainPageBody";
 import { getServerClient, isConfigured } from "@/lib/supabase";
 import { COUNTRIES, PAGE_LANG, TP, fill, parseTrainSlug, typeSlug, trainPageHref, shortName } from "@/lib/trainpage";
+import { stationLinks } from "@/lib/stations-server";
 
 // One lasting page per train number, for search engines ("ICE 597 delay", "TGV 8702 retard").
 // Rendered on each visit (no ISR cache): with ~9,000 train pages and search engines crawling them, cached pages
@@ -20,7 +21,8 @@ async function load(country, slug) {
   const row = (info || []).find((r) => typeSlug(r.type) === p.type);
   if (!row) return null;
   const { data: week } = await sb.rpc("train_week_summary", { p_country: country, p_type: row.type, p_number: p.number });
-  return { ...row, number: p.number, country, week: (week || [])[0] || null };
+  const links = await stationLinks(country, (row.stops || []).map((s) => s.name)); // stations that have their own page
+  return { ...row, number: p.number, country, week: (week || [])[0] || null, links };
 }
 
 export async function generateMetadata({ params }) {
