@@ -21,7 +21,7 @@ async function load(country, slug) {
   const row = (info || []).find((r) => typeSlug(r.type) === p.type);
   if (!row) return null;
   const { data: week } = await sb.rpc("train_week_summary", { p_country: country, p_type: row.type, p_number: p.number });
-  const links = await stationLinks(country, (row.stops || []).map((s) => s.name)); // stations that have their own page
+  const links = await stationLinks(country, row.stops || []); // stations that have their own page
   return { ...row, number: p.number, country, week: (week || [])[0] || null, links };
 }
 
