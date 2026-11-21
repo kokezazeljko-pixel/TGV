@@ -8,7 +8,7 @@ import TrainLive from "@/components/TrainLive";
 import ShareTrain from "@/components/ShareTrain";
 import { RP, routePageHref } from "@/lib/routepage";
 import { useLang } from "@/components/LangProvider";
-import { COUNTRY_NAME, TP, fill, shortName } from "@/lib/trainpage";
+import { COUNTRY_NAME, TP, fill, shortName, trainPageHref } from "@/lib/trainpage";
 
 const SOURCE = { fr: "SNCF", ch: "opentransportdata.swiss", be: "SNCB / NMBS", nl: "NS / NDOV", lu: "CFL / mobiliteit.lu", es: "Renfe", pt: "CP", de: "Deutsche Bahn", at: "ÖBB / DB" };
 const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0);
@@ -45,6 +45,13 @@ export default function TrainPageBody({ tr }) {
           <ShareTrain country={tr.country} type={tr.type} number={tr.number} />
         </div>
       </div>
+      {tr.successor && (
+        // this number stopped running and the same departure now runs under another number (lib train_successor)
+        <section className="card" style={{ borderLeft: "4px solid var(--warn)", marginTop: 12 }}>
+          <p style={{ margin: 0 }}>{fill(L.renamed, { d: new Date(tr.successor.first_day + "T12:00:00Z").toLocaleDateString(loc, { day: "numeric", month: "long" }), n: `${tr.successor.type} ${tr.successor.number}` })}{" "}
+            <Link href={trainPageHref(tr.country, tr.successor.type, tr.successor.number)} prefetch={false}><b>{tr.successor.type} {tr.successor.number} →</b></Link></p>
+        </section>
+      )}
 
       <div className="cols">
         <div className="col">

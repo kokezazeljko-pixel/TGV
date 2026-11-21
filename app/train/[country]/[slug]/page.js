@@ -22,7 +22,9 @@ async function load(country, slug) {
   if (!row) return null;
   const { data: week } = await sb.rpc("train_week_summary", { p_country: country, p_type: row.type, p_number: p.number });
   const links = await stationLinks(country, row.stops || []); // stations that have their own page
-  return { ...row, number: p.number, country, week: (week || [])[0] || null, links };
+  // a number that stopped running while the same departure goes on under another number (ICE 1254 → ICE 224, 17.11.2026)
+  const { data: successor } = await sb.rpc("train_successor", { p_country: country, p_type: row.type, p_number: p.number });
+  return { ...row, number: p.number, country, week: (week || [])[0] || null, links, successor: successor || null };
 }
 
 export async function generateMetadata({ params }) {
