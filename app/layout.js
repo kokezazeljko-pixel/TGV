@@ -12,12 +12,14 @@ const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["500", "700"], variab
 
 export const metadata = {
   metadataBase: new URL(SITE_URL),
-  title: { default: "Train Punctuality – live delays of high-speed and long-distance trains in Europe", template: "%s · Train Punctuality" },
+  // home page in search results: Google shows ~60 characters of the title and ~155 of the description (21.11.2026:
+  // 246 impressions, 1.2 % clicks with the long title); every other page sets its own title
+  title: { default: "Live Train Delays in Europe – TGV, ICE, AVE, Eurostar", template: "%s · Train Punctuality" },
   applicationName: "Train Punctuality", // the name a browser shows when the site is saved or installed
   appleWebApp: { title: "Train Punctuality" },
-  description: "How late is your train in France (TGV), Switzerland (IC, IR, EC), Belgium (IC, EC) the Netherlands (NS Intercity, ICE, Eurostar) Luxembourg (CFL), Germany (ICE, IC), Austria (Railjet, IC, Nightjet), Spain (AVE, Alvia) and Portugal (Alfa Pendular, Intercidades), and what passengers on board are saying. Zugverspätungen und Berichte von Reisenden. Retards des trains et avis des voyageurs. Treinvertragingen en meldingen van reizigers.",
+  description: "Is your train late? Live delays and 7-day punctuality of every TGV, ICE, AVE, Eurostar and Intercity in 9 European countries, on a live map.",
   alternates: { canonical: "/" },
-  openGraph: { title: "Train Punctuality – live delays of high-speed and long-distance trains in Europe", description: "Live delays of high-speed and long-distance trains in France, Switzerland, Belgium, the Netherlands, Luxembourg, Germany, Austria, Spain and Portugal and reports from passengers on board.", url: "/", siteName: "Train Punctuality", type: "website" },
+  openGraph: { title: "Live Train Delays in Europe – TGV, ICE, AVE, Eurostar · Train Punctuality", description: "Live delays of high-speed and long-distance trains in France, Switzerland, Belgium, the Netherlands, Luxembourg, Germany, Austria, Spain and Portugal and reports from passengers on board.", url: "/", siteName: "Train Punctuality", type: "website" },
 };
 
 export const viewport = { themeColor: "#16233f" };
