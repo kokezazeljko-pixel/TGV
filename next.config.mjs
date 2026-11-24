@@ -10,7 +10,7 @@ const nextConfig = {
   async headers() {
     return [
       { source: "/train/:country/:slug", headers: cdn(3600, 86400) },
-      { source: "/train/:country/:slug/opengraph-image:rest*", headers: cdn(86400, 86400) },
+      { source: "/train/:country/:slug/:image", headers: cdn(86400, 86400) }, // the share picture (opengraph-image…), the only address below a train page
       { source: "/route/:country/:slug", headers: cdn(3600, 86400) },
       { source: "/station/:country/:slug", headers: cdn(600, 3600) }, // today's departures are on the page
     ];
