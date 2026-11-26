@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { getServerClient, isConfigured } from "@/lib/supabase";
 import { COUNTRIES, parseTrainSlug, typeSlug, shortName } from "@/lib/trainpage";
+import { rpcStrict } from "@/lib/rpc";
 
 // Picture shown when a train page is shared (LinkedIn, WhatsApp, X…): average delay and one coloured bar per day
 // of the last 7 days. Only the colour of each day, never its minutes – the day-by-day delays stay a paid extra.
@@ -19,7 +20,7 @@ async function load(country, slug) {
   const p = parseTrainSlug(slug);
   if (!p) return null;
   const sb = getServerClient();
-  const { data: info } = await sb.rpc("train_page_info", { p_country: country, p_number: p.number });
+  const info = await rpcStrict(sb, "train_page_info", { p_country: country, p_number: p.number }); // a failed call is a 5xx, not "Not found"
   const row = (info || []).find((r) => typeSlug(r.type) === p.type);
   if (!row) return null;
   const args = { p_country: country, p_type: row.type, p_number: p.number };

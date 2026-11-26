@@ -4,6 +4,7 @@ import { getServerClient } from "@/lib/supabase";
 import { COUNTRIES, PAGE_LANG, fill } from "@/lib/trainpage";
 import { SP, stationName, stationPageHref } from "@/lib/stationpage";
 import { findStation } from "@/lib/stations-server";
+import { rpcStrict } from "@/lib/rpc";
 
 // One lasting page per busy station (about 10 trains a day or more), for searches like "Köln Hbf Verspätung".
 // Rendered on each visit (no ISR cache, so no Vercel "ISR writes"): today's trains with their delays at that moment.
@@ -21,7 +22,7 @@ async function load(country, slug) {
   if (!COUNTRIES.includes(country)) return null;
   const s = await findStation(country, slug);
   if (!s) return null;
-  const { data } = await getServerClient().rpc("station_info", { p_country: country, p_name: s.name });
+  const data = await rpcStrict(getServerClient(), "station_info", { p_country: country, p_name: s.name }); // a failed call is a 5xx, not "Not found"
   if (!data) return null;
   return { ...data, now: clock(country) };
 }
